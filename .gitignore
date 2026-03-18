@@ -1,0 +1,7 @@
+.build/
+EACCSMonitor.app/
+__pycache__/
+.venv/
+*.pyc
+.swiftpm/
+.DS_Store
