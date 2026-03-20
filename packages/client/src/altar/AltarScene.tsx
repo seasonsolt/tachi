@@ -81,6 +81,7 @@ function TokenHero() {
           lineHeight: 1,
           transition: 'color 1s ease, text-shadow 1s ease',
           letterSpacing: '-0.02em',
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
         {displayValue}

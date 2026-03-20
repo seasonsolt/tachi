@@ -115,6 +115,21 @@ const globalStyles = `
     opacity: 0.8 !important;
   }
 
+  /* Focus visible for keyboard accessibility */
+  button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--fire-core);
+    outline-offset: 2px;
+  }
+
+  /* Reduced motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    .fire-particle, * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
   /* Range slider styling */
   input[type="range"] {
     -webkit-appearance: none;
@@ -176,8 +191,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   setupButton: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: 8,
+    right: 8,
     background: 'none',
     border: 'none',
     color: 'var(--text-muted)',
@@ -185,7 +200,12 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     opacity: 0.4,
     zIndex: 10,
-    padding: 8,
+    padding: 12,
+    minWidth: 44,
+    minHeight: 44,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     transition: 'opacity 0.3s',
   },
 };
