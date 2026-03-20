@@ -42,7 +42,8 @@ function emptySource(): SourceData {
   };
 }
 
-function parseStats(raw: string): SourceData {
+/** @internal exported for testing */
+export function parseStats(raw: string): SourceData {
   const stats: ClaudeCodeStats = JSON.parse(raw);
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
