@@ -1,0 +1,30 @@
+{
+  "name": "ritual-screen",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "ritual-screen": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ritual-screen/shared": "workspace:*",
+    "chokidar": "^4.0.0",
+    "hono": "^4.7.0",
+    "@hono/node-server": "^1.14.0",
+    "ws": "^8.18.0",
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
