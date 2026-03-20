@@ -105,7 +105,7 @@ export type MilestoneEffect =
 
 // === Theme ===
 
-export type ThemeName = 'ancient' | 'cyber';
+export type ThemeName = 'ancient' | 'cyber' | 'cyberpunk' | 'synthwave' | 'matrix' | 'blood';
 
 export interface Theme {
   name: ThemeName;
