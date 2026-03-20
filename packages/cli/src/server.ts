@@ -149,6 +149,9 @@ export function startServer(port: number): { close: () => void } {
     '.ico': 'image/x-icon',
     '.woff': 'font/woff',
     '.woff2': 'font/woff2',
+    '.mp3': 'audio/mpeg',
+    '.ogg': 'audio/ogg',
+    '.wav': 'audio/wav',
   };
 
   app.get('/*', (c) => {

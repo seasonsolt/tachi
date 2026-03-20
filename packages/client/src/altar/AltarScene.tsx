@@ -1,79 +1,52 @@
-import { useRef, useMemo, useEffect } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
-import * as THREE from 'three';
+import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useStore } from '../stores/store';
 import { useTokenData } from '../hooks/useTokenData';
-import { THEMES, formatTokenCount } from '@ritual-screen/shared';
-import { ParticlePool } from './ParticleSystem';
+import { THEMES, formatTokenCount, formatUSD } from '@ritual-screen/shared';
 
-const MAX_PARTICLES = 1000;
-const MIN_PARTICLES = 500;
-
-function Particles() {
+// CSS-based particle system — works everywhere, no WebGL needed
+function CSSParticles() {
   const theme = useStore((s) => s.theme);
   const { tokensPerSecond, hasData } = useTokenData();
   const t = THEMES[theme];
+  const count = hasData ? Math.min(40 + Math.floor(tokensPerSecond / 5), 120) : 25;
 
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const { viewport } = useThree();
-
-  const pool = useMemo(
-    () => new ParticlePool(MAX_PARTICLES, viewport.width, viewport.height),
-    [],
-  );
-
-  useEffect(() => {
-    pool.resize(viewport.width, viewport.height);
-  }, [viewport.width, viewport.height, pool]);
-
-  const dummy = useMemo(() => new THREE.Object3D(), []);
-  const color = useMemo(() => new THREE.Color(), []);
-
-  useFrame((_, delta) => {
-    if (!meshRef.current || document.hidden) return;
-
-    const rate = hasData ? Math.min(tokensPerSecond, 500) : 10;
-    const count = Math.floor(
-      MIN_PARTICLES + (rate / 500) * (MAX_PARTICLES - MIN_PARTICLES),
-    );
-    pool.setActiveCount(count);
-    pool.update(delta * 1000);
-
-    const active = pool.getActiveCount();
-    for (let i = 0; i < MAX_PARTICLES; i++) {
-      const p = pool.particles[i];
-      if (i >= active) {
-        dummy.position.set(0, -999, 0);
-        dummy.scale.set(0, 0, 0);
-      } else {
-        dummy.position.set(p.x, p.y, p.z);
-        const s = p.size * (0.5 + p.opacity * 0.5);
-        dummy.scale.set(s, s, s);
-      }
-      dummy.updateMatrix();
-      meshRef.current.setMatrixAt(i, dummy.matrix);
-
-      color.set(t.particleColor);
-      if (i < active) {
-        meshRef.current.setColorAt(i, color);
-      }
-    }
-    meshRef.current.instanceMatrix.needsUpdate = true;
-    if (meshRef.current.instanceColor) {
-      meshRef.current.instanceColor.needsUpdate = true;
-    }
-  });
+  const particles = useMemo(() => {
+    return Array.from({ length: 120 }, (_, i) => {
+      const duration = 3 + Math.random() * 5;
+      const delay = Math.random() * duration;
+      const x = 30 + Math.random() * 40; // 30-70% horizontal
+      const size = 2 + Math.random() * 4;
+      const drift = (Math.random() - 0.5) * 20;
+      return { id: i, duration, delay, x, size, drift };
+    });
+  }, []);
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_PARTICLES]}>
-      <sphereGeometry args={[1, 6, 6]} />
-      <meshBasicMaterial transparent opacity={0.8} toneMapped={false} />
-    </instancedMesh>
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+      {particles.slice(0, count).map((p) => (
+        <div
+          key={p.id}
+          className="fire-particle"
+          style={{
+            position: 'absolute',
+            left: `${p.x}%`,
+            bottom: '15%',
+            width: p.size,
+            height: p.size,
+            borderRadius: '50%',
+            background: t.fireCore,
+            boxShadow: `0 0 ${p.size * 2}px ${t.fireCore}, 0 0 ${p.size * 4}px ${t.fireEdge}`,
+            animation: `particleRise ${p.duration}s ease-out ${p.delay}s infinite`,
+            opacity: 0,
+            ['--drift' as string]: `${p.drift}px`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
-function TokenOverlay() {
+function TokenHero() {
   const tokenData = useStore((s) => s.tokenData);
   const theme = useStore((s) => s.theme);
   const milestone = useStore((s) => s.milestone);
@@ -84,85 +57,136 @@ function TokenOverlay() {
     ? formatTokenCount(tokenData.totalTokens)
     : '—';
 
+  const costDisplay = tokenData && tokenData.totalCostUSD > 0
+    ? formatUSD(tokenData.totalCostUSD)
+    : null;
+
   const subtitle = !wsConnected
     ? 'Connection lost'
     : !tokenData
       ? 'Begin your offering.'
       : null;
 
+  const isWide = typeof window !== 'undefined' && window.innerWidth >= 1280;
+
   return (
-    <Html center style={{ pointerEvents: 'none', userSelect: 'none' }}>
-      <div style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+    <div style={heroStyles.container}>
+      <div
+        style={{
+          fontFamily: t.dataFont,
+          fontSize: isWide ? 96 : 72,
+          fontWeight: 300,
+          color: t.textPrimary,
+          textShadow: `0 0 40px ${t.accentGlow}, 0 0 80px ${t.accentGlow}, 0 0 120px ${t.accentGlow}`,
+          lineHeight: 1,
+          transition: 'color 1s ease, text-shadow 1s ease',
+          letterSpacing: '-0.02em',
+        }}
+      >
+        {displayValue}
+      </div>
+      {costDisplay && (
         <div
           style={{
             fontFamily: t.dataFont,
-            fontSize: window.innerWidth >= 1280 ? 96 : 72,
-            fontWeight: 300,
-            color: t.textPrimary,
-            textShadow: `0 0 40px ${t.accentGlow}, 0 0 80px ${t.accentGlow}`,
-            lineHeight: 1,
-            transition: 'color 1s ease',
+            fontSize: 20,
+            color: t.textSecondary,
+            marginTop: 12,
+            opacity: 0.6,
+            letterSpacing: '0.05em',
           }}
         >
-          {displayValue}
+          {costDisplay}
         </div>
-        {subtitle && (
-          <div
-            style={{
-              fontFamily: t.scriptureFont,
-              fontSize: 16,
-              color: !wsConnected ? '#ff4444' : t.textMuted,
-              marginTop: 16,
-              opacity: 0.8,
-            }}
-          >
-            {subtitle}
-          </div>
-        )}
-        {milestone && (
-          <div
-            style={{
-              fontFamily: t.scriptureFont,
-              fontSize: 18,
-              color: t.fireCore,
-              marginTop: 12,
-              opacity: 0.9,
-              textShadow: `0 0 20px ${t.accentGlow}`,
-            }}
-          >
-            {milestone.nameZh} — {milestone.name}
-          </div>
-        )}
-      </div>
-    </Html>
-  );
-}
-
-export function AltarScene() {
-  const theme = useStore((s) => s.theme);
-  const t = THEMES[theme];
-
-  return (
-    <div style={styles.container}>
-      <Canvas
-        camera={{ position: [0, 2, 8], fov: 50 }}
-        style={{ background: 'transparent' }}
-        gl={{ alpha: true, antialias: true }}
-      >
-        <color attach="background" args={[t.bg]} />
-        <ambientLight intensity={0.2} />
-        <pointLight position={[0, 5, 0]} intensity={1} color={t.fireCore} />
-        <Particles />
-        <TokenOverlay />
-      </Canvas>
+      )}
+      {subtitle && (
+        <div
+          style={{
+            fontFamily: t.scriptureFont,
+            fontSize: 18,
+            color: !wsConnected ? '#ff4444' : t.textMuted,
+            marginTop: 20,
+            opacity: 0.8,
+            fontStyle: 'italic',
+          }}
+        >
+          {subtitle}
+        </div>
+      )}
+      {milestone && (
+        <div
+          style={{
+            fontFamily: t.scriptureFont,
+            fontSize: 20,
+            color: t.fireCore,
+            marginTop: 16,
+            textShadow: `0 0 20px ${t.accentGlow}`,
+            animation: 'milestoneGlow 2s ease-in-out infinite',
+          }}
+        >
+          {milestone.nameZh} — {milestone.name}
+        </div>
+      )}
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+function GlowOverlay() {
+  const milestone = useStore((s) => s.milestone);
+  const theme = useStore((s) => s.theme);
+  const t = THEMES[theme];
+  const [glowing, setGlowing] = useState(false);
+
+  useEffect(() => {
+    if (milestone && (milestone.effect === 'screen_glow' || milestone.effect === 'flash')) {
+      setGlowing(true);
+      const timer = setTimeout(() => setGlowing(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [milestone]);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        background: `radial-gradient(ellipse at 50% 55%, ${t.accentGlow} 0%, transparent 60%)`,
+        opacity: glowing ? 0.8 : 0.25,
+        transition: 'opacity 2s ease',
+        zIndex: 1,
+      }}
+    />
+  );
+}
+
+export function AltarScene() {
+  return (
+    <div style={altarStyles.container}>
+      <GlowOverlay />
+      <CSSParticles />
+      <TokenHero />
+    </div>
+  );
+}
+
+const heroStyles: Record<string, React.CSSProperties> = {
+  container: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    textAlign: 'center',
+    zIndex: 5,
+    pointerEvents: 'none',
+    userSelect: 'none',
+  },
+};
+
+const altarStyles: Record<string, React.CSSProperties> = {
   container: {
     width: '100%',
-    height: '65vh',
+    height: '70vh',
     position: 'relative',
   },
 };

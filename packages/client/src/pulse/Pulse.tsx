@@ -1,6 +1,31 @@
+import { useRef, useEffect, useState } from 'react';
 import { useStore } from '../stores/store';
 import { useTokenData } from '../hooks/useTokenData';
 import { THEMES } from '@ritual-screen/shared';
+
+function AnimatedValue({ value, style }: { value: string; style?: React.CSSProperties }) {
+  const [display, setDisplay] = useState(value);
+  const [fading, setFading] = useState(false);
+  const prevRef = useRef(value);
+
+  useEffect(() => {
+    if (value !== prevRef.current) {
+      setFading(true);
+      const t = setTimeout(() => {
+        setDisplay(value);
+        setFading(false);
+        prevRef.current = value;
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, [value]);
+
+  return (
+    <span style={{ ...style, opacity: fading ? 0.4 : 1, transition: 'opacity 0.15s ease' }}>
+      {display}
+    </span>
+  );
+}
 
 export function Pulse() {
   const theme = useStore((s) => s.theme);
@@ -17,21 +42,21 @@ export function Pulse() {
     <div style={{ ...styles.container, fontFamily: t.dataFont }}>
       <div style={styles.row}>
         <span style={styles.label}>rate</span>
-        <span style={styles.value}>{rateDisplay}</span>
+        <AnimatedValue value={rateDisplay} style={styles.value} />
       </div>
       <div style={styles.divider} />
       <div style={styles.row}>
         <span style={styles.label}>today</span>
         <span style={styles.value}>
-          {todayTokensDisplay}{' '}
-          <span style={styles.cost}>{todayCostDisplay}</span>
+          <AnimatedValue value={todayTokensDisplay} />{' '}
+          <AnimatedValue value={todayCostDisplay} style={styles.cost} />
         </span>
       </div>
       <div style={styles.row}>
         <span style={styles.label}>month</span>
         <span style={styles.value}>
-          {monthTokensDisplay}{' '}
-          <span style={styles.cost}>{monthCostDisplay}</span>
+          <AnimatedValue value={monthTokensDisplay} />{' '}
+          <AnimatedValue value={monthCostDisplay} style={styles.cost} />
         </span>
       </div>
     </div>
@@ -63,7 +88,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   value: {
     color: 'var(--text-secondary)',
-    transition: 'color 0.3s',
   },
   cost: {
     color: 'var(--text-muted)',

@@ -39,7 +39,7 @@ export function Setup({ send, onClose }: SetupProps) {
 
   return (
     <div style={styles.overlay} onClick={(e) => e.stopPropagation()}>
-      <div style={{ ...styles.panel, fontFamily: t.dataFont, borderColor: t.textMuted }}>
+      <div style={{ ...styles.panel, fontFamily: t.dataFont, borderColor: t.textMuted, background: `${t.bg}f2` }}>
         <div style={styles.header}>
           <span style={{ ...styles.title, fontFamily: t.scriptureFont }}>
             Configure

@@ -61,6 +61,7 @@ export function App() {
         <Pulse />
         <Chant />
         <button
+          className="setup-btn"
           onClick={(e) => { e.stopPropagation(); toggleSetup(); }}
           style={styles.setupButton}
           title="Configure"
@@ -82,17 +83,69 @@ const globalStyles = `
     .desktop-container { display: block !important; }
     .mobile-block { display: none !important; }
   }
+
   @keyframes slideIn {
     from { transform: translateX(100%); }
     to { transform: translateX(0); }
   }
+
+  @keyframes milestoneGlow {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.5; }
+  }
+
+  @keyframes particleRise {
+    0% {
+      transform: translateY(0) translateX(0);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.8;
+    }
+    50% {
+      opacity: 0.6;
+    }
+    100% {
+      transform: translateY(-60vh) translateX(var(--drift, 0px));
+      opacity: 0;
+    }
+  }
+
+  .setup-btn:hover {
+    opacity: 0.8 !important;
+  }
+
+  /* Range slider styling */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 2px;
+    background: var(--text-muted);
+    outline: none;
+    border-radius: 0;
+  }
   input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
+    appearance: none;
     width: 8px;
     height: 8px;
     background: var(--text-secondary);
     border: none;
     cursor: pointer;
+    border-radius: 0;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 8px;
+    height: 8px;
+    background: var(--text-secondary);
+    border: none;
+    cursor: pointer;
+    border-radius: 0;
+  }
+
+  /* Number transition helper */
+  .pulse-value {
+    transition: opacity 0.3s ease;
   }
 `;
 
