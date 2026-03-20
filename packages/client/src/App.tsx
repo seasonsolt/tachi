@@ -56,7 +56,9 @@ export function App() {
         </p>
       </div>
       <div className="desktop-container" style={styles.desktopContainer}>
-        {theme === 'matrix' && <div className="matrix-scanlines" />}
+        <div className="crt-scanlines" />
+        <div className="film-grain" />
+        <div className="vignette" />
         <AltarScene />
         <Scripture />
         <Pulse />
@@ -90,18 +92,59 @@ const globalStyles = `
     to { transform: translateX(0); }
   }
 
-  /* CRT scanline overlay for Matrix theme */
-  .matrix-scanlines {
+  /* CRT scanlines — all themes */
+  .crt-scanlines {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 8;
     background: repeating-linear-gradient(
       0deg,
-      rgba(0, 0, 0, 0.15) 0px,
-      rgba(0, 0, 0, 0.15) 1px,
+      rgba(0, 0, 0, 0.12) 0px,
+      rgba(0, 0, 0, 0.12) 1px,
       transparent 1px,
       transparent 3px
+    );
+    mix-blend-mode: multiply;
+  }
+
+  /* Film grain noise — animated */
+  .film-grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9;
+    opacity: 0.06;
+    animation: grainShift 0.3s steps(4) infinite;
+  }
+  .film-grain::before {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    width: 200%;
+    height: 200%;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    background-size: 256px 256px;
+  }
+
+  @keyframes grainShift {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(-2%, -3%); }
+    50% { transform: translate(1%, 2%); }
+    75% { transform: translate(-1%, 1%); }
+    100% { transform: translate(2%, -2%); }
+  }
+
+  /* Vignette — subtle darkened edges */
+  .vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 7;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 50%,
+      rgba(0, 0, 0, 0.4) 100%
     );
   }
 
