@@ -162,16 +162,32 @@ function TokenHero() {
       : null;
 
   const isWide = typeof window !== 'undefined' && window.innerWidth >= 1280;
+  const isMatrix = theme === 'matrix';
 
   return (
     <div style={heroStyles.container}>
+      {/* Dark backdrop behind hero number for Matrix readability */}
+      {isMatrix && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '120%',
+          height: '200%',
+          background: 'radial-gradient(ellipse, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, transparent 70%)',
+          zIndex: -1,
+        }} />
+      )}
       <div
         style={{
           fontFamily: t.dataFont,
           fontSize: isWide ? 96 : 72,
-          fontWeight: 300,
-          color: t.textPrimary,
-          textShadow: `0 0 40px ${t.accentGlow}, 0 0 80px ${t.accentGlow}, 0 0 120px ${t.accentGlow}`,
+          fontWeight: isMatrix ? 400 : 300,
+          color: isMatrix ? '#ffffff' : t.textPrimary,
+          textShadow: isMatrix
+            ? '0 0 20px #00ff41, 0 0 40px #00ff41, 0 0 80px rgba(0,255,65,0.5)'
+            : `0 0 40px ${t.accentGlow}, 0 0 80px ${t.accentGlow}, 0 0 120px ${t.accentGlow}`,
           lineHeight: 1,
           transition: 'color 1s ease, text-shadow 1s ease',
           letterSpacing: '-0.02em',
@@ -185,9 +201,9 @@ function TokenHero() {
           style={{
             fontFamily: t.dataFont,
             fontSize: 20,
-            color: t.textSecondary,
+            color: isMatrix ? '#88ff88' : t.textSecondary,
             marginTop: 12,
-            opacity: 0.6,
+            opacity: isMatrix ? 0.8 : 0.6,
             letterSpacing: '0.05em',
           }}
         >
@@ -257,11 +273,12 @@ function GlowOverlay() {
 
 export function AltarScene() {
   const theme = useStore((s) => s.theme);
+  const isMatrix = theme === 'matrix';
 
   return (
-    <div style={altarStyles.container}>
+    <div style={{ ...altarStyles.container, height: isMatrix ? '100vh' : '70vh' }}>
       <GlowOverlay />
-      {theme === 'matrix' ? <MatrixRain /> : <CSSParticles />}
+      {isMatrix ? <MatrixRain /> : <CSSParticles />}
       <TokenHero />
     </div>
   );
@@ -270,7 +287,7 @@ export function AltarScene() {
 const heroStyles: Record<string, React.CSSProperties> = {
   container: {
     position: 'absolute',
-    top: '50%',
+    top: '45%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
     textAlign: 'center',
