@@ -105,6 +105,21 @@ const globalStyles = `
     );
   }
 
+  @keyframes laughingManSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes vkSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes vkSpinReverse {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(-360deg); }
+  }
+
   @keyframes milestoneGlow {
     0%, 100% { opacity: 0.9; }
     50% { opacity: 0.5; }
