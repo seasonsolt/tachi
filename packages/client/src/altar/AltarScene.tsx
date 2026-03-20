@@ -2,6 +2,11 @@ import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useStore } from '../stores/store';
 import { useTokenData } from '../hooks/useTokenData';
 import { THEMES, formatTokenCount, formatUSD } from '@ritual-screen/shared';
+import { LaughingMan } from './LaughingMan';
+import { BladeRunnerEye } from './BladeRunnerEye';
+import { TronGrid } from './TronGrid';
+import { NervHex } from './NervHex';
+import { DuneRunes } from './DuneRunes';
 
 // Matrix digital rain — canvas-based falling characters
 function MatrixRain() {
@@ -283,10 +288,17 @@ export function AltarScene() {
   const theme = useStore((s) => s.theme);
   const isMatrix = theme === 'matrix';
 
+  const isCyber = theme === 'cyber';
+
   return (
     <div style={{ ...altarStyles.container, height: isMatrix ? '100vh' : '70vh' }}>
       <GlowOverlay />
       {isMatrix ? <MatrixRain /> : <CSSParticles />}
+      {isCyber && <LaughingMan />}
+      {theme === 'cyberpunk' && <BladeRunnerEye />}
+      {theme === 'synthwave' && <TronGrid />}
+      {theme === 'blood' && <NervHex />}
+      {theme === 'ancient' && <DuneRunes />}
       <TokenHero />
     </div>
   );
