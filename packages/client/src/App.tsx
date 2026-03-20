@@ -56,6 +56,7 @@ export function App() {
         </p>
       </div>
       <div className="desktop-container" style={styles.desktopContainer}>
+        {theme === 'matrix' && <div className="matrix-scanlines" />}
         <AltarScene />
         <Scripture />
         <Pulse />
@@ -87,6 +88,21 @@ const globalStyles = `
   @keyframes slideIn {
     from { transform: translateX(100%); }
     to { transform: translateX(0); }
+  }
+
+  /* CRT scanline overlay for Matrix theme */
+  .matrix-scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 8;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.15) 0px,
+      rgba(0, 0, 0, 0.15) 1px,
+      transparent 1px,
+      transparent 3px
+    );
   }
 
   @keyframes milestoneGlow {
