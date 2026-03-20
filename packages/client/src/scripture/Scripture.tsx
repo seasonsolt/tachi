@@ -72,15 +72,24 @@ export function Scripture() {
     }
   }, [milestone, cycle]);
 
+  const isMatrix = theme === 'matrix';
+
   return (
     <div
       style={{
         ...styles.container,
-        fontFamily: t.scriptureFont,
+        fontFamily: isMatrix ? t.dataFont : t.scriptureFont,
+        fontStyle: isMatrix ? 'normal' : 'italic',
+        fontSize: isMatrix ? 14 : 20,
+        letterSpacing: isMatrix ? '0.1em' : undefined,
+        textTransform: isMatrix ? 'uppercase' as const : undefined,
+        color: isMatrix ? '#00ff41' : 'var(--text-secondary)',
+        background: isMatrix ? 'rgba(0,0,0,0.7)' : 'transparent',
+        padding: isMatrix ? '8px 24px' : 0,
         opacity,
       }}
     >
-      {text}
+      {isMatrix ? `> ${text}_` : text}
     </div>
   );
 }
@@ -95,11 +104,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 20,
     fontStyle: 'italic',
     color: 'var(--text-secondary)',
-    maxWidth: '60%',
+    maxWidth: '70%',
     lineHeight: 1.6,
     transition: 'opacity 3s ease',
     pointerEvents: 'none',
     userSelect: 'none',
-    zIndex: 5,
+    zIndex: 10,
   },
 };

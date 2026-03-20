@@ -46,19 +46,27 @@ function MatrixRain() {
 
       ctx.font = `${fontSize}px "Fira Code", monospace`;
 
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height * 0.45;
+
       for (let i = 0; i < columns; i++) {
         const char = chars[Math.floor(Math.random() * chars.length)];
         const x = i * fontSize;
         const y = drops[i] * fontSize;
 
+        // Fade out columns near center to give hero number breathing room
+        const dx = Math.abs(x - centerX) / (canvas.width * 0.3);
+        const dy = Math.abs(y - centerY) / (canvas.height * 0.25);
+        const distFromCenter = Math.sqrt(dx * dx + dy * dy);
+        const centerFade = Math.min(1, Math.max(0.1, distFromCenter));
+
         // Head character is bright white-green
         if (Math.random() > 0.3) {
           ctx.fillStyle = '#00ff41';
-          ctx.globalAlpha = 0.9;
+          ctx.globalAlpha = 0.9 * centerFade;
         } else {
-          // Some chars are brighter (head of stream)
           ctx.fillStyle = '#80ff80';
-          ctx.globalAlpha = 1;
+          ctx.globalAlpha = 1 * centerFade;
         }
         ctx.fillText(char, x, y);
         ctx.globalAlpha = 1;
