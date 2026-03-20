@@ -1,35 +1,78 @@
 import { useStore } from '../stores/store';
+import { THEMES } from '@ritual-screen/shared';
 
 /**
  * Laughing Man — Ghost in the Shell: Stand Alone Complex
- * Uses the original SVG. Text ring rotates, face stays still.
- * Two layers: rotating full logo (text ring visible) + static face (clipped to center)
+ * Based on the 1KB vector SVG by Johan Sundström
+ * https://gist.github.com/johan/1066590
+ *
+ * Adapted: theme color, separate rotation for text vs face
  */
 export function LaughingMan() {
   const theme = useStore((s) => s.theme);
-
-  // CSS filter to recolor the dark blue SVG to match theme cyan
-  const filter = 'brightness(0) invert(1) sepia(1) saturate(10) hue-rotate(155deg) brightness(0.6) contrast(1.2)';
+  const t = THEMES[theme];
+  const c = t.fireCore;
+  const bg = t.bg;
 
   return (
     <div style={styles.container}>
-      {/* Layer 1: ROTATING — the full logo (text ring is what you see rotating) */}
-      <div style={styles.rotatingLayer}>
-        <img
-          src="/images/laughing-man.svg"
-          alt=""
-          style={{ ...styles.img, filter, opacity: 0.25 }}
-        />
-      </div>
+      <svg viewBox="-170 -170 340 340" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <path id="lm-text-path" d="m123,0a123,123 0,0 1-246,0a123,123 0,0 1 246,0" />
+        </defs>
 
-      {/* Layer 2: STATIC — face only, clipped to inner circle so text ring is hidden */}
-      <div style={styles.staticLayer}>
-        <img
-          src="/images/laughing-man.svg"
-          alt=""
-          style={{ ...styles.img, filter, opacity: 0.3, clipPath: 'circle(38% at 50% 53%)' }}
-        />
-      </div>
+        {/* === ROTATING LAYER: outer ring + text === */}
+        <g style={{ animation: 'laughingManSpin 50s linear infinite', transformOrigin: '0 0' }}>
+          {/* Outer filled circle (the band) */}
+          <circle r="160" fill={c} opacity="0.25" />
+          {/* Inner cutout for the band */}
+          <circle r="150" fill={bg} />
+          {/* Circular text */}
+          <text
+            fill={c}
+            fontSize="28"
+            fontStretch="condensed"
+            fontFamily="Impact, 'Arial Narrow', sans-serif"
+            opacity="0.7"
+          >
+            <textPath href="#lm-text-path">
+              I thought what I'd do was, I'd pretend I was one of those deaf-mutes
+            </textPath>
+          </text>
+        </g>
+
+        {/* === STATIC LAYER: the face === */}
+        <g fill={c} opacity="0.3">
+          {/* Inner dark circle */}
+          <circle r="115" />
+          {/* Face background */}
+          <circle r="95" fill={bg} />
+
+          {/* Cap top notch */}
+          <path d="m-8-119h16 l2,5h-20z" />
+
+          {/* Cap right circle */}
+          <circle cx="160" cy="0" r="40" />
+
+          {/* Cap visor bar (the signature element) */}
+          <path d="m-95-20v-20h255a40,40 0,0 1 0,80h-55v-20z" />
+
+          {/* Smile curve */}
+          <path d="m-85 0a85,85 0,0 0 170,0h-20a65,65 0,0 1-130,0z" />
+
+          {/* Chin bar */}
+          <path d="m-65 20v20h140v-20z" />
+
+          {/* Visor highlight (white/bg cut) */}
+          <path d="m-115-20v10h25v30h250a20,20 0,0 0 0,-40z" fill={bg} opacity="0.7" />
+
+          {/* Left eye */}
+          <path d="m-20 10c-17-14-27-14-44 0 6-25 37-25 44 0z" />
+
+          {/* Right eye */}
+          <path d="m60 10c-17-14-27-14-44 0 6-25 37-25 44 0z" />
+        </g>
+      </svg>
     </div>
   );
 }
@@ -46,19 +89,5 @@ const styles: Record<string, React.CSSProperties> = {
     maxHeight: '600px',
     pointerEvents: 'none',
     zIndex: 2,
-  },
-  rotatingLayer: {
-    position: 'absolute',
-    inset: 0,
-    animation: 'laughingManSpin 50s linear infinite',
-  },
-  staticLayer: {
-    position: 'absolute',
-    inset: 0,
-  },
-  img: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
   },
 };
