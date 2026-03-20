@@ -102,25 +102,29 @@ export function Setup({ send, onClose }: SetupProps) {
 
         <div style={styles.section}>
           <div style={styles.sectionLabel}>Theme</div>
-          <div style={styles.themeRow}>
-            <button
-              onClick={() => setTheme('ancient')}
-              style={{
-                ...styles.themeBtn,
-                borderColor: theme === 'ancient' ? THEMES.ancient.fireCore : '#333',
-              }}
-            >
-              Ancient Altar
-            </button>
-            <button
-              onClick={() => setTheme('cyber')}
-              style={{
-                ...styles.themeBtn,
-                borderColor: theme === 'cyber' ? THEMES.cyber.fireCore : '#333',
-              }}
-            >
-              Cyber Shrine
-            </button>
+          <div style={styles.themeGrid}>
+            {Object.values(THEMES).map((th) => (
+              <button
+                key={th.name}
+                onClick={() => setTheme(th.name)}
+                style={{
+                  ...styles.themeBtn,
+                  borderColor: theme === th.name ? th.fireCore : '#333',
+                }}
+              >
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    background: th.fireCore,
+                    display: 'inline-block',
+                    marginRight: 6,
+                    flexShrink: 0,
+                  }}
+                />
+                {th.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -220,21 +224,24 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: 1,
     transition: 'opacity 0.3s',
   },
-  themeRow: {
-    display: 'flex',
+  themeGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
     gap: 8,
   },
   themeBtn: {
-    flex: 1,
     background: 'rgba(255,255,255,0.03)',
     border: '1px solid',
     borderRadius: 0,
     color: 'var(--text-secondary)',
-    padding: '8px 12px',
-    fontSize: 11,
+    padding: '8px 10px',
+    fontSize: 10,
     cursor: 'pointer',
     textTransform: 'uppercase',
     letterSpacing: 1,
     transition: 'border-color 0.3s',
+    display: 'flex',
+    alignItems: 'center',
+    fontFamily: 'inherit',
   },
 };
