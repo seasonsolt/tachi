@@ -3,6 +3,100 @@ import { useStore } from '../stores/store';
 import { useTokenData } from '../hooks/useTokenData';
 import { THEMES, formatTokenCount, formatUSD } from '@ritual-screen/shared';
 
+// Matrix digital rain — canvas-based falling characters
+function MatrixRain() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const fontSize = 14;
+    const columns = Math.floor(canvas.width / fontSize);
+    const drops: number[] = Array.from({ length: columns }, () => Math.random() * -100);
+    const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF';
+
+    let lastTime = 0;
+    const draw = (time: number) => {
+      if (document.hidden) {
+        animRef.current = requestAnimationFrame(draw);
+        return;
+      }
+
+      // Target ~20fps for the classic Matrix look
+      if (time - lastTime < 50) {
+        animRef.current = requestAnimationFrame(draw);
+        return;
+      }
+      lastTime = time;
+
+      // Fade trail
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.font = `${fontSize}px "Fira Code", monospace`;
+
+      for (let i = 0; i < columns; i++) {
+        const char = chars[Math.floor(Math.random() * chars.length)];
+        const x = i * fontSize;
+        const y = drops[i] * fontSize;
+
+        // Head character is bright white-green
+        if (Math.random() > 0.3) {
+          ctx.fillStyle = '#00ff41';
+          ctx.globalAlpha = 0.9;
+        } else {
+          // Some chars are brighter (head of stream)
+          ctx.fillStyle = '#80ff80';
+          ctx.globalAlpha = 1;
+        }
+        ctx.fillText(char, x, y);
+        ctx.globalAlpha = 1;
+
+        // Reset drop to top when it reaches bottom
+        if (y > canvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    animRef.current = requestAnimationFrame(draw);
+
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        opacity: 0.4,
+        pointerEvents: 'none',
+        zIndex: 0,
+      }}
+    />
+  );
+}
+
 // CSS-based particle system — works everywhere, no WebGL needed
 function CSSParticles() {
   const theme = useStore((s) => s.theme);
@@ -162,10 +256,12 @@ function GlowOverlay() {
 }
 
 export function AltarScene() {
+  const theme = useStore((s) => s.theme);
+
   return (
     <div style={altarStyles.container}>
       <GlowOverlay />
-      <CSSParticles />
+      {theme === 'matrix' ? <MatrixRain /> : <CSSParticles />}
       <TokenHero />
     </div>
   );
