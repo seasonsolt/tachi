@@ -64,13 +64,24 @@ export interface ClaudeCodeStats {
   firstSessionDate: string;
 }
 
+// === Session Info ===
+
+export interface SessionInfo {
+  pid: number;
+  sessionId: string;
+  cwd: string;
+  startedAt: number;
+  alive: boolean;
+}
+
 // === WebSocket Messages ===
 
 export type WSMessage =
   | { type: 'token_update'; data: TokenData }
   | { type: 'milestone'; milestone: Milestone }
   | { type: 'error'; source: string; message: string }
-  | { type: 'connected'; sources: string[] };
+  | { type: 'connected'; sources: string[] }
+  | { type: 'session_update'; sessions: SessionInfo[] };
 
 export type WSClientMessage =
   | { type: 'configure'; config: Partial<RitualConfig> }
@@ -105,7 +116,7 @@ export type MilestoneEffect =
 
 // === Theme ===
 
-export type ThemeName = 'ancient' | 'cyber' | 'cyberpunk' | 'synthwave' | 'matrix' | 'blood';
+export type ThemeName = 'cyber' | 'bladerunner' | 'matrix' | 'blood';
 
 export interface Theme {
   name: ThemeName;

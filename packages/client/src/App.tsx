@@ -1,11 +1,13 @@
 import { useEffect, useCallback } from 'react';
 import { useStore } from './stores/store';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useApiPolling } from './hooks/useApiPolling';
 import { THEMES } from '@ritual-screen/shared';
 import { AltarScene } from './altar/AltarScene';
 import { Pulse } from './pulse/Pulse';
 import { Scripture } from './scripture/Scripture';
 import { Chant } from './chant/Chant';
+import { Sessions } from './sessions/Sessions';
 import { Setup } from './setup/Setup';
 
 export function App() {
@@ -14,6 +16,7 @@ export function App() {
   const setupOpen = useStore((s) => s.setupOpen);
   const toggleSetup = useStore((s) => s.toggleSetup);
   const { send } = useWebSocket();
+  useApiPolling();
   const t = THEMES[theme];
 
   useEffect(() => {
@@ -59,8 +62,11 @@ export function App() {
         <div className="crt-scanlines" />
         <div className="film-grain" />
         <div className="vignette" />
+        <div className="ambient-veil" />
+        <div className="focus-halo" />
         <AltarScene />
         <Scripture />
+        <Sessions />
         <Pulse />
         <Chant />
         <button
@@ -100,10 +106,10 @@ const globalStyles = `
     z-index: 8;
     background: repeating-linear-gradient(
       0deg,
-      rgba(0, 0, 0, 0.12) 0px,
-      rgba(0, 0, 0, 0.12) 1px,
+      rgba(0, 0, 0, 0.07) 0px,
+      rgba(0, 0, 0, 0.07) 1px,
       transparent 1px,
-      transparent 3px
+      transparent 4px
     );
     mix-blend-mode: multiply;
   }
@@ -114,7 +120,7 @@ const globalStyles = `
     inset: 0;
     pointer-events: none;
     z-index: 9;
-    opacity: 0.06;
+    opacity: 0.035;
     animation: grainShift 0.3s steps(4) infinite;
   }
   .film-grain::before {
@@ -143,9 +149,30 @@ const globalStyles = `
     z-index: 7;
     background: radial-gradient(
       ellipse at center,
-      transparent 50%,
-      rgba(0, 0, 0, 0.4) 100%
+      transparent 44%,
+      rgba(0, 0, 0, 0.46) 100%
     );
+  }
+
+  .ambient-veil {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.08) 16%, rgba(0, 0, 0, 0.04) 55%, rgba(0, 0, 0, 0.34) 100%),
+      linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0%, transparent 18%, transparent 82%, rgba(0, 0, 0, 0.22) 100%);
+  }
+
+  .focus-halo {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+    background:
+      radial-gradient(circle at 50% 44%, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.12) 20%, transparent 42%),
+      radial-gradient(circle at 15% 85%, rgba(0, 0, 0, 0.3) 0%, transparent 30%),
+      radial-gradient(circle at 85% 85%, rgba(0, 0, 0, 0.28) 0%, transparent 28%);
   }
 
   @keyframes laughingManSpin {
@@ -262,17 +289,18 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     height: '100%',
     position: 'relative',
+    isolation: 'isolate',
   },
   setupButton: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 12,
+    right: 12,
     background: 'none',
     border: 'none',
-    color: 'var(--text-muted)',
-    fontSize: 20,
+    color: 'var(--text-secondary)',
+    fontSize: 24,
     cursor: 'pointer',
-    opacity: 0.4,
+    opacity: 0.7,
     zIndex: 10,
     padding: 12,
     minWidth: 44,

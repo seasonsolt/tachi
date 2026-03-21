@@ -21,7 +21,9 @@ export function Chant() {
       style={{
         ...styles.container,
         fontFamily: t.dataFont,
-        opacity: hovered ? 0.8 : 0.3,
+        opacity: hovered ? 0.96 : 0.78,
+        background: `linear-gradient(270deg, ${t.bg}ee 0%, ${t.bg}d0 68%, transparent 100%)`,
+        textShadow: `0 0 14px ${t.accentGlow}`,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -55,11 +57,12 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-muted)',
     transition: 'opacity 0.4s ease',
     zIndex: 5,
+    padding: '8px 0 8px 28px',
   },
   playBtn: {
     background: 'none',
     border: 'none',
-    color: 'var(--text-muted)',
+    color: 'var(--text-secondary)',
     fontSize: 14,
     cursor: 'pointer',
     padding: 12,
@@ -84,5 +87,6 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase' as const,
     letterSpacing: 1,
     fontSize: 9,
+    color: 'var(--text-secondary)',
   },
 };

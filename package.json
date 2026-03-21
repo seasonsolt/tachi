@@ -8,6 +8,7 @@
     "clean": "pnpm -r clean"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "wrangler": "^4.0.0"
   }
 }

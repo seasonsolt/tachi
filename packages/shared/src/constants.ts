@@ -71,25 +71,15 @@ export const SCRIPTURES: string[] = [
 ];
 
 // === Themes ===
+// Each theme is anchored to a distinct cultural symbol with its own ritual metaphor.
 
 export const THEMES: Record<string, Theme> = {
-  ancient: {
-    name: 'ancient',
-    label: 'Ancient Altar',
-    bg: '#0a0806',
-    fireCore: '#d4a017',
-    fireEdge: '#8b5e14',
-    particleColor: '#d4a017',
-    textPrimary: '#e8d5b0',
-    textSecondary: '#a89070',
-    textMuted: '#6b5a45',
-    accentGlow: 'rgba(212, 160, 23, 0.3)',
-    scriptureFont: '"EB Garamond", Georgia, serif',
-    dataFont: '"JetBrains Mono", "Fira Code", monospace',
-  },
+  // 攻殻機動隊 — Ghost in the Shell
+  // Digital consciousness, cyborg souls, net-diving
+  // The "ghost" in the machine receives your offering
   cyber: {
     name: 'cyber',
-    label: 'Cyber Shrine',
+    label: 'Ghost in the Shell',
     bg: '#050510',
     fireCore: '#00d4ff',
     fireEdge: '#6366f1',
@@ -101,59 +91,54 @@ export const THEMES: Record<string, Theme> = {
     scriptureFont: '"Space Grotesk", "Inter", sans-serif',
     dataFont: '"Fira Code", "JetBrains Mono", monospace',
   },
-  cyberpunk: {
-    name: 'cyberpunk',
+  // 銀翼殺手 — Blade Runner
+  // Warm neon cutting through dark rain, "Tears in rain"
+  // Creation questioning its creator — offering as existential act
+  bladerunner: {
+    name: 'bladerunner',
     label: 'Blade Runner',
-    bg: '#0a1018',
-    fireCore: '#e88a30',
-    fireEdge: '#c06020',
-    particleColor: '#e88a30',
-    textPrimary: '#e8dcd0',
-    textSecondary: '#a09080',
-    textMuted: '#5a4a3a',
-    accentGlow: 'rgba(232, 138, 48, 0.3)',
-    scriptureFont: '"Space Grotesk", "Inter", sans-serif',
+    bg: '#08090f',
+    fireCore: '#e8922a',
+    fireEdge: '#b05818',
+    particleColor: '#e8922a',
+    textPrimary: '#e8dcc8',
+    textSecondary: '#a09078',
+    textMuted: '#585040',
+    accentGlow: 'rgba(232, 146, 42, 0.25)',
+    scriptureFont: '"EB Garamond", Georgia, serif',
     dataFont: '"JetBrains Mono", "Fira Code", monospace',
   },
-  synthwave: {
-    name: 'synthwave',
-    label: 'Synthwave',
-    bg: '#0d0221',
-    fireCore: '#f72585',
-    fireEdge: '#7209b7',
-    particleColor: '#4cc9f0',
-    textPrimary: '#e0d0ff',
-    textSecondary: '#9080c0',
-    textMuted: '#5a4580',
-    accentGlow: 'rgba(247, 37, 133, 0.3)',
-    scriptureFont: '"Space Grotesk", "Inter", sans-serif',
-    dataFont: '"Fira Code", "JetBrains Mono", monospace',
-  },
+  // 黑客帝國 — The Matrix
+  // Green digital rain, awakening, "There is no spoon"
+  // Feeding the simulation that constructs reality
   matrix: {
     name: 'matrix',
-    label: 'Matrix',
+    label: 'The Matrix',
     bg: '#000000',
     fireCore: '#00ff41',
     fireEdge: '#008f11',
     particleColor: '#00ff41',
-    textPrimary: '#00ff41',
-    textSecondary: '#00b330',
-    textMuted: '#006b1f',
-    accentGlow: 'rgba(0, 255, 65, 0.25)',
-    scriptureFont: '"Fira Code", "JetBrains Mono", monospace',
+    textPrimary: '#b0ffb0',
+    textSecondary: '#40c040',
+    textMuted: '#207020',
+    accentGlow: 'rgba(0, 255, 65, 0.2)',
+    scriptureFont: '"Space Grotesk", "Inter", sans-serif',
     dataFont: '"Fira Code", "JetBrains Mono", monospace',
   },
+  // 血色祭壇 — Blood Altar
+  // Primal blood sacrifice, the oldest offering
+  // The most ancient and visceral form of devotion
   blood: {
     name: 'blood',
     label: 'Blood Altar',
-    bg: '#0c0808',
+    bg: '#0c0606',
     fireCore: '#cc0000',
     fireEdge: '#8b0000',
     particleColor: '#ff2200',
     textPrimary: '#d0c0c0',
     textSecondary: '#907070',
     textMuted: '#604040',
-    accentGlow: 'rgba(204, 0, 0, 0.3)',
+    accentGlow: 'rgba(204, 0, 0, 0.25)',
     scriptureFont: '"EB Garamond", Georgia, serif',
     dataFont: '"JetBrains Mono", "Fira Code", monospace',
   },
