@@ -4,9 +4,7 @@ import { useTokenData } from '../hooks/useTokenData';
 import { THEMES, formatTokenCount, formatUSD } from '@ritual-screen/shared';
 import { LaughingMan } from './LaughingMan';
 import { BladeRunnerEye } from './BladeRunnerEye';
-import { TronGrid } from './TronGrid';
 import { NervHex } from './NervHex';
-import { DuneRunes } from './DuneRunes';
 
 // Matrix digital rain — canvas-based falling characters
 function MatrixRain() {
@@ -158,6 +156,7 @@ function TokenHero() {
   const theme = useStore((s) => s.theme);
   const milestone = useStore((s) => s.milestone);
   const wsConnected = useStore((s) => s.wsConnected);
+  const mode = useStore((s) => s.mode);
   const t = THEMES[theme];
 
   const displayValue = tokenData
@@ -168,7 +167,7 @@ function TokenHero() {
     ? formatUSD(tokenData.totalCostUSD)
     : null;
 
-  const subtitle = !wsConnected
+  const subtitle = (mode === 'cli' && !wsConnected)
     ? 'Connection lost'
     : !tokenData
       ? 'Begin your offering.'
@@ -179,19 +178,33 @@ function TokenHero() {
 
   return (
     <div style={heroStyles.container}>
-      {/* Dark backdrop behind hero number for Matrix readability */}
-      {isMatrix && (
-        <div style={{
+      <div
+        style={{
           position: 'absolute',
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: '120%',
-          height: '200%',
-          background: 'radial-gradient(ellipse, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, transparent 70%)',
+          width: isMatrix ? '128%' : '112%',
+          height: isMatrix ? '220%' : '190%',
+          background: isMatrix
+            ? 'radial-gradient(ellipse, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.52) 46%, transparent 74%)'
+            : `radial-gradient(ellipse, rgba(0,0,0,0.56) 0%, ${t.bg}b8 34%, transparent 72%)`,
+          filter: 'blur(4px)',
+          zIndex: -2,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: '56%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '150%',
+          height: '78%',
+          background: `linear-gradient(180deg, transparent 0%, ${t.bg}38 18%, ${t.bg}9e 52%, transparent 100%)`,
           zIndex: -1,
-        }} />
-      )}
+        }}
+      />
       <div
         style={{
           fontFamily: t.dataFont,
@@ -205,6 +218,7 @@ function TokenHero() {
           transition: 'color 1s ease, text-shadow 1s ease',
           letterSpacing: '-0.02em',
           fontVariantNumeric: 'tabular-nums',
+          padding: '0 0.08em',
         }}
       >
         {displayValue}
@@ -216,8 +230,13 @@ function TokenHero() {
             fontSize: 20,
             color: isMatrix ? '#88ff88' : t.textSecondary,
             marginTop: 12,
-            opacity: isMatrix ? 0.8 : 0.6,
-            letterSpacing: '0.05em',
+            opacity: isMatrix ? 0.88 : 0.82,
+            letterSpacing: '0.08em',
+            textShadow: isMatrix
+              ? '0 0 12px rgba(0,255,65,0.35)'
+              : `0 0 20px ${t.accentGlow}`,
+            background: `linear-gradient(90deg, transparent 0%, ${t.bg}a0 18%, ${t.bg}a0 82%, transparent 100%)`,
+            padding: '4px 18px',
           }}
         >
           {costDisplay}
@@ -230,8 +249,11 @@ function TokenHero() {
             fontSize: 18,
             color: !wsConnected ? '#ff4444' : t.textMuted,
             marginTop: 20,
-            opacity: 0.8,
+            opacity: 0.92,
             fontStyle: 'italic',
+            background: `linear-gradient(90deg, transparent 0%, ${t.bg}bc 14%, ${t.bg}bc 86%, transparent 100%)`,
+            padding: '6px 20px',
+            textShadow: `0 0 18px ${t.bg}`,
           }}
         >
           {subtitle}
@@ -246,6 +268,8 @@ function TokenHero() {
             marginTop: 16,
             textShadow: `0 0 20px ${t.accentGlow}`,
             animation: 'milestoneGlow 2s ease-in-out infinite',
+            background: `linear-gradient(90deg, transparent 0%, ${t.bg}9a 12%, ${t.bg}9a 88%, transparent 100%)`,
+            padding: '6px 22px',
           }}
         >
           {milestone.nameZh} — {milestone.name}
@@ -295,10 +319,8 @@ export function AltarScene() {
       <GlowOverlay />
       {isMatrix ? <MatrixRain /> : <CSSParticles />}
       {isCyber && <LaughingMan />}
-      {theme === 'cyberpunk' && <BladeRunnerEye />}
-      {theme === 'synthwave' && <TronGrid />}
+      {theme === 'bladerunner' && <BladeRunnerEye />}
       {theme === 'blood' && <NervHex />}
-      {theme === 'ancient' && <DuneRunes />}
       <TokenHero />
     </div>
   );
@@ -314,6 +336,7 @@ const heroStyles: Record<string, React.CSSProperties> = {
     zIndex: 5,
     pointerEvents: 'none',
     userSelect: 'none',
+    width: 'min(80vw, 960px)',
   },
 };
 

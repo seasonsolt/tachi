@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useStore } from '../stores/store';
 import { THEMES } from '@ritual-screen/shared';
+import { LS_ANTHROPIC_KEY, LS_OPENAI_KEY } from '../hooks/useApiPolling';
 import type { WSClientMessage } from '@ritual-screen/shared';
 
 interface SetupProps {
@@ -12,7 +13,10 @@ export function Setup({ send, onClose }: SetupProps) {
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
   const tokenData = useStore((s) => s.tokenData);
+  const mode = useStore((s) => s.mode);
   const t = THEMES[theme];
+
+  const isWeb = mode === 'web';
 
   const [anthropicKey, setAnthropicKey] = useState('');
   const [openaiKey, setOpenaiKey] = useState('');
@@ -24,18 +28,33 @@ export function Setup({ send, onClose }: SetupProps) {
 
   const handleSave = useCallback(() => {
     setSaving(true);
-    const config: Record<string, string> = {};
-    if (anthropicKey.trim()) config.anthropicAdminKey = anthropicKey.trim();
-    if (openaiKey.trim()) config.openaiKey = openaiKey.trim();
-    send({ type: 'configure', config });
-    setTimeout(() => {
-      setSaving(false);
-      if (anthropicKey.trim() || openaiKey.trim()) {
+
+    if (isWeb) {
+      if (anthropicKey.trim()) localStorage.setItem(LS_ANTHROPIC_KEY, anthropicKey.trim());
+      if (openaiKey.trim()) localStorage.setItem(LS_OPENAI_KEY, openaiKey.trim());
+      // Trigger a re-poll by dispatching a storage event won't work same-tab,
+      // so we just reload the polling cycle via a brief delay
+      setTimeout(() => {
+        setSaving(false);
         setAnthropicKey('');
         setOpenaiKey('');
-      }
-    }, 1000);
-  }, [anthropicKey, openaiKey, send]);
+        // Force re-render to pick up new keys
+        window.dispatchEvent(new Event('ritual-keys-updated'));
+      }, 500);
+    } else {
+      const config: Record<string, string> = {};
+      if (anthropicKey.trim()) config.anthropicAdminKey = anthropicKey.trim();
+      if (openaiKey.trim()) config.openaiKey = openaiKey.trim();
+      send({ type: 'configure', config });
+      setTimeout(() => {
+        setSaving(false);
+        if (anthropicKey.trim() || openaiKey.trim()) {
+          setAnthropicKey('');
+          setOpenaiKey('');
+        }
+      }, 1000);
+    }
+  }, [anthropicKey, openaiKey, send, isWeb]);
 
   return (
     <div style={styles.overlay} onClick={(e) => e.stopPropagation()}>
@@ -49,11 +68,17 @@ export function Setup({ send, onClose }: SetupProps) {
           </button>
         </div>
 
+        {isWeb && (
+          <div style={{ ...styles.modeBadge, color: t.fireCore, borderColor: t.fireCore }}>
+            WEB MODE
+          </div>
+        )}
+
         <div style={styles.section}>
           <div style={styles.sectionLabel}>Sources</div>
           <div style={styles.sourceRow}>
             <span style={{ ...styles.dot, background: claudeConnected ? '#4ade80' : '#666' }} />
-            <span>Claude Code (auto-detected)</span>
+            <span>Claude Code {isWeb ? '(CLI mode only)' : '(auto-detected)'}</span>
           </div>
           <div style={styles.sourceRow}>
             <span style={{ ...styles.dot, background: anthropicConnected ? '#4ade80' : '#666' }} />
@@ -170,6 +195,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 18,
     cursor: 'pointer',
     padding: 4,
+  },
+  modeBadge: {
+    fontSize: 9,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    border: '1px solid',
+    padding: '4px 8px',
+    alignSelf: 'flex-start',
   },
   section: {
     display: 'flex',

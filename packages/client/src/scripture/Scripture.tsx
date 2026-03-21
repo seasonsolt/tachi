@@ -83,9 +83,13 @@ export function Scripture() {
         fontSize: isMatrix ? 14 : 20,
         letterSpacing: isMatrix ? '0.1em' : undefined,
         textTransform: isMatrix ? 'uppercase' as const : undefined,
-        color: isMatrix ? '#00ff41' : 'var(--text-secondary)',
-        background: isMatrix ? 'rgba(0,0,0,0.7)' : 'transparent',
-        padding: isMatrix ? '8px 24px' : 0,
+        color: isMatrix ? '#00ff41' : 'var(--text-primary)',
+        background: isMatrix
+          ? 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.78) 18%, rgba(0,0,0,0.78) 82%, transparent 100%)'
+          : 'linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.34) 100%)',
+        padding: isMatrix ? '8px 24px' : '10px 28px',
+        textShadow: isMatrix ? '0 0 12px rgba(0,255,65,0.28)' : '0 0 22px rgba(0,0,0,0.42)',
+        backdropFilter: 'blur(2px)',
         opacity,
       }}
     >
@@ -104,11 +108,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 20,
     fontStyle: 'italic',
     color: 'var(--text-secondary)',
-    maxWidth: '70%',
+    maxWidth: '60%',
     lineHeight: 1.6,
     transition: 'opacity 3s ease',
     pointerEvents: 'none',
     userSelect: 'none',
     zIndex: 10,
+    border: '1px solid transparent',
   },
 };

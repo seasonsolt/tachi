@@ -4,12 +4,13 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { TokenData, SourceData, WSMessage, WSClientMessage, RitualConfig } from '@ritual-screen/shared';
+import type { TokenData, SourceData, WSMessage, WSClientMessage, RitualConfig, SessionInfo } from '@ritual-screen/shared';
 import { getMilestone } from '@ritual-screen/shared';
 import { loadConfig, saveConfig } from './config.js';
 import { startClaudeCodeCollector } from './collectors/claude-code.js';
 import { startAnthropicCollector } from './collectors/anthropic-api.js';
 import { startOpenAICollector } from './collectors/openai-api.js';
+import { startSessionCollector } from './collectors/claude-sessions.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -57,6 +58,8 @@ export function startServer(port: number): { close: () => void } {
     anthropicApi: emptySource(),
     openaiApi: emptySource(),
   };
+
+  let currentSessions: SessionInfo[] = [];
 
   let previousTotalTokens = 0;
   let lastMilestoneThreshold = 0;
@@ -116,6 +119,11 @@ export function startServer(port: number): { close: () => void } {
       broadcast({ type: 'error', source: 'openaiApi', message });
     },
   );
+
+  const stopSessions = startSessionCollector((sessions) => {
+    currentSessions = sessions;
+    broadcast({ type: 'session_update', sessions });
+  });
 
   // Hono app
   const app = new Hono();
@@ -201,6 +209,7 @@ export function startServer(port: number): { close: () => void } {
 
     ws.send(JSON.stringify({ type: 'connected', sources: connectedSources } satisfies WSMessage));
     ws.send(JSON.stringify({ type: 'token_update', data: buildTokenData(sources) } satisfies WSMessage));
+    ws.send(JSON.stringify({ type: 'session_update', sessions: currentSessions } satisfies WSMessage));
 
     ws.on('message', (raw) => {
       try {
@@ -223,6 +232,7 @@ export function startServer(port: number): { close: () => void } {
       stopClaude();
       stopAnthropic();
       stopOpenAI();
+      stopSessions();
       wss.close();
       (server as import('node:http').Server).close();
     },

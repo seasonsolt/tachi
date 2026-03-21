@@ -7,13 +7,16 @@ import {
 } from '@ritual-screen/shared';
 import type { WSMessage, WSClientMessage } from '@ritual-screen/shared';
 
+const MAX_RETRIES_BEFORE_WEB_MODE = 3;
+
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const prevMilestoneRef = useRef<string | null>(null);
 
-  const { setTokenData, setWsConnected, setMilestone } = useStore();
+  const mode = useStore((s) => s.mode);
+  const { setTokenData, setWsConnected, setMilestone, setMode, setSessions } = useStore();
 
   const getUrl = useCallback(() => {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -56,6 +59,9 @@ export function useWebSocket() {
             prevMilestoneRef.current = msg.milestone.name;
             setTimeout(() => setMilestone(null), 8000);
             break;
+          case 'session_update':
+            setSessions(msg.sessions);
+            break;
           case 'connected':
           case 'error':
             break;
@@ -68,26 +74,33 @@ export function useWebSocket() {
     ws.onclose = () => {
       setWsConnected(false);
       wsRef.current = null;
+      retriesRef.current++;
+
+      if (retriesRef.current >= MAX_RETRIES_BEFORE_WEB_MODE) {
+        setMode('web');
+        return;
+      }
+
       const delay = Math.min(
         WS_RECONNECT_BASE * 2 ** retriesRef.current,
         WS_RECONNECT_MAX,
       );
-      retriesRef.current++;
       timerRef.current = setTimeout(connect, delay);
     };
 
     ws.onerror = () => {
       ws.close();
     };
-  }, [getUrl, setTokenData, setWsConnected, setMilestone]);
+  }, [getUrl, setTokenData, setWsConnected, setMilestone, setMode, setSessions]);
 
   useEffect(() => {
+    if (mode === 'web') return;
     connect();
     return () => {
       clearTimeout(timerRef.current);
       wsRef.current?.close();
     };
-  }, [connect]);
+  }, [connect, mode]);
 
   return { send };
 }
