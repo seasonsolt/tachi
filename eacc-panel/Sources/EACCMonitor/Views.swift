@@ -9,7 +9,7 @@ let matrixGreen = Color(red: 0, green: 0.9, blue: 0.4)
 // MARK: - Content View
 
 struct ContentView: View {
-    var vm: ViewModel
+    @Bindable var vm: ViewModel
 
     var body: some View {
         VStack(spacing: 0) {
@@ -79,6 +79,7 @@ struct ContentView: View {
         ScrollView {
             LazyVStack(spacing: 8) {
                 companionSection
+                agentChatSection
                 if !vm.sessions.isEmpty {
                     sessionsSection
                 }
@@ -93,6 +94,115 @@ struct ContentView: View {
     private var companionSection: some View {
         CompanionCard(vm: vm)
             .padding(.bottom, 4)
+    }
+
+    // MARK: - Agent Chat
+
+    private var agentChatSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(vm.themeColors.accent)
+                Text("AGENT")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(vm.themeColors.textSecondary)
+                Spacer()
+                if vm.agentIsThinking {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                        .frame(width: 14, height: 14)
+                }
+            }
+            .padding(.horizontal, 4)
+
+            if vm.agentNeedsAPIKey {
+                agentAPIKeyPrompt
+            } else {
+                agentMessagesList
+                agentInputField
+            }
+        }
+        .padding(.bottom, 4)
+    }
+
+    private var agentAPIKeyPrompt: some View {
+        VStack(spacing: 8) {
+            Text("Enter your Anthropic API key to activate the agent.")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(vm.themeColors.textSecondary)
+                .multilineTextAlignment(.center)
+            HStack(spacing: 6) {
+                SecureField("sk-ant-...", text: $vm.agentInput)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11, design: .monospaced))
+                    .padding(6)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(vm.themeColors.cardBg))
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(vm.themeColors.cardBorder))
+                Button("SET") {
+                    let key = vm.agentInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !key.isEmpty {
+                        vm.agentInput = ""
+                        vm.setAgentAPIKey(key)
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(vm.themeColors.accent.opacity(0.2)))
+                .foregroundStyle(vm.themeColors.accent)
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 6).fill(vm.themeColors.cardBg))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(vm.themeColors.cardBorder))
+    }
+
+    private var agentMessagesList: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(vm.agentMessages.suffix(6)) { msg in
+                HStack(alignment: .top, spacing: 6) {
+                    if msg.role == .user {
+                        Spacer(minLength: 40)
+                        Text(msg.content)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(vm.themeColors.textPrimary)
+                            .padding(6)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(vm.themeColors.accent.opacity(0.12)))
+                    } else {
+                        Text(msg.content)
+                            .font(.system(size: 11))
+                            .foregroundStyle(vm.themeColors.textSecondary)
+                            .padding(6)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(vm.themeColors.cardBg))
+                        Spacer(minLength: 40)
+                    }
+                }
+            }
+        }
+    }
+
+    private var agentInputField: some View {
+        HStack(spacing: 6) {
+            TextField("Ask the agent...", text: $vm.agentInput)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11, design: .monospaced))
+                .padding(6)
+                .background(RoundedRectangle(cornerRadius: 4).fill(vm.themeColors.cardBg))
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(vm.themeColors.cardBorder))
+                .onSubmit { vm.sendAgentMessage() }
+                .disabled(vm.agentIsThinking)
+            Button {
+                vm.sendAgentMessage()
+            } label: {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 16))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(vm.agentInput.isEmpty || vm.agentIsThinking ? vm.themeColors.textMuted : vm.themeColors.accent)
+            .disabled(vm.agentInput.isEmpty || vm.agentIsThinking)
+        }
     }
 
     private var sessionsSection: some View {

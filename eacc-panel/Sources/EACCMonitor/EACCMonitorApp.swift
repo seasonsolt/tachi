@@ -11,6 +11,10 @@ struct EACCMonitorApp: App {
     private let themeWatcher = ThemeWatcher()
     private let bridge: EACCBridge
 
+    // Agent-native subsystems
+    private let agentCore = AgentCore()
+    private let recipeRuntime = RecipeRuntime()
+
     init() {
         NotificationManager.shared.requestAuthorization()
 
@@ -28,11 +32,19 @@ struct EACCMonitorApp: App {
             vm.handleExternalThemeChange(theme)
         }
 
+        // Connect Agent + RecipeRuntime to ViewModel
+        vm.agent = agentCore
+        vm.recipeRuntime = recipeRuntime
+
+        // Install default recipes if first run
+        RecipeStore.installDefaults()
+
         bridge.start()
         wsServer.start()
         statsWatcher.start()
         sessionsWatcher.start()
         themeWatcher.start()
+        recipeRuntime.start()
     }
 
     var body: some Scene {
