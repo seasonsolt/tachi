@@ -62,7 +62,12 @@ function readThemeFile(): ThemeName | null {
       : null;
     if (!path) return null;
     const json = JSON.parse(readFileSync(path, 'utf-8'));
-    return json.theme || null;
+    const raw = json.theme as string | undefined;
+    if (!raw) return null;
+    // Migrate removed themes
+    if (raw === 'bladerunner' || raw === 'blood') return 'amber';
+    if (raw === 'singularity') return 'void';
+    return raw as ThemeName;
   } catch {
     return null;
   }

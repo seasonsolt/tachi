@@ -118,11 +118,13 @@ export type MilestoneEffect =
 
 // === Theme ===
 
-export type ThemeName = 'cyber' | 'bladerunner' | 'matrix' | 'blood' | 'singularity';
+export type ThemeName = 'cyber' | 'matrix' | 'amber' | 'void';
 
 export interface Theme {
   name: ThemeName;
   label: string;
+  labelZh: string;
+  isLightTheme: boolean;
   bg: string;
   surfaceStrong: string;
   surfaceSoft: string;

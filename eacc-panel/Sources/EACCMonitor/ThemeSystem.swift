@@ -4,38 +4,34 @@ import SwiftUI
 
 enum EACCThemeName: String, CaseIterable, Codable {
     case cyber       // 攻殻機動隊 — Ghost in the Shell
-    case bladerunner // 銀翼殺手 — Blade Runner
     case matrix      // 黑客帝國 — The Matrix
-    case blood       // 血色祭壇 — Blood Altar (NERV)
-    case singularity // 奇点 — The Singularity
+    case amber       // 琥珀 — Amber
+    case voidTheme = "void" // 虚無 — The Void
 
     var label: String {
         switch self {
         case .cyber: return "攻殻機動隊"
-        case .bladerunner: return "銀翼殺手"
         case .matrix: return "黑客帝國"
-        case .blood: return "血色祭壇"
-        case .singularity: return "奇点"
+        case .amber: return "琥珀"
+        case .voidTheme: return "虚無"
         }
     }
 
     var subtitle: String {
         switch self {
         case .cyber: return "Ghost in the Shell"
-        case .bladerunner: return "Blade Runner"
         case .matrix: return "The Matrix"
-        case .blood: return "Blood Altar"
-        case .singularity: return "The Singularity"
+        case .amber: return "Amber"
+        case .voidTheme: return "The Void"
         }
     }
 
     var defaultPersona: CompanionPersona {
         switch self {
         case .cyber: return .laughingMan
-        case .bladerunner: return .bladeRunnerEye
         case .matrix: return .matrixAgent
-        case .blood: return .nervHex
-        case .singularity: return .singularityVoid
+        case .amber: return .amberEye
+        case .voidTheme: return .voidMonolith
         }
     }
 }
@@ -65,17 +61,6 @@ struct EACCThemeColors {
                 textSecondary: Color.white.opacity(0.58),
                 textMuted: Color.white.opacity(0.38)
             )
-        case .bladerunner:
-            return EACCThemeColors(
-                bg: Color(red: 0.04, green: 0.035, blue: 0.04),
-                cardBg: Color(red: 0.09, green: 0.07, blue: 0.06),
-                cardBorder: Color(red: 0.87, green: 0.69, blue: 0.44).opacity(0.15),
-                accent: Color(red: 0.91, green: 0.57, blue: 0.16),
-                accentEdge: Color(red: 0.69, green: 0.35, blue: 0.09),
-                textPrimary: Color(red: 0.96, green: 0.92, blue: 0.86),
-                textSecondary: Color(red: 0.81, green: 0.71, blue: 0.61),
-                textMuted: Color(red: 0.59, green: 0.50, blue: 0.40)
-            )
         case .matrix:
             return EACCThemeColors(
                 bg: Color.black,
@@ -87,27 +72,27 @@ struct EACCThemeColors {
                 textSecondary: Color(red: 0.64, green: 0.97, blue: 0.71),
                 textMuted: Color(red: 0.38, green: 0.72, blue: 0.46)
             )
-        case .blood:
+        case .amber:
             return EACCThemeColors(
-                bg: Color(red: 0.047, green: 0.024, blue: 0.024),
-                cardBg: Color(red: 0.09, green: 0.05, blue: 0.05),
-                cardBorder: Color(red: 0.84, green: 0.60, blue: 0.58).opacity(0.12),
-                accent: Color(red: 0.84, green: 0.12, blue: 0.12),
+                bg: Color(red: 0.03, green: 0.035, blue: 0.06),
+                cardBg: Color(red: 0.09, green: 0.07, blue: 0.06),
+                cardBorder: Color(red: 0.87, green: 0.69, blue: 0.44).opacity(0.15),
+                accent: Color(red: 0.91, green: 0.57, blue: 0.16),
                 accentEdge: Color(red: 0.49, green: 0.05, blue: 0.05),
-                textPrimary: Color(red: 0.94, green: 0.89, blue: 0.87),
-                textSecondary: Color(red: 0.82, green: 0.69, blue: 0.67),
-                textMuted: Color(red: 0.61, green: 0.48, blue: 0.47)
+                textPrimary: Color(red: 0.96, green: 0.92, blue: 0.86),
+                textSecondary: Color(red: 0.81, green: 0.71, blue: 0.61),
+                textMuted: Color(red: 0.59, green: 0.50, blue: 0.40)
             )
-        case .singularity:
+        case .voidTheme:
             return EACCThemeColors(
-                bg: Color.black,
-                cardBg: Color(red: 0.06, green: 0.06, blue: 0.06),
-                cardBorder: Color.white.opacity(0.1),
-                accent: Color.white,
-                accentEdge: Color(red: 0.53, green: 0.53, blue: 0.53),
-                textPrimary: Color.white,
-                textSecondary: Color(red: 0.63, green: 0.63, blue: 0.63),
-                textMuted: Color(red: 0.4, green: 0.4, blue: 0.4)
+                bg: Color(red: 0.96, green: 0.96, blue: 0.94),
+                cardBg: Color(red: 0.93, green: 0.93, blue: 0.91),
+                cardBorder: Color.black.opacity(0.08),
+                accent: Color(red: 0.1, green: 0.1, blue: 0.1),
+                accentEdge: Color(red: 0.4, green: 0.4, blue: 0.4),
+                textPrimary: Color(red: 0.1, green: 0.1, blue: 0.1),
+                textSecondary: Color(red: 0.4, green: 0.4, blue: 0.4),
+                textMuted: Color(red: 0.6, green: 0.6, blue: 0.6)
             )
         }
     }
@@ -431,95 +416,39 @@ struct NervHexPetView: View {
     }
 }
 
-// MARK: - Singularity Pet View (The Void)
+// MARK: - Void Pet View (2001 Monolith)
 
-struct SingularityPetView: View {
+struct VoidPetView: View {
     let mood: CompanionMood
     let accent: Color
 
-    @State private var isFloating = false
-    @State private var isWarping = false
-    @State private var diskAngle = false
+    @State private var isBreathing = false
 
     var body: some View {
         ZStack {
-            // Gravitational lensing rings
-            ForEach(0..<3, id: \.self) { i in
-                Circle()
-                    .stroke(Color.white.opacity(ringOpacity(i)), lineWidth: 0.5)
-                    .frame(
-                        width: CGFloat(50 + i * 18),
-                        height: CGFloat(50 + i * 18)
-                    )
-                    .scaleEffect(isWarping ? 1.05 : 0.95)
-            }
+            // Subtle shadow beneath monolith
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Color.black.opacity(0.15))
+                .frame(width: 32, height: 78)
+                .blur(radius: 8)
+                .offset(y: 4)
 
-            // Event horizon
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [.white.opacity(0.9), .white.opacity(0.3), .black],
-                        center: .center,
-                        startRadius: 2,
-                        endRadius: horizonRadius
-                    )
+            // Monolith
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Color(red: 0.08, green: 0.08, blue: 0.08))
+                .frame(width: 28, height: 72)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .stroke(Color.black.opacity(0.3), lineWidth: 0.5)
                 )
-                .frame(width: horizonRadius * 2, height: horizonRadius * 2)
-
-            // Void center
-            Circle()
-                .fill(.black)
-                .frame(width: voidCenter, height: voidCenter)
-
-            // Accretion disk
-            Ellipse()
-                .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                .frame(width: 70, height: 14)
-                .rotationEffect(.degrees(diskAngle ? 360 : 0))
+                .scaleEffect(isBreathing ? 1.02 : 1.0)
         }
         .frame(width: 108, height: 108)
-        .offset(y: isFloating ? -3 : 3)
         .onAppear {
-            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
-                isFloating = true
-                isWarping = true
-            }
-            withAnimation(.linear(duration: 12).repeatForever(autoreverses: false)) {
-                diskAngle = true
+            withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
+                isBreathing = true
             }
         }
-    }
-
-    private var horizonRadius: CGFloat {
-        switch mood {
-        case .feasting: return 26
-        case .alert: return 23
-        case .expecting: return 20
-        case .dozing: return 17
-        case .sleeping: return 14
-        }
-    }
-
-    private var voidCenter: CGFloat {
-        switch mood {
-        case .feasting: return 10
-        case .alert: return 12
-        case .expecting: return 14
-        case .dozing: return 18
-        case .sleeping: return 22
-        }
-    }
-
-    private func ringOpacity(_ index: Int) -> Double {
-        let base: Double
-        switch mood {
-        case .feasting: base = 0.4
-        case .alert: base = 0.3
-        case .expecting: base = 0.25
-        case .dozing: base = 0.15
-        case .sleeping: base = 0.08
-        }
-        return base * (1.0 - Double(index) * 0.15)
     }
 }
 

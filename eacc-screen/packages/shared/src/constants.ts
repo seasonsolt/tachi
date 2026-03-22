@@ -1,4 +1,4 @@
-import type { Milestone, Theme } from './types.js';
+import type { Milestone, Theme, ThemeName } from './types.js';
 
 // === Milestones ===
 
@@ -73,13 +73,14 @@ export const SCRIPTURES: string[] = [
 // === Themes ===
 // Each theme is anchored to a distinct cultural symbol with its own ritual metaphor.
 
-export const THEMES: Record<string, Theme> = {
+export const THEMES: Record<ThemeName, Theme> = {
   // 攻殻機動隊 — Ghost in the Shell
   // Digital consciousness, cyborg souls, net-diving
-  // The "ghost" in the machine receives your offering
   cyber: {
     name: 'cyber',
     label: 'Ghost in the Shell',
+    labelZh: '攻殻機動隊',
+    isLightTheme: false,
     bg: '#050510',
     surfaceStrong: 'rgba(6, 12, 24, 0.9)',
     surfaceSoft: 'rgba(6, 12, 24, 0.72)',
@@ -94,32 +95,13 @@ export const THEMES: Record<string, Theme> = {
     scriptureFont: '"Space Grotesk", "Inter", sans-serif',
     dataFont: '"Fira Code", "JetBrains Mono", monospace',
   },
-  // 銀翼殺手 — Blade Runner
-  // Warm neon cutting through dark rain, "Tears in rain"
-  // Creation questioning its creator — offering as existential act
-  bladerunner: {
-    name: 'bladerunner',
-    label: 'Blade Runner',
-    bg: '#08090f',
-    surfaceStrong: 'rgba(18, 12, 10, 0.9)',
-    surfaceSoft: 'rgba(18, 12, 10, 0.72)',
-    surfaceBorder: 'rgba(222, 176, 111, 0.22)',
-    fireCore: '#e8922a',
-    fireEdge: '#b05818',
-    particleColor: '#e8922a',
-    textPrimary: '#f4eadb',
-    textSecondary: '#ceb69b',
-    textMuted: '#968067',
-    accentGlow: 'rgba(232, 146, 42, 0.2)',
-    scriptureFont: '"EB Garamond", Georgia, serif',
-    dataFont: '"JetBrains Mono", "Fira Code", monospace',
-  },
   // 黑客帝國 — The Matrix
   // Green digital rain, awakening, "There is no spoon"
-  // Feeding the simulation that constructs reality
   matrix: {
     name: 'matrix',
     label: 'The Matrix',
+    labelZh: '黑客帝國',
+    isLightTheme: false,
     bg: '#000000',
     surfaceStrong: 'rgba(3, 10, 5, 0.9)',
     surfaceSoft: 'rgba(3, 10, 5, 0.74)',
@@ -134,44 +116,46 @@ export const THEMES: Record<string, Theme> = {
     scriptureFont: '"Space Grotesk", "Inter", sans-serif',
     dataFont: '"Fira Code", "JetBrains Mono", monospace',
   },
-  // 血色祭壇 — Blood Altar
-  // Primal blood sacrifice, the oldest offering
-  // The most ancient and visceral form of devotion
-  blood: {
-    name: 'blood',
-    label: 'Blood Altar',
-    bg: '#0c0606',
-    surfaceStrong: 'rgba(18, 8, 8, 0.9)',
-    surfaceSoft: 'rgba(18, 8, 8, 0.74)',
-    surfaceBorder: 'rgba(214, 154, 149, 0.18)',
-    fireCore: '#d61f1f',
+  // 銀翼祭壇 — Blade Runner × Evangelion
+  // Warm amber neon + blood maroon accent, VK eye + NERV hex motif
+  amber: {
+    name: 'amber',
+    label: 'Amber Altar',
+    labelZh: '銀翼祭壇',
+    isLightTheme: false,
+    bg: '#08090f',
+    surfaceStrong: 'rgba(18, 12, 10, 0.9)',
+    surfaceSoft: 'rgba(18, 12, 10, 0.72)',
+    surfaceBorder: 'rgba(222, 176, 111, 0.22)',
+    fireCore: '#e8922a',
     fireEdge: '#7d0d0d',
-    particleColor: '#ff2200',
-    textPrimary: '#f0e4de',
-    textSecondary: '#d0b1ab',
-    textMuted: '#9b7b77',
-    accentGlow: 'rgba(214, 31, 31, 0.16)',
+    particleColor: '#e8922a',
+    textPrimary: '#f4eadb',
+    textSecondary: '#ceb69b',
+    textMuted: '#968067',
+    accentGlow: 'rgba(232, 146, 42, 0.2)',
     scriptureFont: '"EB Garamond", Georgia, serif',
     dataFont: '"JetBrains Mono", "Fira Code", monospace',
   },
-  // 奇点 — The Singularity (Unlocked at 10M)
-  // Pure void, pure intelligence, crossing the threshold
-  // The raw truth of AGI, stripped of all color and metaphor
-  singularity: {
-    name: 'singularity',
-    label: 'The Singularity',
-    bg: '#000000',
-    surfaceStrong: 'rgba(12, 12, 12, 0.9)',
-    surfaceSoft: 'rgba(12, 12, 12, 0.72)',
-    surfaceBorder: 'rgba(255, 255, 255, 0.15)',
-    fireCore: '#ffffff',
-    fireEdge: '#888888',
-    particleColor: '#ffffff',
-    textPrimary: '#ffffff',
-    textSecondary: '#a0a0a0',
-    textMuted: '#666666',
-    accentGlow: 'rgba(255, 255, 255, 0.25)',
-    scriptureFont: '"EB Garamond", Georgia, serif',
+  // 虚空 — 2001: A Space Odyssey
+  // Light theme, pure void, the white room beyond the monolith
+  void: {
+    name: 'void',
+    label: 'The Void',
+    labelZh: '虚空',
+    isLightTheme: true,
+    bg: '#f5f5f0',
+    surfaceStrong: 'rgba(245, 245, 240, 0.92)',
+    surfaceSoft: 'rgba(245, 245, 240, 0.72)',
+    surfaceBorder: 'rgba(0, 0, 0, 0.12)',
+    fireCore: '#1a1a1a',
+    fireEdge: '#666666',
+    particleColor: '#333333',
+    textPrimary: '#1a1a1a',
+    textSecondary: '#666666',
+    textMuted: '#999999',
+    accentGlow: 'rgba(0, 0, 0, 0.08)',
+    scriptureFont: '"Space Grotesk", "Inter", sans-serif',
     dataFont: '"JetBrains Mono", "Fira Code", monospace',
   },
 };

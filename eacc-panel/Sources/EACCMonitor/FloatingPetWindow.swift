@@ -69,7 +69,8 @@ struct DesktopPetView: View {
                 CompanionPetView(
                     persona: vm.companionPersona,
                     mood: vm.companionMood,
-                    accent: vm.companionPetAccent
+                    accent: vm.companionPetAccent,
+                    themeColors: vm.themeColors
                 )
                     .frame(width: 124, height: 124)
             }
@@ -102,12 +103,12 @@ struct DesktopPetView: View {
 
             Text(vm.companionHeadline)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(textPrimary)
+                .foregroundStyle(vm.themeColors.textPrimary)
                 .lineLimit(2)
 
             Text(shortSubtitle)
                 .font(.system(size: 10))
-                .foregroundStyle(textSecondary)
+                .foregroundStyle(vm.themeColors.textSecondary)
                 .lineLimit(2)
         }
         .padding(.horizontal, 12)
@@ -115,7 +116,7 @@ struct DesktopPetView: View {
         .frame(width: 200, alignment: .leading)
         .background(
             BubbleShape()
-                .fill(cardBg.opacity(0.92))
+                .fill(vm.themeColors.cardBg.opacity(0.92))
         )
         .overlay(
             BubbleShape()
