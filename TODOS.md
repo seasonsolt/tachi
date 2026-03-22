@@ -1,42 +1,41 @@
 # TODOS
 
+## Agent-Native
+
+### TODO: Agent onboarding flow polish
+- **What:** First-launch experience: agent auto-detects installed AI tools + env credentials, greets user, sets up recipes
+- **Context:** AgentCore auto-detects 12 provider env vars. Onboarding triggers via `triggerOnboarding()` in ViewModel. Needs UX polish for the chat flow.
+- **Status:** Open
+
+### TODO: Wire RecipeRuntime as primary data source
+- **What:** Currently EACCBridge uses both hardcoded watchers (StatsWatcher) AND RecipeRuntime. Migrate fully to RecipeRuntime as the single source of truth.
+- **Why:** Avoid duplicate data from StatsWatcher + recipe runtime both watching the same file
+- **Status:** Open
+
+### TODO: Agent can answer usage questions from collected data
+- **What:** `query_data` tool currently reads raw stats-cache.json. Should query RecipeRuntime's aggregated data for accurate cross-source answers.
+- **Status:** Open
+
 ## Pre-implementation Research
 
 ### TODO: Verify Anthropic Admin API behavior
 - **What:** Confirm request rate limits, data latency, billing granularity for `/v1/organizations/usage_report/messages` endpoint
-- **Why:** If the API doesn't support 1-minute granularity or has strict rate limits, the data layer polling strategy needs to change
-- **Context:** API requires admin key (`sk-ant-admin...`), not regular API key. Docs suggest 1-minute bucket granularity is available but rate limits are undocumented.
 - **Status:** Open
 
 ### TODO: Confirm music source SDK limitations
-- **What:** Validate Spotify Web Playback SDK (Premium requirement?), YouTube embed autoplay restrictions, and source CC0/royalty-free ambient tracks for default playlist
-- **Why:** User chose "user-selectable music source" which involves three independent integrations
-- **Context:** YouTube integration already exists in `useAudio.ts`. Spotify and local file support TBD. Need 3-5 CC0 ambient tracks (10+ min each) as default/fallback.
+- **What:** Validate Spotify Web Playback SDK, YouTube autoplay restrictions, source CC0 ambient tracks
 - **Status:** Open
-
-### TODO: Document local file formats for Claude Code and Codex CLI
-- **What:** Inspect `~/.claude/stats-cache.json` and `~/.codex/` SQLite database, document schema, write TypeScript type definitions
-- **Why:** These file formats have no official documentation and may change between versions
-- **Context:** Parsers already exist in both `claude-code.ts` and `StatsWatcher.swift` but are based on reverse engineering. Codex SQLite support exists in Swift (`SessionMonitor.swift`) but not in TypeScript.
-- **Status:** Open
-- **Blocked by:** Claude Code and Codex CLI must be installed locally
 
 ## Architecture
 
 ### TODO: Unify pricing tables between TypeScript and Swift
-- **What:** Model pricing is hardcoded in both `eacc-screen/packages/cli/src/collectors/claude-code.ts` and `eacc-panel/Sources/EACCMonitor/StatsWatcher.swift`
-- **Why:** When new models launch, both must be updated independently — easy to miss one
-- **Options:** Shared JSON file that both read, or single source of truth generated at build time
-- **Status:** Open
-
-### TODO: Add Codex session collector to TypeScript CLI
-- **What:** Swift `SessionMonitor.swift` scans `~/.codex/session_index.jsonl` + day-organized session files, but the TypeScript CLI (`claude-sessions.ts`) only watches Claude Code sessions
-- **Why:** Parity between macOS app and web experience
+- **What:** Model pricing hardcoded in both `claude-code.ts` and `StatsWatcher.swift` — easy to miss when models change
+- **Options:** Shared JSON file, or agent-maintained pricing via `update_recipe`
 - **Status:** Open
 
 ### TODO: Add tests
 - **What:** No test infrastructure exists in either project
-- **Priority areas:** Shared package (formatters, milestone logic), collectors (parsing), WebSocket message serialization
+- **Priority areas:** Shared package (formatters, milestone logic), AgentCore tool execution, RecipeRuntime JSONPath extraction
 - **Status:** Open
 
 ### TODO: CI/CD pipeline
@@ -46,31 +45,24 @@
 ## Features
 
 ### TODO: Milestone visual effects
-- **What:** 6 milestone tiers defined in constants but visual effects only partially implemented in the client
-- **Effects needed:** flash (10K), color pulse (100K), particle burst (500K), screen glow (1M), theme shift (5M), permanent unlock (10M / singularity theme)
+- **What:** 6 milestone tiers defined but effects only partially implemented
+- **Effects needed:** flash (10K), color pulse (100K), particle burst (500K), screen glow (1M), theme shift (5M), permanent unlock (10M)
 - **Status:** Open
-
-### TODO: Spotify integration for audio
-- **What:** Add Spotify Web Playback as a third audio source alongside YouTube and local file
-- **Blocker:** Requires Spotify Premium, needs API key management
-- **Status:** Open
-- **Blocked by:** Music source SDK research
 
 ### TODO: Web mode Claude Code data
-- **What:** In web mode (no local CLI server), Claude Code stats are unavailable. Consider a remote relay or cloud sync option.
+- **What:** In web mode (no local CLI server), Claude Code stats are unavailable
 - **Status:** Open
 
 ## Design
 
 ### TODO: Update DESIGN.md to cover all 4 themes
-- **What:** DESIGN.md still documents old 2-theme system. Needs rewrite for consolidated 4-theme system: cyber, matrix, amber, void
-- **Why:** Design system should be the single source of truth for all visual decisions
+- **What:** DESIGN.md still documents old 2-theme system. Needs rewrite for: cyber, matrix, amber, void
 - **Status:** Open
 
 ## Infrastructure
 
 ### TODO: Document Cloudflare Worker deployment
-- **What:** `packages/worker/` has a wrangler.toml but no deployment docs or environment setup instructions
+- **What:** `packages/worker/` has a wrangler.toml but no deployment docs
 - **Status:** Open
 
 ### TODO: macOS app distribution
