@@ -32,9 +32,10 @@ struct EACCMonitorApp: App {
             vm.handleExternalThemeChange(theme)
         }
 
-        // Connect Agent + RecipeRuntime to ViewModel
+        // Connect Agent + RecipeRuntime to ViewModel + Bridge
         vm.agent = agentCore
         vm.recipeRuntime = recipeRuntime
+        bridge.recipeRuntime = recipeRuntime
 
         // Install default recipes if first run
         RecipeStore.installDefaults()

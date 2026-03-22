@@ -127,7 +127,7 @@ final class ViewModel {
     var agentMessages: [AgentMessage] = []
     var agentInput: String = ""
     var agentIsThinking = false
-    var agentNeedsAPIKey: Bool { agent?.apiKey == nil }
+    var agentNeedsAPIKey: Bool { agent?.apiKey == nil || (agent?.apiKey?.isEmpty ?? true) }
     var agent: AgentCore?
     var recipeRuntime: RecipeRuntime?
 

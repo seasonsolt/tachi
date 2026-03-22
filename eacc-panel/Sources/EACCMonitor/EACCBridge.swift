@@ -14,10 +14,20 @@ final class EACCBridge: @unchecked Sendable {
     private var claudeCodeSource: EACCSourceData = .empty
     private var anthropicSource: EACCSourceData = .empty
     private var openaiSource: EACCSourceData = .empty
+    private var dynamicSources: [String: EACCSourceData] = [:]  // from RecipeRuntime
     private var sessions: [EACCSessionInfo] = []
     private var lastMilestoneThreshold = 0
     private var previousTotalTokens = 0
     private var currentTheme: String = "cyber"
+
+    /// RecipeRuntime integration — dynamic sources feed into token aggregation
+    var recipeRuntime: RecipeRuntime? {
+        didSet {
+            recipeRuntime?.onSourceUpdate = { [weak self] id, data in
+                self?.updateDynamicSource(id: id, data: data)
+            }
+        }
+    }
 
     /// Called on main thread when theme changes (from file watcher or WebSocket client)
     var onThemeChanged: ((String) -> Void)?
@@ -153,6 +163,15 @@ final class EACCBridge: @unchecked Sendable {
         broadcastTokenUpdate()
     }
 
+    // MARK: - Dynamic source update (from RecipeRuntime)
+
+    private func updateDynamicSource(id: String, data: EACCSourceData) {
+        lock.lock()
+        dynamicSources[id] = data
+        lock.unlock()
+        broadcastTokenUpdate()
+    }
+
     // MARK: - Private data flow
 
     private func updateClaudeCode(_ data: EACCSourceData) {
@@ -180,6 +199,7 @@ final class EACCBridge: @unchecked Sendable {
         let cc = claudeCodeSource
         let anth = anthropicSource
         let oai = openaiSource
+        let dynamic = dynamicSources
         let sess = sessions
         let theme = currentTheme
         lock.unlock()
@@ -189,13 +209,16 @@ final class EACCBridge: @unchecked Sendable {
         if cc.connected { connectedSources.append("claudeCode") }
         if anth.connected { connectedSources.append("anthropicApi") }
         if oai.connected { connectedSources.append("openaiApi") }
+        for (id, src) in dynamic where src.connected {
+            connectedSources.append(id)
+        }
 
         if let data = EACCWSMessage.connected(connectedSources).jsonData() {
             wsServer.send(to: conn, data: data)
         }
 
         // 2. token_update
-        let tokenData = buildTokenData(cc: cc, anth: anth, oai: oai)
+        let tokenData = buildTokenData(cc: cc, anth: anth, oai: oai, dynamic: dynamic)
         if let data = EACCWSMessage.tokenUpdate(tokenData).jsonData() {
             wsServer.send(to: conn, data: data)
         }
@@ -218,9 +241,10 @@ final class EACCBridge: @unchecked Sendable {
         let cc = claudeCodeSource
         let anth = anthropicSource
         let oai = openaiSource
+        let dynamic = dynamicSources
         lock.unlock()
 
-        let tokenData = buildTokenData(cc: cc, anth: anth, oai: oai)
+        let tokenData = buildTokenData(cc: cc, anth: anth, oai: oai, dynamic: dynamic)
 
         // Check milestone
         checkMilestone(totalTokens: tokenData.totalTokens)
@@ -261,8 +285,8 @@ final class EACCBridge: @unchecked Sendable {
 
     // MARK: - Build aggregated TokenData (matches server.ts buildTokenData)
 
-    private func buildTokenData(cc: EACCSourceData, anth: EACCSourceData, oai: EACCSourceData) -> EACCTokenData {
-        let all = [cc, anth, oai]
+    private func buildTokenData(cc: EACCSourceData, anth: EACCSourceData, oai: EACCSourceData, dynamic: [String: EACCSourceData] = [:]) -> EACCTokenData {
+        let all = [cc, anth, oai] + Array(dynamic.values)
         return EACCTokenData(
             totalTokens: all.reduce(0) { $0 + $1.totalTokens },
             totalCostUSD: all.reduce(0.0) { $0 + $1.costUSD },
