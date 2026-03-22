@@ -37,7 +37,17 @@ final class AgentCore: @unchecked Sendable {
     private let tools: [AgentTool]
     private let queue = DispatchQueue(label: "agent.core")
 
+    /// API key (sk-ant-... or cr_... token)
     private(set) var apiKey: String?
+    /// Base URL for Anthropic API (default: https://api.anthropic.com)
+    private(set) var apiBaseURL: String
+    /// Auth style: "x-api-key" (standard) or "bearer" (proxy/custom)
+    private(set) var authStyle: AuthStyle
+
+    enum AuthStyle {
+        case xApiKey   // x-api-key header (standard Anthropic)
+        case bearer    // Authorization: Bearer (proxy like claude.benwk.io)
+    }
 
     var onMessage: ((AgentMessage) -> Void)?
     var onToolCall: ((String, [String: Any]) -> Void)?
@@ -46,13 +56,133 @@ final class AgentCore: @unchecked Sendable {
 
     init() {
         self.tools = AgentTools.allTools()
-        self.apiKey = Self.loadAPIKey()
+
+        // Auto-detect credentials from environment → saved config → nil
+        let env = Self.detectEnvironment()
+        self.apiBaseURL = env.baseURL
+        self.authStyle = env.authStyle
+        self.apiKey = env.apiKey ?? Self.loadAPIKey()
         self.conversationHistory = Self.loadHistory()
+
+        // Detect all provider keys from environment
+        self.detectedProviders = Self.detectAllProviders()
+
+        if apiKey != nil {
+            NSLog("[AgentCore] Agent credentials: \(authStyle == .bearer ? "Bearer" : "x-api-key") → \(apiBaseURL)")
+        }
+        if !detectedProviders.isEmpty {
+            NSLog("[AgentCore] Detected providers: \(detectedProviders.map(\.name).joined(separator: ", "))")
+        }
     }
 
     func setAPIKey(_ key: String) {
         apiKey = key
+        // Detect auth style from key format
+        if key.hasPrefix("cr_") || key.hasPrefix("Bearer ") {
+            authStyle = .bearer
+        } else {
+            authStyle = .xApiKey
+        }
         saveAPIKey(key)
+    }
+
+    // MARK: - Environment Detection
+
+    private struct EnvCredentials {
+        let apiKey: String?
+        let baseURL: String
+        let authStyle: AuthStyle
+    }
+
+    /// Detected third-party provider credentials from environment
+    struct DetectedProvider {
+        let name: String
+        let apiKey: String
+        let baseURL: String?
+    }
+
+    /// All detected providers from env vars (available to AgentTools for auto-setup)
+    private(set) var detectedProviders: [DetectedProvider] = []
+
+    private static func detectEnvironment() -> EnvCredentials {
+        let baseURL = ProcessInfo.processInfo.environment["ANTHROPIC_BASE_URL"]
+            ?? "https://api.anthropic.com"
+
+        // Try ANTHROPIC_AUTH_TOKEN (bearer proxy), then ANTHROPIC_API_KEY (standard)
+        if let token = ProcessInfo.processInfo.environment["ANTHROPIC_AUTH_TOKEN"], !token.isEmpty {
+            return EnvCredentials(apiKey: token, baseURL: baseURL, authStyle: .bearer)
+        }
+        if let key = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !key.isEmpty {
+            return EnvCredentials(apiKey: key, baseURL: baseURL, authStyle: .xApiKey)
+        }
+
+        return EnvCredentials(apiKey: nil, baseURL: baseURL, authStyle: .xApiKey)
+    }
+
+    /// Scan environment for all known AI provider credentials
+    static func detectAllProviders() -> [DetectedProvider] {
+        let env = ProcessInfo.processInfo.environment
+        var providers: [DetectedProvider] = []
+
+        // Anthropic
+        if let key = env["ANTHROPIC_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "Anthropic", apiKey: key, baseURL: env["ANTHROPIC_BASE_URL"]))
+        }
+        if let token = env["ANTHROPIC_AUTH_TOKEN"], !token.isEmpty {
+            providers.append(DetectedProvider(name: "Anthropic (proxy)", apiKey: token, baseURL: env["ANTHROPIC_BASE_URL"]))
+        }
+
+        // OpenAI
+        if let key = env["OPENAI_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "OpenAI", apiKey: key, baseURL: env["OPENAI_BASE_URL"]))
+        }
+
+        // OpenRouter
+        if let key = env["OPENROUTER_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "OpenRouter", apiKey: key, baseURL: nil))
+        }
+
+        // Together
+        if let key = env["TOGETHER_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "Together", apiKey: key, baseURL: nil))
+        }
+
+        // Groq
+        if let key = env["GROQ_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "Groq", apiKey: key, baseURL: nil))
+        }
+
+        // Fireworks
+        if let key = env["FIREWORKS_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "Fireworks", apiKey: key, baseURL: nil))
+        }
+
+        // Mistral
+        if let key = env["MISTRAL_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "Mistral", apiKey: key, baseURL: nil))
+        }
+
+        // Google / Gemini
+        if let key = env["GOOGLE_API_KEY"] ?? env["GEMINI_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "Google AI", apiKey: key, baseURL: nil))
+        }
+
+        // Deepseek
+        if let key = env["DEEPSEEK_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "DeepSeek", apiKey: key, baseURL: nil))
+        }
+
+        // Perplexity
+        if let key = env["PERPLEXITY_API_KEY"] ?? env["PPLX_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "Perplexity", apiKey: key, baseURL: nil))
+        }
+
+        // Cohere
+        if let key = env["COHERE_API_KEY"] ?? env["CO_API_KEY"], !key.isEmpty {
+            providers.append(DetectedProvider(name: "Cohere", apiKey: key, baseURL: nil))
+        }
+
+        return providers
     }
 
     // MARK: - Send message (full tool-use loop)
@@ -148,7 +278,10 @@ final class AgentCore: @unchecked Sendable {
 
     private func callAPI(system: String, messages: [[String: Any]]) async -> [[String: Any]]? {
         guard let key = apiKey, !key.isEmpty else { return nil }
-        guard let url = URL(string: "https://api.anthropic.com/v1/messages") else { return nil }
+
+        // Build URL from base (supports custom proxies like claude.benwk.io)
+        let base = apiBaseURL.hasSuffix("/") ? String(apiBaseURL.dropLast()) : apiBaseURL
+        guard let url = URL(string: "\(base)/v1/messages") else { return nil }
 
         // Build tool definitions
         let toolDefs = tools.map { $0.definition }
@@ -165,7 +298,15 @@ final class AgentCore: @unchecked Sendable {
 
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
-        req.setValue(key, forHTTPHeaderField: "x-api-key")
+
+        // Auth: Bearer for proxy tokens (cr_...), x-api-key for standard Anthropic keys
+        switch authStyle {
+        case .bearer:
+            req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        case .xApiKey:
+            req.setValue(key, forHTTPHeaderField: "x-api-key")
+        }
+
         req.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         req.setValue("application/json", forHTTPHeaderField: "content-type")
         req.timeoutInterval = 60
@@ -203,6 +344,17 @@ final class AgentCore: @unchecked Sendable {
             "When the user asks you to set up tracking for a new API, use http_probe first to understand the API format, then create_recipe to configure the collector.",
             "Always be concise and direct.",
         ]
+
+        // Detected providers from environment
+        if !detectedProviders.isEmpty {
+            parts.append("")
+            parts.append("Detected API keys in environment (auto-discovered, ready to use):")
+            for p in detectedProviders {
+                let base = p.baseURL.map { " (base: \($0))" } ?? ""
+                parts.append("- \(p.name): key available\(base)")
+            }
+            parts.append("Use these keys directly when creating recipes — no need to ask the user for them.")
+        }
 
         if let ctx = context {
             parts.append("")

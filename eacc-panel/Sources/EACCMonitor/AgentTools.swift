@@ -336,6 +336,21 @@ final class AgentTools {
             info["recipes"] = ["count": 0]
         }
 
+        // Detected API keys from environment variables
+        let providers = AgentCore.detectAllProviders()
+        if !providers.isEmpty {
+            info["env_api_keys"] = providers.map { p -> [String: Any] in
+                var entry: [String: Any] = [
+                    "provider": p.name,
+                    "key_prefix": String(p.apiKey.prefix(8)) + "...",
+                ]
+                if let base = p.baseURL {
+                    entry["base_url"] = base
+                }
+                return entry
+            }
+        }
+
         if let data = try? JSONSerialization.data(withJSONObject: info),
            let str = String(data: data, encoding: .utf8) {
             return str
