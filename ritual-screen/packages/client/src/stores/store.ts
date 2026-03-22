@@ -53,9 +53,19 @@ const DEFAULT_AUDIO_SOURCE: AudioSource = {
   label: 'ambient',
 };
 
+const LS_THEME = 'ritual-theme';
+
+function loadTheme(): ThemeName {
+  const saved = localStorage.getItem(LS_THEME);
+  if (saved === 'cyber' || saved === 'bladerunner' || saved === 'matrix' || saved === 'blood' || saved === 'singularity') {
+    return saved;
+  }
+  return 'cyber';
+}
+
 export const useStore = create<RitualStore>((set) => ({
   tokenData: null,
-  theme: 'cyber',
+  theme: loadTheme(),
   mode: 'cli',
   wsConnected: false,
   setupOpen: false,
@@ -71,7 +81,10 @@ export const useStore = create<RitualStore>((set) => ({
   focusRunning: false,
   focusCompletedAt: null,
   setTokenData: (data) => set({ tokenData: data }),
-  setTheme: (theme) => set({ theme }),
+  setTheme: (theme) => {
+    localStorage.setItem(LS_THEME, theme);
+    set({ theme });
+  },
   setMode: (mode) => set({ mode }),
   toggleSetup: () => set((s) => ({ setupOpen: !s.setupOpen })),
   setSetupOpen: (open) => set({ setupOpen: open }),

@@ -62,6 +62,7 @@ enum RitualWSMessage {
     case sessionUpdate([RitualSessionInfo])
     case connected([String])
     case milestone(RitualMilestone)
+    case themeChange(String)
     case error(source: String, message: String)
 
     func jsonData() -> Data? {
@@ -86,6 +87,9 @@ extension RitualWSMessage: Encodable {
         case .milestone(let m):
             try container.encode("milestone", forKey: .type)
             try container.encode(m, forKey: .milestone)
+        case .themeChange(let theme):
+            try container.encode("theme_change", forKey: .type)
+            try container.encode(theme, forKey: .theme)
         case .error(let source, let message):
             try container.encode("error", forKey: .type)
             try container.encode(source, forKey: .source)
@@ -94,6 +98,6 @@ extension RitualWSMessage: Encodable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case type, data, sessions, sources, milestone, source, message
+        case type, data, sessions, sources, milestone, source, message, theme
     }
 }

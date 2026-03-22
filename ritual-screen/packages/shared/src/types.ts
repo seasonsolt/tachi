@@ -81,10 +81,12 @@ export type WSMessage =
   | { type: 'milestone'; milestone: Milestone }
   | { type: 'error'; source: string; message: string }
   | { type: 'connected'; sources: string[] }
-  | { type: 'session_update'; sessions: SessionInfo[] };
+  | { type: 'session_update'; sessions: SessionInfo[] }
+  | { type: 'theme_change'; theme: ThemeName };
 
 export type WSClientMessage =
   | { type: 'configure'; config: Partial<RitualConfig> }
+  | { type: 'theme_change'; theme: ThemeName }
   | { type: 'ping' };
 
 // === Config ===

@@ -324,7 +324,10 @@ export function Setup({ send, onClose }: SetupProps) {
             {Object.values(THEMES).map((th) => (
               <button
                 key={th.name}
-                onClick={() => setTheme(th.name)}
+                onClick={() => {
+                  setTheme(th.name);
+                  send({ type: 'theme_change', theme: th.name });
+                }}
                 style={{
                   ...styles.themeBtn,
                   borderColor: theme === th.name ? th.fireCore : th.surfaceBorder,

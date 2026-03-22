@@ -8,6 +8,7 @@ final class RitualBridge: @unchecked Sendable {
     let wsServer: WebSocketServer
     let statsWatcher: StatsWatcher
     let sessionsWatcher: SessionsWatcher
+    let themeWatcher: ThemeWatcher
 
     private let lock = NSLock()
     private var claudeCodeSource: RitualSourceData = .empty
@@ -16,11 +17,16 @@ final class RitualBridge: @unchecked Sendable {
     private var sessions: [RitualSessionInfo] = []
     private var lastMilestoneThreshold = 0
     private var previousTotalTokens = 0
+    private var currentTheme: String = "cyber"
 
-    init(wsServer: WebSocketServer, statsWatcher: StatsWatcher, sessionsWatcher: SessionsWatcher) {
+    /// Called on main thread when theme changes (from file watcher or WebSocket client)
+    var onThemeChanged: ((String) -> Void)?
+
+    init(wsServer: WebSocketServer, statsWatcher: StatsWatcher, sessionsWatcher: SessionsWatcher, themeWatcher: ThemeWatcher) {
         self.wsServer = wsServer
         self.statsWatcher = statsWatcher
         self.sessionsWatcher = sessionsWatcher
+        self.themeWatcher = themeWatcher
     }
 
     // MARK: - Milestone table (matches constants.ts lines 5-48)
@@ -46,13 +52,89 @@ final class RitualBridge: @unchecked Sendable {
             self?.updateSessions(sessions)
         }
 
+        // Wire up theme watcher — file changes → broadcast to WebSocket clients + notify ViewModel
+        themeWatcher.onChange = { [weak self] theme in
+            self?.handleThemeFileChanged(theme)
+        }
+
         // Wire up WebSocket client connection handler
         wsServer.onClientConnected = { [weak self] conn in
             self?.handleNewClient(conn)
         }
 
-        // Silently ignore client messages (configure not needed, ping auto-handled)
-        wsServer.onClientMessage = { _, _ in }
+        // Handle client messages (theme_change)
+        wsServer.onClientMessage = { [weak self] _, message in
+            self?.handleClientMessage(message)
+        }
+
+        // Read initial theme from file
+        if let theme = themeWatcher.readTheme() {
+            lock.lock()
+            currentTheme = theme
+            lock.unlock()
+        }
+    }
+
+    // MARK: - Theme sync
+
+    /// Called when macOS UI changes theme — write file + broadcast to WS clients
+    func setTheme(_ theme: String) {
+        lock.lock()
+        let changed = currentTheme != theme
+        currentTheme = theme
+        lock.unlock()
+
+        if changed {
+            themeWatcher.writeTheme(theme)
+            broadcastTheme(theme)
+        }
+    }
+
+    private func handleThemeFileChanged(_ theme: String) {
+        lock.lock()
+        let changed = currentTheme != theme
+        currentTheme = theme
+        lock.unlock()
+
+        if changed {
+            // Broadcast to WebSocket clients
+            broadcastTheme(theme)
+            // Notify ViewModel on main thread
+            DispatchQueue.main.async { [weak self] in
+                self?.onThemeChanged?(theme)
+            }
+        }
+    }
+
+    private func handleClientMessage(_ message: String) {
+        guard let data = message.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let type = json["type"] as? String
+        else { return }
+
+        if type == "theme_change", let theme = json["theme"] as? String {
+            lock.lock()
+            let changed = currentTheme != theme
+            currentTheme = theme
+            lock.unlock()
+
+            if changed {
+                // Write to file so CLI/web picks it up
+                themeWatcher.writeTheme(theme)
+                // Broadcast to all other WS clients
+                broadcastTheme(theme)
+                // Notify ViewModel on main thread
+                DispatchQueue.main.async { [weak self] in
+                    self?.onThemeChanged?(theme)
+                }
+            }
+        }
+    }
+
+    private func broadcastTheme(_ theme: String) {
+        if let data = RitualWSMessage.themeChange(theme).jsonData() {
+            wsServer.broadcast(data)
+        }
     }
 
     // MARK: - Update from API polling (called from ViewModel refresh cycle)
@@ -99,6 +181,7 @@ final class RitualBridge: @unchecked Sendable {
         let anth = anthropicSource
         let oai = openaiSource
         let sess = sessions
+        let theme = currentTheme
         lock.unlock()
 
         // 1. connected
@@ -119,6 +202,11 @@ final class RitualBridge: @unchecked Sendable {
 
         // 3. session_update
         if let data = RitualWSMessage.sessionUpdate(sess).jsonData() {
+            wsServer.send(to: conn, data: data)
+        }
+
+        // 4. theme_change (send current theme to new client)
+        if let data = RitualWSMessage.themeChange(theme).jsonData() {
             wsServer.send(to: conn, data: data)
         }
     }
