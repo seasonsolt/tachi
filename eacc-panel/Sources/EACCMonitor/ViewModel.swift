@@ -123,6 +123,14 @@ final class ViewModel {
     var companionPersonaMode: CompanionPersonaMode = ViewModel.loadCompanionPersonaMode()
     var selectedTheme: EACCThemeName = ViewModel.loadTheme()
 
+    // Agent
+    var agentMessages: [AgentMessage] = []
+    var agentInput: String = ""
+    var agentIsThinking = false
+    var agentNeedsAPIKey: Bool { agent?.apiKey == nil }
+    var agent: AgentCore?
+    var recipeRuntime: RecipeRuntime?
+
     var themeColors: EACCThemeColors {
         EACCThemeColors.forTheme(selectedTheme)
     }
@@ -284,6 +292,65 @@ final class ViewModel {
 
     /// Bridge reference for cross-process theme sync
     var bridge: EACCBridge?
+
+    // MARK: - Agent
+
+    @MainActor
+    func sendAgentMessage() {
+        let text = agentInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let agent else { return }
+        agentInput = ""
+
+        let userMsg = AgentMessage(id: UUID(), role: .user, content: text, timestamp: Date(), toolCalls: nil)
+        agentMessages.append(userMsg)
+        agentIsThinking = true
+
+        Task {
+            let context = buildAgentContext()
+            let response = await agent.sendMessage(text, context: context)
+            await MainActor.run {
+                agentMessages.append(response)
+                agentIsThinking = false
+            }
+        }
+    }
+
+    @MainActor
+    func setAgentAPIKey(_ key: String) {
+        agent?.setAPIKey(key)
+        // Trigger onboarding after key is set
+        if agentMessages.isEmpty {
+            triggerOnboarding()
+        }
+    }
+
+    @MainActor
+    func triggerOnboarding() {
+        guard let agent, agent.apiKey != nil else { return }
+        agentIsThinking = true
+        Task {
+            let context = buildAgentContext()
+            let response = await agent.sendMessage(
+                "I just launched the app for the first time. Please check what AI tools I have installed and help me set up token tracking.",
+                context: context
+            )
+            await MainActor.run {
+                agentMessages.append(response)
+                agentIsThinking = false
+            }
+        }
+    }
+
+    private func buildAgentContext() -> AgentContext {
+        let recipes = recipeRuntime?.getAllData().keys.map { $0 } ?? []
+        let sources = recipeRuntime?.getAllData().reduce(into: [String: Bool]()) { $0[$1.key] = $1.value.connected } ?? [:]
+        let allData: [EACCSourceData] = recipeRuntime.map { Array($0.getAllData().values) } ?? []
+        let totalTokens = allData.reduce(0) { $0 + $1.totalTokens }
+        let totalCost = allData.reduce(0.0) { $0 + $1.costUSD }
+        let todayTokens = allData.reduce(0) { $0 + $1.todayTokens }
+        let todayCost = allData.reduce(0.0) { $0 + $1.todayCostUSD }
+        return AgentContext(recipes: recipes, sources: sources, totalTokens: totalTokens, totalCost: totalCost, todayTokens: todayTokens, todayCost: todayCost)
+    }
 
     @MainActor
     func setTheme(_ theme: EACCThemeName) {
