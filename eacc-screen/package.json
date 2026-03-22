@@ -1,0 +1,14 @@
+{
+  "name": "eacc-screen",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -F cli dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "clean": "pnpm -r clean"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "wrangler": "^4.0.0"
+  }
+}

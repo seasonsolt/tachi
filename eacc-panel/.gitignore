@@ -1,0 +1,4 @@
+.build/
+EACCMonitor.app/
+.swiftpm/
+.DS_Store
