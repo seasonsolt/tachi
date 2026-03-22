@@ -184,27 +184,16 @@ function TokenHero() {
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: isMatrix ? '128%' : '112%',
-          height: isMatrix ? '220%' : '190%',
+          width: isMatrix ? '128%' : '120%',
+          height: isMatrix ? '220%' : '200%',
           background: isMatrix
             ? 'radial-gradient(ellipse, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.52) 46%, transparent 74%)'
-            : `radial-gradient(ellipse, rgba(0,0,0,0.56) 0%, ${t.bg}b8 34%, transparent 72%)`,
+            : `radial-gradient(ellipse, ${t.surfaceStrong} 0%, ${t.surfaceSoft} 34%, transparent 72%)`,
           filter: 'blur(4px)',
           zIndex: -2,
         }}
       />
-      <div
-        style={{
-          position: 'absolute',
-          top: '56%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '150%',
-          height: '78%',
-          background: `linear-gradient(180deg, transparent 0%, ${t.bg}38 18%, ${t.bg}9e 52%, transparent 100%)`,
-          zIndex: -1,
-        }}
-      />
+
       <div
         style={{
           fontFamily: t.dataFont,
@@ -213,7 +202,7 @@ function TokenHero() {
           color: isMatrix ? '#ffffff' : t.textPrimary,
           textShadow: isMatrix
             ? '0 0 20px #00ff41, 0 0 40px #00ff41, 0 0 80px rgba(0,255,65,0.5)'
-            : `0 0 40px ${t.accentGlow}, 0 0 80px ${t.accentGlow}, 0 0 120px ${t.accentGlow}`,
+            : `0 0 24px ${t.accentGlow}, 0 0 56px ${t.accentGlow}`,
           lineHeight: 1,
           transition: 'color 1s ease, text-shadow 1s ease',
           letterSpacing: '-0.02em',
@@ -223,25 +212,7 @@ function TokenHero() {
       >
         {displayValue}
       </div>
-      {costDisplay && (
-        <div
-          style={{
-            fontFamily: t.dataFont,
-            fontSize: 20,
-            color: isMatrix ? '#88ff88' : t.textSecondary,
-            marginTop: 12,
-            opacity: isMatrix ? 0.88 : 0.82,
-            letterSpacing: '0.08em',
-            textShadow: isMatrix
-              ? '0 0 12px rgba(0,255,65,0.35)'
-              : `0 0 20px ${t.accentGlow}`,
-            background: `linear-gradient(90deg, transparent 0%, ${t.bg}a0 18%, ${t.bg}a0 82%, transparent 100%)`,
-            padding: '4px 18px',
-          }}
-        >
-          {costDisplay}
-        </div>
-      )}
+
       {subtitle && (
         <div
           style={{
@@ -251,9 +222,7 @@ function TokenHero() {
             marginTop: 20,
             opacity: 0.92,
             fontStyle: 'italic',
-            background: `linear-gradient(90deg, transparent 0%, ${t.bg}bc 14%, ${t.bg}bc 86%, transparent 100%)`,
-            padding: '6px 20px',
-            textShadow: `0 0 18px ${t.bg}`,
+            textShadow: `0 0 12px ${t.surfaceStrong}, 0 0 24px ${t.bg}`,
           }}
         >
           {subtitle}
@@ -266,10 +235,8 @@ function TokenHero() {
             fontSize: 20,
             color: t.fireCore,
             marginTop: 16,
-            textShadow: `0 0 20px ${t.accentGlow}`,
+            textShadow: `0 0 20px ${t.accentGlow}, 0 0 12px ${t.surfaceStrong}`,
             animation: 'milestoneGlow 2s ease-in-out infinite',
-            background: `linear-gradient(90deg, transparent 0%, ${t.bg}9a 12%, ${t.bg}9a 88%, transparent 100%)`,
-            padding: '6px 22px',
           }}
         >
           {milestone.nameZh} — {milestone.name}
@@ -329,7 +296,7 @@ export function AltarScene() {
 const heroStyles: Record<string, React.CSSProperties> = {
   container: {
     position: 'absolute',
-    top: '45%',
+    top: '40%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
     textAlign: 'center',

@@ -85,12 +85,14 @@ export function Scripture() {
         textTransform: isMatrix ? 'uppercase' as const : undefined,
         color: isMatrix ? '#00ff41' : 'var(--text-primary)',
         background: isMatrix
-          ? 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.78) 18%, rgba(0,0,0,0.78) 82%, transparent 100%)'
-          : 'linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.34) 100%)',
+          ? 'linear-gradient(90deg, transparent 0%, var(--surface-strong) 18%, var(--surface-strong) 82%, transparent 100%)'
+          : 'linear-gradient(180deg, var(--surface-soft) 0%, var(--surface-strong) 100%)',
         padding: isMatrix ? '8px 24px' : '10px 28px',
         textShadow: isMatrix ? '0 0 12px rgba(0,255,65,0.28)' : '0 0 22px rgba(0,0,0,0.42)',
         backdropFilter: 'blur(2px)',
+        borderColor: isMatrix ? 'var(--surface-border)' : 'transparent',
         opacity,
+        filter: opacity === 0 ? 'blur(8px)' : 'blur(0px)',
       }}
     >
       {isMatrix ? `> ${text}_` : text}
@@ -110,10 +112,10 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-secondary)',
     maxWidth: '60%',
     lineHeight: 1.6,
-    transition: 'opacity 3s ease',
+    transition: 'opacity 3s ease, filter 3s ease',
     pointerEvents: 'none',
     userSelect: 'none',
     zIndex: 10,
-    border: '1px solid transparent',
+    border: '1px solid var(--surface-border)',
   },
 };

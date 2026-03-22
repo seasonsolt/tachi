@@ -128,6 +128,18 @@ export function startServer(port: number): { close: () => void } {
   // Hono app
   const app = new Hono();
 
+  // CORS middleware — allow e-acc.ai and any origin to connect
+  app.use('*', async (c, next) => {
+    await next();
+    c.header('Access-Control-Allow-Origin', c.req.header('Origin') || '*');
+    c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    c.header('Access-Control-Allow-Headers', 'Content-Type');
+  });
+
+  app.options('*', (c) => {
+    return c.body(null, 204);
+  });
+
   // API endpoints
   app.get('/api/status', (c) => {
     return c.json(buildTokenData(sources));

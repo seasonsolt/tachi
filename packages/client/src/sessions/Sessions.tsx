@@ -97,8 +97,9 @@ export function Sessions() {
         ...styles.container,
         fontFamily: t.dataFont,
         opacity: hovered ? 0.92 : 0.78,
-        background: `linear-gradient(90deg, ${t.bg}f5 0%, ${t.bg}d8 58%, transparent 100%)`,
-        textShadow: `0 0 18px ${t.accentGlow}`,
+        background: `linear-gradient(90deg, ${t.surfaceStrong} 0%, ${t.surfaceSoft} 58%, transparent 100%)`,
+        textShadow: `0 0 12px ${t.accentGlow}`,
+        borderBottom: `1px solid ${t.surfaceBorder}`,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
