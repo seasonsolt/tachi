@@ -4,6 +4,10 @@ import SwiftUI
 enum CompanionPersona: Equatable {
     case defaultOrb
     case laughingMan
+    case bladeRunnerEye
+    case matrixAgent
+    case nervHex
+    case singularityVoid
 
     var petAccent: Color? {
         switch self {
@@ -11,30 +15,15 @@ enum CompanionPersona: Equatable {
             return nil
         case .laughingMan:
             return ghostAccent
+        case .bladeRunnerEye:
+            return Color(red: 0.91, green: 0.57, blue: 0.16)
+        case .matrixAgent:
+            return Color(red: 0, green: 1.0, blue: 0.25)
+        case .nervHex:
+            return Color(red: 0.84, green: 0.12, blue: 0.12)
+        case .singularityVoid:
+            return .white
         }
-    }
-
-    static func detect(from session: CodingSession?) -> CompanionPersona {
-        guard let session else { return .defaultOrb }
-
-        let haystacks = [
-            session.projectPath,
-            session.projectName,
-            session.slug,
-        ].map { $0.lowercased() }
-
-        if haystacks.contains(where: {
-            $0.contains("ritual-screen")
-                || $0.contains("laughing-man")
-                || $0.contains("laughingman")
-                || $0.contains("ghost-in-the-shell")
-                || $0.contains("standalonecomplex")
-                || $0.contains("stand-alone-complex")
-        }) {
-            return .laughingMan
-        }
-
-        return .defaultOrb
     }
 }
 
@@ -42,37 +31,44 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
     case automatic
     case defaultOrb
     case laughingMan
+    case bladeRunnerEye
+    case matrixAgent
+    case nervHex
+    case singularityVoid
 
     var label: String {
         switch self {
-        case .automatic:
-            return "Auto"
-        case .defaultOrb:
-            return "Orb"
-        case .laughingMan:
-            return "Laughing Man"
+        case .automatic: return "Auto (follows theme)"
+        case .defaultOrb: return "Orb"
+        case .laughingMan: return "笑い男 Laughing Man"
+        case .bladeRunnerEye: return "Voight-Kampff Eye"
+        case .matrixAgent: return "Matrix Agent"
+        case .nervHex: return "NERV Hex"
+        case .singularityVoid: return "Singularity Void"
         }
     }
 
     var badge: String {
         switch self {
-        case .automatic:
-            return "PET AUTO"
-        case .defaultOrb:
-            return "PET ORB"
-        case .laughingMan:
-            return "PET LM"
+        case .automatic: return "PET AUTO"
+        case .defaultOrb: return "PET ORB"
+        case .laughingMan: return "PET LM"
+        case .bladeRunnerEye: return "PET VK"
+        case .matrixAgent: return "PET MX"
+        case .nervHex: return "PET NV"
+        case .singularityVoid: return "PET ∞"
         }
     }
 
     var personaOverride: CompanionPersona? {
         switch self {
-        case .automatic:
-            return nil
-        case .defaultOrb:
-            return .defaultOrb
-        case .laughingMan:
-            return .laughingMan
+        case .automatic: return nil
+        case .defaultOrb: return .defaultOrb
+        case .laughingMan: return .laughingMan
+        case .bladeRunnerEye: return .bladeRunnerEye
+        case .matrixAgent: return .matrixAgent
+        case .nervHex: return .nervHex
+        case .singularityVoid: return .singularityVoid
         }
     }
 }
@@ -132,6 +128,11 @@ final class ViewModel {
     var testStates: [Int: TestState] = [:]
     var menuAnimationFrame = 0
     var companionPersonaMode: CompanionPersonaMode = ViewModel.loadCompanionPersonaMode()
+    var selectedTheme: RitualThemeName = ViewModel.loadTheme()
+
+    var themeColors: RitualThemeColors {
+        RitualThemeColors.forTheme(selectedTheme)
+    }
 
     var refreshInterval: TimeInterval {
         get {
@@ -207,7 +208,7 @@ final class ViewModel {
     }
 
     var companionPersona: CompanionPersona {
-        companionPersonaMode.personaOverride ?? CompanionPersona.detect(from: dominantSession)
+        companionPersonaMode.personaOverride ?? selectedTheme.defaultPersona
     }
 
     var companionHeadline: String {
@@ -288,6 +289,27 @@ final class ViewModel {
         UserDefaults.standard.set(mode.rawValue, forKey: Self.companionPersonaModeKey)
     }
 
+    /// Bridge reference for cross-process theme sync
+    var bridge: RitualBridge?
+
+    @MainActor
+    func setTheme(_ theme: RitualThemeName) {
+        selectedTheme = theme
+        UserDefaults.standard.set(theme.rawValue, forKey: Self.themeKey)
+        // Sync to file + WebSocket clients
+        bridge?.setTheme(theme.rawValue)
+    }
+
+    /// Called by RitualBridge when theme changes externally (file watcher or WebSocket client)
+    @MainActor
+    func handleExternalThemeChange(_ themeName: String) {
+        guard let theme = RitualThemeName(rawValue: themeName),
+              theme != selectedTheme
+        else { return }
+        selectedTheme = theme
+        UserDefaults.standard.set(theme.rawValue, forKey: Self.themeKey)
+    }
+
     @MainActor
     private func refreshUsage() async {
         let api = APIClient.shared
@@ -335,10 +357,16 @@ final class ViewModel {
     }
 
     private static let companionPersonaModeKey = "companionPersonaMode"
+    private static let themeKey = "ritualTheme"
 
     private static func loadCompanionPersonaMode() -> CompanionPersonaMode {
         let raw = UserDefaults.standard.string(forKey: companionPersonaModeKey)
         return raw.flatMap(CompanionPersonaMode.init(rawValue:)) ?? .automatic
+    }
+
+    private static func loadTheme() -> RitualThemeName {
+        let raw = UserDefaults.standard.string(forKey: themeKey)
+        return raw.flatMap(RitualThemeName.init(rawValue:)) ?? .cyber
     }
 
     @MainActor

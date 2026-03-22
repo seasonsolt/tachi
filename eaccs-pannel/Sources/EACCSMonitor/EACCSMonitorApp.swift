@@ -8,21 +8,31 @@ struct EACCSMonitorApp: App {
     private let wsServer = WebSocketServer(port: 3666)
     private let statsWatcher = StatsWatcher()
     private let sessionsWatcher = SessionsWatcher()
+    private let themeWatcher = ThemeWatcher()
     private let bridge: RitualBridge
 
     init() {
         NotificationManager.shared.requestAuthorization()
 
-        // Wire up the ritual bridge
+        // Wire up the ritual bridge (includes theme watcher)
         bridge = RitualBridge(
             wsServer: wsServer,
             statsWatcher: statsWatcher,
-            sessionsWatcher: sessionsWatcher
+            sessionsWatcher: sessionsWatcher,
+            themeWatcher: themeWatcher
         )
+
+        // Connect ViewModel ↔ Bridge for theme sync
+        vm.bridge = bridge
+        bridge.onThemeChanged = { [vm] theme in
+            vm.handleExternalThemeChange(theme)
+        }
+
         bridge.start()
         wsServer.start()
         statsWatcher.start()
         sessionsWatcher.start()
+        themeWatcher.start()
     }
 
     var body: some Scene {

@@ -37,8 +37,10 @@ struct ContentView: View {
         .frame(width: 400)
         .background {
             ZStack {
-                ritualBg
-                MatrixRainView()
+                vm.themeColors.bg
+                if vm.selectedTheme == .matrix {
+                    MatrixRainView()
+                }
             }
         }
     }
@@ -47,7 +49,7 @@ struct ContentView: View {
         HStack {
             Text("e/acc")
                 .font(.system(size: 14, weight: .bold, design: .monospaced))
-                .foregroundStyle(cyanAccent)
+                .foregroundStyle(vm.themeColors.accent)
             Spacer()
             if let date = vm.lastUpdated {
                 HStack(spacing: 4) {
@@ -193,6 +195,8 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
 
+                ThemePickerMenu(vm: vm)
+
                 Spacer()
                 Button("OPEN ALTAR") {
                     if let url = URL(string: "https://e-acc.ai") {
@@ -201,7 +205,7 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(cyanAccent.opacity(0.7))
+                .foregroundStyle(vm.themeColors.accent.opacity(0.7))
                 Button("DISCONNECT") {
                     NSApplication.shared.terminate(nil)
                 }
@@ -346,6 +350,43 @@ struct CompanionPersonaActions: View {
     }
 }
 
+// MARK: - Theme Picker Menu
+
+struct ThemePickerMenu: View {
+    let vm: ViewModel
+
+    var body: some View {
+        Menu {
+            ForEach(RitualThemeName.allCases, id: \.self) { theme in
+                Button {
+                    vm.setTheme(theme)
+                } label: {
+                    HStack {
+                        Text("\(theme.label) — \(theme.subtitle)")
+                        if vm.selectedTheme == theme {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(vm.themeColors.accent)
+                    .frame(width: 6, height: 6)
+                Text(vm.selectedTheme.label)
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(vm.themeColors.accent.opacity(0.12)))
+            .foregroundStyle(vm.themeColors.accent)
+        }
+        .menuStyle(.borderlessButton)
+        .help("Switch theme")
+    }
+}
+
 struct CompanionPetView: View {
     let persona: CompanionPersona
     let mood: CompanionMood
@@ -357,6 +398,14 @@ struct CompanionPetView: View {
             DefaultCompanionPetView(mood: mood, accent: accent)
         case .laughingMan:
             LaughingManPetView(mood: mood, accent: accent)
+        case .bladeRunnerEye:
+            BladeRunnerPetView(mood: mood, accent: accent)
+        case .matrixAgent:
+            MatrixPetView(mood: mood, accent: accent)
+        case .nervHex:
+            NervHexPetView(mood: mood, accent: accent)
+        case .singularityVoid:
+            SingularityPetView(mood: mood, accent: accent)
         }
     }
 }

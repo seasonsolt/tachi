@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { WebSocketServer, WebSocket } from 'ws';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, watchFile, unwatchFile } from 'node:fs';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { TokenData, SourceData, WSMessage, WSClientMessage, RitualConfig, SessionInfo } from '@ritual-screen/shared';
+import { homedir } from 'node:os';
+import type { TokenData, SourceData, WSMessage, WSClientMessage, RitualConfig, SessionInfo, ThemeName } from '@ritual-screen/shared';
 import { getMilestone } from '@ritual-screen/shared';
 import { loadConfig, saveConfig } from './config.js';
 import { startClaudeCodeCollector } from './collectors/claude-code.js';
@@ -48,6 +49,29 @@ function buildTokenData(sources: {
   };
 }
 
+// Theme file for cross-process sync with macOS app
+const THEME_DIR = join(homedir(), '.ritual-screen');
+const THEME_FILE = join(THEME_DIR, 'theme.json');
+
+function readThemeFile(): ThemeName | null {
+  try {
+    if (!existsSync(THEME_FILE)) return null;
+    const json = JSON.parse(readFileSync(THEME_FILE, 'utf-8'));
+    return json.theme || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeThemeFile(theme: ThemeName): void {
+  try {
+    mkdirSync(THEME_DIR, { recursive: true });
+    writeFileSync(THEME_FILE, JSON.stringify({ theme }) + '\n');
+  } catch {
+    // Ignore write errors
+  }
+}
+
 export function startServer(port: number): { close: () => void } {
   let config = loadConfig();
   config.port = port;
@@ -60,6 +84,7 @@ export function startServer(port: number): { close: () => void } {
   };
 
   let currentSessions: SessionInfo[] = [];
+  let currentTheme: ThemeName = readThemeFile() || 'cyber';
 
   let previousTotalTokens = 0;
   let lastMilestoneThreshold = 0;
@@ -123,6 +148,15 @@ export function startServer(port: number): { close: () => void } {
   const stopSessions = startSessionCollector((sessions) => {
     currentSessions = sessions;
     broadcast({ type: 'session_update', sessions });
+  });
+
+  // Watch theme file for cross-process sync (macOS app writes this)
+  watchFile(THEME_FILE, { interval: 1000 }, () => {
+    const theme = readThemeFile();
+    if (theme && theme !== currentTheme) {
+      currentTheme = theme;
+      broadcast({ type: 'theme_change', theme });
+    }
   });
 
   // Hono app
@@ -222,6 +256,7 @@ export function startServer(port: number): { close: () => void } {
     ws.send(JSON.stringify({ type: 'connected', sources: connectedSources } satisfies WSMessage));
     ws.send(JSON.stringify({ type: 'token_update', data: buildTokenData(sources) } satisfies WSMessage));
     ws.send(JSON.stringify({ type: 'session_update', sessions: currentSessions } satisfies WSMessage));
+    ws.send(JSON.stringify({ type: 'theme_change', theme: currentTheme } satisfies WSMessage));
 
     ws.on('message', (raw) => {
       try {
@@ -229,8 +264,13 @@ export function startServer(port: number): { close: () => void } {
         if (msg.type === 'configure') {
           config = { ...config, ...msg.config };
           saveConfig(config);
-          // Broadcast updated state
           broadcastUpdate();
+        } else if (msg.type === 'theme_change') {
+          if (msg.theme !== currentTheme) {
+            currentTheme = msg.theme;
+            writeThemeFile(msg.theme);
+            broadcast({ type: 'theme_change', theme: msg.theme });
+          }
         }
         // ping is just a keepalive, no response needed
       } catch {
@@ -245,6 +285,7 @@ export function startServer(port: number): { close: () => void } {
       stopAnthropic();
       stopOpenAI();
       stopSessions();
+      unwatchFile(THEME_FILE);
       wss.close();
       (server as import('node:http').Server).close();
     },

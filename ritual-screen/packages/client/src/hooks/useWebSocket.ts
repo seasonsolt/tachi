@@ -40,7 +40,7 @@ export function useWebSocket() {
   const prevMilestoneRef = useRef<string | null>(null);
 
   const mode = useStore((s) => s.mode);
-  const { setTokenData, setWsConnected, setMilestone, setMode, setSessions } = useStore();
+  const { setTokenData, setWsConnected, setMilestone, setMode, setSessions, setTheme } = useStore();
 
   const getUrl = useCallback(() => {
     const customServer = resolveServerUrl();
@@ -92,6 +92,9 @@ export function useWebSocket() {
           case 'session_update':
             setSessions(msg.sessions);
             break;
+          case 'theme_change':
+            setTheme(msg.theme);
+            break;
           case 'connected':
           case 'error':
             break;
@@ -121,7 +124,7 @@ export function useWebSocket() {
     ws.onerror = () => {
       ws.close();
     };
-  }, [getUrl, setTokenData, setWsConnected, setMilestone, setMode, setSessions]);
+  }, [getUrl, setTokenData, setWsConnected, setMilestone, setMode, setSessions, setTheme]);
 
   useEffect(() => {
     if (mode === 'web') return;
