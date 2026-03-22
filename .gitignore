@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.build/
+dist/
+*.o
+*.d
+
+# macOS
+.DS_Store
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+xcuserdata/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Claude
+.claude/
