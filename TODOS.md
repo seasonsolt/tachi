@@ -62,13 +62,9 @@
 
 ## Design
 
-### TODO: Update DESIGN.md to cover all 5 themes
-- **What:** DESIGN.md only documents 2 themes (Ancient Altar, Cyber Shrine) but code has 5: cyber, bladerunner, matrix, blood, singularity
+### TODO: Update DESIGN.md to cover all 4 themes
+- **What:** DESIGN.md still documents old 2-theme system. Needs rewrite for consolidated 4-theme system: cyber, matrix, amber, void
 - **Why:** Design system should be the single source of truth for all visual decisions
-- **Status:** Open
-
-### TODO: Companion pet design specs
-- **What:** The macOS floating pet window has 5 themed companions (Laughing Man, Voight-Kampff Eye, Matrix Agent, NERV Hex, Singularity) but no design spec
 - **Status:** Open
 
 ## Infrastructure

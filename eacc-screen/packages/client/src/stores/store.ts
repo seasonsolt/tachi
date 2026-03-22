@@ -57,7 +57,10 @@ const LS_THEME = 'ritual-theme';
 
 function loadTheme(): ThemeName {
   const saved = localStorage.getItem(LS_THEME);
-  if (saved === 'cyber' || saved === 'bladerunner' || saved === 'matrix' || saved === 'blood' || saved === 'singularity') {
+  // Migrate removed themes
+  if (saved === 'bladerunner' || saved === 'blood') return 'amber';
+  if (saved === 'singularity') return 'void';
+  if (saved === 'cyber' || saved === 'matrix' || saved === 'amber' || saved === 'void') {
     return saved;
   }
   return 'cyber';

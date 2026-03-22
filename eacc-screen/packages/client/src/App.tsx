@@ -24,6 +24,11 @@ export function App() {
   useFocusTimerController();
   const t = THEMES[theme];
 
+  // Set color-scheme for light/dark themes
+  useEffect(() => {
+    document.documentElement.style.colorScheme = t.isLightTheme ? 'light' : 'dark';
+  }, [t.isLightTheme]);
+
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
@@ -53,6 +58,7 @@ export function App() {
     '--accent-glow': t.accentGlow,
     '--scripture-font': t.scriptureFont,
     '--data-font': t.dataFont,
+    '--crt-opacity': t.isLightTheme ? '0.03' : '0.07',
   } as React.CSSProperties;
 
   return (
@@ -107,7 +113,7 @@ const globalStyles = `
     to { transform: translateX(0); }
   }
 
-  /* CRT scanlines — all themes */
+  /* CRT scanlines — all themes, reduced for void */
   .crt-scanlines {
     position: fixed;
     inset: 0;
@@ -115,8 +121,8 @@ const globalStyles = `
     z-index: 8;
     background: repeating-linear-gradient(
       0deg,
-      rgba(0, 0, 0, 0.07) 0px,
-      rgba(0, 0, 0, 0.07) 1px,
+      rgba(0, 0, 0, var(--crt-opacity, 0.07)) 0px,
+      rgba(0, 0, 0, var(--crt-opacity, 0.07)) 1px,
       transparent 1px,
       transparent 4px
     );

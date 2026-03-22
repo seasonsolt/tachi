@@ -4,25 +4,22 @@ import SwiftUI
 enum CompanionPersona: Equatable {
     case defaultOrb
     case laughingMan
-    case bladeRunnerEye
     case matrixAgent
-    case nervHex
-    case singularityVoid
+    case amberEye
+    case voidMonolith
 
     var petAccent: Color? {
         switch self {
         case .defaultOrb:
             return nil
         case .laughingMan:
-            return ghostAccent
-        case .bladeRunnerEye:
-            return Color(red: 0.91, green: 0.57, blue: 0.16)
+            return Color(red: 0.0, green: 0.84, blue: 1.0)
         case .matrixAgent:
             return Color(red: 0, green: 1.0, blue: 0.25)
-        case .nervHex:
-            return Color(red: 0.84, green: 0.12, blue: 0.12)
-        case .singularityVoid:
-            return .white
+        case .amberEye:
+            return Color(red: 0.91, green: 0.57, blue: 0.16)
+        case .voidMonolith:
+            return Color(red: 0.1, green: 0.1, blue: 0.1)
         }
     }
 }
@@ -31,20 +28,18 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
     case automatic
     case defaultOrb
     case laughingMan
-    case bladeRunnerEye
     case matrixAgent
-    case nervHex
-    case singularityVoid
+    case amberEye
+    case voidMonolith
 
     var label: String {
         switch self {
         case .automatic: return "Auto (follows theme)"
         case .defaultOrb: return "Orb"
         case .laughingMan: return "笑い男 Laughing Man"
-        case .bladeRunnerEye: return "Voight-Kampff Eye"
         case .matrixAgent: return "Matrix Agent"
-        case .nervHex: return "NERV Hex"
-        case .singularityVoid: return "Singularity Void"
+        case .amberEye: return "Amber Eye"
+        case .voidMonolith: return "Void Monolith"
         }
     }
 
@@ -53,10 +48,9 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
         case .automatic: return "PET AUTO"
         case .defaultOrb: return "PET ORB"
         case .laughingMan: return "PET LM"
-        case .bladeRunnerEye: return "PET VK"
         case .matrixAgent: return "PET MX"
-        case .nervHex: return "PET NV"
-        case .singularityVoid: return "PET ∞"
+        case .amberEye: return "PET AM"
+        case .voidMonolith: return "PET VD"
         }
     }
 
@@ -65,10 +59,9 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
         case .automatic: return nil
         case .defaultOrb: return .defaultOrb
         case .laughingMan: return .laughingMan
-        case .bladeRunnerEye: return .bladeRunnerEye
         case .matrixAgent: return .matrixAgent
-        case .nervHex: return .nervHex
-        case .singularityVoid: return .singularityVoid
+        case .amberEye: return .amberEye
+        case .voidMonolith: return .voidMonolith
         }
     }
 }
@@ -97,13 +90,13 @@ enum CompanionMood: Equatable {
         return frames[frame % frames.count]
     }
 
-    var accent: Color {
+    func accent(for theme: EACCThemeColors) -> Color {
         switch self {
-        case .feasting: return cyanAccent
-        case .alert: return goldAccent
-        case .expecting: return goldAccent
+        case .feasting: return theme.accent
+        case .alert: return theme.accent.opacity(0.8)
+        case .expecting: return theme.accent.opacity(0.7)
         case .dozing: return purpleAccent
-        case .sleeping: return textTertiary
+        case .sleeping: return theme.textMuted
         }
     }
 
@@ -235,7 +228,7 @@ final class ViewModel {
     }
 
     var companionAccent: Color {
-        companionMood.accent
+        companionMood.accent(for: themeColors)
     }
 
     var companionPetAccent: Color {
@@ -361,12 +354,34 @@ final class ViewModel {
 
     private static func loadCompanionPersonaMode() -> CompanionPersonaMode {
         let raw = UserDefaults.standard.string(forKey: companionPersonaModeKey)
-        return raw.flatMap(CompanionPersonaMode.init(rawValue:)) ?? .automatic
+        if let raw, let mode = CompanionPersonaMode(rawValue: raw) {
+            return mode
+        }
+        // Migrate removed persona modes
+        if let raw {
+            switch raw {
+            case "bladeRunnerEye", "nervHex": return .amberEye
+            case "singularityVoid": return .voidMonolith
+            default: break
+            }
+        }
+        return .automatic
     }
 
     private static func loadTheme() -> EACCThemeName {
         let raw = UserDefaults.standard.string(forKey: themeKey)
-        return raw.flatMap(EACCThemeName.init(rawValue:)) ?? .cyber
+        if let raw, let theme = EACCThemeName(rawValue: raw) {
+            return theme
+        }
+        // Migrate removed theme names
+        if let raw {
+            switch raw {
+            case "bladerunner", "blood": return .amber
+            case "singularity": return .voidTheme
+            default: break
+            }
+        }
+        return .cyber
     }
 
     @MainActor

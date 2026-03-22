@@ -5,6 +5,7 @@ import { THEMES, formatTokenCount, formatUSD } from '@eacc/shared';
 import { LaughingMan } from './LaughingMan';
 import { BladeRunnerEye } from './BladeRunnerEye';
 import { NervHex } from './NervHex';
+import { VoidMonolith } from './VoidMonolith';
 
 // Matrix digital rain — canvas-based falling characters
 function MatrixRain() {
@@ -280,14 +281,17 @@ export function AltarScene() {
   const isMatrix = theme === 'matrix';
 
   const isCyber = theme === 'cyber';
+  const isAmber = theme === 'amber';
+  const isVoid = theme === 'void';
 
   return (
     <div style={{ ...altarStyles.container, height: isMatrix ? '100vh' : '70vh' }}>
       <GlowOverlay />
       {isMatrix ? <MatrixRain /> : <CSSParticles />}
       {isCyber && <LaughingMan />}
-      {theme === 'bladerunner' && <BladeRunnerEye />}
-      {theme === 'blood' && <NervHex />}
+      {isAmber && <BladeRunnerEye />}
+      {isAmber && <div style={{ opacity: 0.04 }}><NervHex /></div>}
+      {isVoid && <VoidMonolith />}
       <TokenHero />
     </div>
   );

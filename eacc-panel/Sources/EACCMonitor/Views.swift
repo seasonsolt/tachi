@@ -1,21 +1,10 @@
 import SwiftUI
 
-// MARK: - EACC Color System (Dark / Matrix)
+// MARK: - EACC Semantic Status Colors (theme-independent)
 
-let ritualBg = Color(red: 0.04, green: 0.04, blue: 0.06)
-let cardBg = Color(red: 0.08, green: 0.09, blue: 0.11)
-let cardBorder = Color.white.opacity(0.08)
-let textPrimary = Color.white.opacity(0.88)
-let textSecondary = Color.white.opacity(0.58)
-let textTertiary = Color.white.opacity(0.38)
-
-// Neon accents
-let cyanAccent = Color(red: 0, green: 0.95, blue: 0.65)
 let redAccent = Color(red: 1.0, green: 0.28, blue: 0.28)
 let purpleAccent = Color(red: 0.58, green: 0.38, blue: 1.0)
-let goldAccent = Color(red: 1.0, green: 0.78, blue: 0.2)
 let matrixGreen = Color(red: 0, green: 0.9, blue: 0.4)
-let ghostAccent = Color(red: 0.0, green: 0.84, blue: 1.0)
 
 // MARK: - Content View
 
@@ -55,10 +44,10 @@ struct ContentView: View {
                 HStack(spacing: 4) {
                     Text("CYCLE")
                         .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .foregroundStyle(textTertiary)
+                        .foregroundStyle(vm.themeColors.textMuted)
                     Text(date, style: .time)
                         .font(.system(size: 11, design: .monospaced).monospacedDigit())
-                        .foregroundStyle(textSecondary)
+                        .foregroundStyle(vm.themeColors.textSecondary)
                 }
             }
             Button {
@@ -68,7 +57,7 @@ struct ContentView: View {
                     .font(.system(size: 11, weight: .medium))
             }
             .buttonStyle(.plain)
-            .foregroundStyle(textSecondary)
+            .foregroundStyle(vm.themeColors.textSecondary)
             .help("Refresh")
         }
         .padding(.horizontal, 16)
@@ -81,7 +70,7 @@ struct ContentView: View {
                 .scaleEffect(0.8)
             Text("Initializing ritual link...")
                 .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(textSecondary)
+                .foregroundStyle(vm.themeColors.textSecondary)
         }
         .frame(height: 120)
     }
@@ -111,31 +100,31 @@ struct ContentView: View {
             HStack(spacing: 6) {
                 Image(systemName: "waveform.path")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(cyanAccent)
+                    .foregroundStyle(vm.themeColors.accent)
                 Text("PET-SENSED THREADS")
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(textSecondary)
+                    .foregroundStyle(vm.themeColors.textSecondary)
                 Spacer()
                 if vm.workingSessionCount > 0 {
                     Text("\(vm.workingSessionCount) FEEDING")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Capsule().fill(cyanAccent.opacity(0.12)))
-                        .foregroundStyle(cyanAccent)
+                        .background(Capsule().fill(vm.themeColors.accent.opacity(0.12)))
+                        .foregroundStyle(vm.themeColors.accent)
                 } else if vm.waitingSessionCount > 0 {
                     Text("\(vm.waitingSessionCount) WATCHING")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Capsule().fill(goldAccent.opacity(0.12)))
-                        .foregroundStyle(goldAccent)
+                        .background(Capsule().fill(vm.themeColors.accent.opacity(0.12)))
+                        .foregroundStyle(vm.themeColors.accent)
                 }
             }
             .padding(.horizontal, 4)
 
             ForEach(vm.sessions) { session in
-                SessionRow(session: session)
+                SessionRow(session: session, themeColors: vm.themeColors)
             }
         }
         .padding(.bottom, 4)
@@ -149,7 +138,7 @@ struct ContentView: View {
                     .foregroundStyle(redAccent.opacity(0.7))
                 Text("OFFERINGS")
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(textSecondary)
+                    .foregroundStyle(vm.themeColors.textSecondary)
                 Spacer()
             }
             .padding(.horizontal, 4)
@@ -157,6 +146,7 @@ struct ContentView: View {
             ForEach(vm.providers) { provider in
                 ProviderCard(
                     provider: provider,
+                    themeColors: vm.themeColors,
                     testState: provider.capacityData.map { vm.testStates[$0.id] ?? .idle } ?? .idle
                 ) {
                     if let cap = provider.capacityData {
@@ -190,7 +180,7 @@ struct ContentView: View {
                         Text("\(Int(vm.refreshInterval))s")
                             .font(.system(size: 11, design: .monospaced).monospacedDigit())
                     }
-                    .foregroundStyle(textSecondary)
+                    .foregroundStyle(vm.themeColors.textSecondary)
                 }
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
@@ -215,10 +205,10 @@ struct ContentView: View {
             }
             Text("Session pulse: \(Int(vm.sessionRefreshInterval))s")
                 .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(textTertiary)
+                .foregroundStyle(vm.themeColors.textMuted)
             Text("ACCELERATE OR DIE")
                 .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(textTertiary)
+                .foregroundStyle(vm.themeColors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(.horizontal, 16)
@@ -236,7 +226,8 @@ struct CompanionCard: View {
             CompanionPetView(
                 persona: vm.companionPersona,
                 mood: vm.companionMood,
-                accent: vm.companionPetAccent
+                accent: vm.companionPetAccent,
+                themeColors: vm.themeColors
             )
 
             VStack(alignment: .leading, spacing: 8) {
@@ -251,21 +242,21 @@ struct CompanionCard: View {
                     CompanionPersonaMenu(vm: vm)
                     Text("\(vm.weightedUtil)% util")
                         .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(textSecondary)
+                        .foregroundStyle(vm.themeColors.textSecondary)
                 }
 
                 Text(vm.companionHeadline)
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(textPrimary)
+                    .foregroundStyle(vm.themeColors.textPrimary)
 
                 Text(vm.companionSubtitle)
                     .font(.system(size: 11))
-                    .foregroundStyle(textSecondary)
+                    .foregroundStyle(vm.themeColors.textSecondary)
                     .lineLimit(2)
 
                 HStack(spacing: 6) {
-                    companionChip(icon: "flame", text: "\(vm.workingSessionCount) live", tint: cyanAccent)
-                    companionChip(icon: "sparkle.magnifyingglass", text: "\(vm.waitingSessionCount) waiting", tint: goldAccent)
+                    companionChip(icon: "flame", text: "\(vm.workingSessionCount) live", tint: vm.themeColors.accent)
+                    companionChip(icon: "sparkle.magnifyingglass", text: "\(vm.waitingSessionCount) waiting", tint: vm.themeColors.accent)
                     companionChip(icon: "waveform.path.ecg", text: "\(vm.warmSessionCount) warm", tint: purpleAccent)
                 }
             }
@@ -275,7 +266,7 @@ struct CompanionCard: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [cardBg.opacity(0.96), vm.companionAccent.opacity(0.08)],
+                        colors: [vm.themeColors.cardBg.opacity(0.96), vm.companionAccent.opacity(0.08)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ))
@@ -391,21 +382,20 @@ struct CompanionPetView: View {
     let persona: CompanionPersona
     let mood: CompanionMood
     let accent: Color
+    let themeColors: EACCThemeColors
 
     var body: some View {
         switch persona {
         case .defaultOrb:
-            DefaultCompanionPetView(mood: mood, accent: accent)
+            DefaultCompanionPetView(mood: mood, accent: accent, themeColors: themeColors)
         case .laughingMan:
             LaughingManPetView(mood: mood, accent: accent)
-        case .bladeRunnerEye:
-            BladeRunnerPetView(mood: mood, accent: accent)
         case .matrixAgent:
             MatrixPetView(mood: mood, accent: accent)
-        case .nervHex:
-            NervHexPetView(mood: mood, accent: accent)
-        case .singularityVoid:
-            SingularityPetView(mood: mood, accent: accent)
+        case .amberEye:
+            BladeRunnerPetView(mood: mood, accent: accent)
+        case .voidMonolith:
+            VoidPetView(mood: mood, accent: accent)
         }
     }
 }
@@ -413,6 +403,7 @@ struct CompanionPetView: View {
 private struct DefaultCompanionPetView: View {
     let mood: CompanionMood
     let accent: Color
+    let themeColors: EACCThemeColors
 
     @State private var isFloating = false
     @State private var isOrbiting = false
@@ -482,24 +473,24 @@ private struct DefaultCompanionPetView: View {
         switch mood {
         case .sleeping:
             Capsule()
-                .fill(textPrimary)
+                .fill(themeColors.textPrimary)
                 .frame(width: 12, height: 2)
         case .dozing:
             Capsule()
-                .fill(textPrimary)
+                .fill(themeColors.textPrimary)
                 .frame(width: 10, height: 3)
         case .expecting:
             Circle()
-                .fill(textPrimary)
+                .fill(themeColors.textPrimary)
                 .frame(width: 7, height: 7)
         case .alert:
             Circle()
-                .fill(textPrimary)
+                .fill(themeColors.textPrimary)
                 .frame(width: 8, height: 8)
                 .overlay(Circle().fill(accent).frame(width: 3, height: 3))
         case .feasting:
             Circle()
-                .fill(textPrimary)
+                .fill(themeColors.textPrimary)
                 .frame(width: 9, height: 9)
                 .overlay(Circle().fill(accent).frame(width: 4, height: 4))
         }
@@ -510,23 +501,23 @@ private struct DefaultCompanionPetView: View {
         switch mood {
         case .feasting:
             Capsule()
-                .fill(textPrimary)
+                .fill(themeColors.textPrimary)
                 .frame(width: 18, height: 6)
         case .alert:
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(textPrimary)
+                .fill(themeColors.textPrimary)
                 .frame(width: 14, height: 5)
         case .expecting:
             Circle()
-                .fill(textPrimary)
+                .fill(themeColors.textPrimary)
                 .frame(width: 7, height: 7)
         case .dozing:
             Capsule()
-                .fill(textPrimary.opacity(0.8))
+                .fill(themeColors.textPrimary.opacity(0.8))
                 .frame(width: 14, height: 3)
         case .sleeping:
             Capsule()
-                .fill(textPrimary.opacity(0.75))
+                .fill(themeColors.textPrimary.opacity(0.75))
                 .frame(width: 12, height: 2)
         }
     }
@@ -775,6 +766,7 @@ private struct LaughingManPetView: View {
 
 struct ProviderCard: View {
     let provider: ProviderSummary
+    let themeColors: EACCThemeColors
     let testState: TestState
     let onTest: () -> Void
 
@@ -800,12 +792,12 @@ struct ProviderCard: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(cardBg)
+                .fill(themeColors.cardBg)
                 .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(cardBorder, lineWidth: 0.5)
+                .strokeBorder(themeColors.cardBorder, lineWidth: 0.5)
         )
     }
 
@@ -820,12 +812,12 @@ struct ProviderCard: View {
             HStack(spacing: 4) {
                 Text(provider.name)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(textPrimary)
+                    .foregroundStyle(themeColors.textPrimary)
                     .lineLimit(1)
                 if provider.platform == "anthropic" {
                     Text("// SYMBIONT")
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
-                        .foregroundStyle(textTertiary)
+                        .foregroundStyle(themeColors.textMuted)
                 }
             }
             Spacer()
@@ -843,16 +835,18 @@ struct ProviderCard: View {
             let util = cap.maxUtilization
             Text("\(util)%")
                 .font(.system(size: 20, weight: .bold, design: .rounded).monospacedDigit())
-                .foregroundStyle(ritualColorForUtil(util))
+                .foregroundStyle(ritualColorForUtil(util, accent: themeColors.accent))
         }
     }
+
+    private static let brandGold = Color(red: 1.0, green: 0.78, blue: 0.2)
 
     private var platformGradient: some ShapeStyle {
         switch provider.platform {
         case "openai":
             return AnyShapeStyle(
                 .linearGradient(
-                    colors: [goldAccent, goldAccent.opacity(0.6)],
+                    colors: [Self.brandGold, Self.brandGold.opacity(0.6)],
                     startPoint: .topLeading, endPoint: .bottomTrailing))
         case "anthropic":
             return AnyShapeStyle(
@@ -862,7 +856,7 @@ struct ProviderCard: View {
         case "antigravity":
             return AnyShapeStyle(
                 .linearGradient(
-                    colors: [cyanAccent, cyanAccent.opacity(0.5)],
+                    colors: [themeColors.accent, themeColors.accent.opacity(0.5)],
                     startPoint: .topLeading, endPoint: .bottomTrailing))
         default:
             return AnyShapeStyle(.secondary)
@@ -875,7 +869,7 @@ struct ProviderCard: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("TRIBUTE")
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(textTertiary)
+                .foregroundStyle(themeColors.textMuted)
 
             if stats.dailyCostLimit > 0 {
                 costBar(label: "Today", current: stats.dailyCost, limit: stats.dailyCostLimit)
@@ -898,7 +892,7 @@ struct ProviderCard: View {
                 Spacer()
             }
             .font(.system(size: 10))
-            .foregroundStyle(textTertiary)
+            .foregroundStyle(themeColors.textMuted)
         }
     }
 
@@ -906,11 +900,11 @@ struct ProviderCard: View {
         HStack(spacing: 8) {
             Text(label)
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundStyle(textTertiary)
+                .foregroundStyle(themeColors.textMuted)
                 .frame(width: 50, alignment: .trailing)
             Text(String(format: "$%.2f", cost))
                 .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
-                .foregroundStyle(textSecondary)
+                .foregroundStyle(themeColors.textSecondary)
             Spacer()
         }
     }
@@ -921,7 +915,7 @@ struct ProviderCard: View {
         return HStack(spacing: 8) {
             Text(label)
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundStyle(textTertiary)
+                .foregroundStyle(themeColors.textMuted)
                 .frame(width: 50, alignment: .trailing)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -937,17 +931,17 @@ struct ProviderCard: View {
             .frame(height: 5)
             Text(String(format: "$%.2f", current))
                 .font(.system(size: 10, weight: .semibold, design: .rounded).monospacedDigit())
-                .foregroundStyle(ritualColorForUtil(utilInt))
+                .foregroundStyle(ritualColorForUtil(utilInt, accent: themeColors.accent))
                 .frame(width: 50, alignment: .trailing)
             Text("/ $\(String(format: "%.0f", limit))")
                 .font(.system(size: 9).monospacedDigit())
-                .foregroundStyle(textTertiary)
+                .foregroundStyle(themeColors.textMuted)
                 .frame(width: 40, alignment: .leading)
         }
     }
 
     private func ritualBarGradient(_ util: Int) -> some ShapeStyle {
-        let c = ritualColorForUtil(util)
+        let c = ritualColorForUtil(util, accent: themeColors.accent)
         return AnyShapeStyle(
             .linearGradient(
                 colors: [c.opacity(0.5), c],
@@ -963,7 +957,7 @@ struct ProviderCard: View {
                 if provider.personalStats != nil {
                     Text("CAPACITY")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundStyle(textTertiary)
+                        .foregroundStyle(themeColors.textMuted)
                 }
                 capacityContent(usage)
             }
@@ -977,8 +971,8 @@ struct ProviderCard: View {
         switch usage {
         case .openai(let fh, let sd):
             VStack(spacing: 6) {
-                UtilRow(label: "5h", util: fh.utilization, remaining: fh.remainingSeconds)
-                UtilRow(label: "7d", util: sd.utilization, remaining: sd.remainingSeconds)
+                UtilRow(label: "5h", util: fh.utilization, remaining: fh.remainingSeconds, themeColors: themeColors)
+                UtilRow(label: "7d", util: sd.utilization, remaining: sd.remainingSeconds, themeColors: themeColors)
                 if fh.requests > 0 || sd.requests > 0 {
                     HStack(spacing: 4) {
                         Label("\(fh.requests) reqs", systemImage: "arrow.up.arrow.down")
@@ -987,7 +981,7 @@ struct ProviderCard: View {
                         Spacer()
                     }
                     .font(.system(size: 10))
-                    .foregroundStyle(textTertiary)
+                    .foregroundStyle(themeColors.textMuted)
                 }
             }
         case .antigravity(let fh, let models, let tier, let credits):
@@ -998,26 +992,26 @@ struct ProviderCard: View {
                             .font(.system(size: 9, weight: .bold, design: .monospaced))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Capsule().fill(cyanAccent.opacity(0.1)))
-                            .foregroundStyle(cyanAccent)
+                            .background(Capsule().fill(themeColors.accent.opacity(0.1)))
+                            .foregroundStyle(themeColors.accent)
                         Text("Credits: \(credits)")
                             .font(.system(size: 10))
-                            .foregroundStyle(textTertiary)
+                            .foregroundStyle(themeColors.textMuted)
                     }
                 }
-                UtilRow(label: "5h", util: fh.utilization, remaining: fh.remainingSeconds)
+                UtilRow(label: "5h", util: fh.utilization, remaining: fh.remainingSeconds, themeColors: themeColors)
 
                 let active = models.filter { $0.utilization > 0 }
                 let idle = models.filter { $0.utilization == 0 }
 
                 ForEach(active) { m in
-                    ModelRow(model: m)
+                    ModelRow(model: m, themeColors: themeColors)
                 }
 
                 if !idle.isEmpty {
                     Text("\(idle.count) models at 0%")
                         .font(.system(size: 10))
-                        .foregroundStyle(textTertiary)
+                        .foregroundStyle(themeColors.textMuted)
                         .padding(.top, 2)
                 }
             }
@@ -1028,7 +1022,7 @@ struct ProviderCard: View {
 
     private var sectionDivider: some View {
         Rectangle()
-            .fill(cardBorder)
+            .fill(themeColors.cardBorder)
             .frame(height: 0.5)
             .padding(.vertical, 2)
     }
@@ -1040,7 +1034,7 @@ struct ProviderCard: View {
                 .foregroundStyle(.orange)
             Text("Offering data unavailable")
                 .font(.system(size: 11))
-                .foregroundStyle(textSecondary)
+                .foregroundStyle(themeColors.textSecondary)
         }
         .padding(.vertical, 4)
     }
@@ -1058,7 +1052,7 @@ struct ProviderCard: View {
                         .font(.system(size: 10, weight: .medium))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(textSecondary)
+                .foregroundStyle(themeColors.textSecondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(Capsule().fill(.quaternary))
@@ -1071,28 +1065,28 @@ struct ProviderCard: View {
                     .frame(width: 14, height: 14)
                 Text("Probing...")
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(textSecondary)
+                    .foregroundStyle(themeColors.textSecondary)
             }
         case .success(let model, let text):
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(cyanAccent)
+                        .foregroundStyle(themeColors.accent)
                         .font(.system(size: 11))
                     Text(model)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(textSecondary)
+                        .foregroundStyle(themeColors.textSecondary)
                 }
                 Text(text)
                     .font(.system(size: 10))
-                    .foregroundStyle(textTertiary)
+                    .foregroundStyle(themeColors.textMuted)
                     .lineLimit(2)
             }
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(cyanAccent.opacity(0.06)))
+                    .fill(themeColors.accent.opacity(0.06)))
             .transition(.opacity.combined(with: .scale(scale: 0.95)))
         case .failure(let error):
             HStack(spacing: 4) {
@@ -1101,7 +1095,7 @@ struct ProviderCard: View {
                     .font(.system(size: 11))
                 Text(error)
                     .font(.system(size: 10))
-                    .foregroundStyle(textSecondary)
+                    .foregroundStyle(themeColors.textSecondary)
                     .lineLimit(2)
             }
             .padding(8)
@@ -1120,21 +1114,22 @@ struct UtilRow: View {
     let label: String
     let util: Int
     let remaining: Int
+    let themeColors: EACCThemeColors
 
     var body: some View {
         HStack(spacing: 8) {
             Text(label)
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundStyle(textTertiary)
+                .foregroundStyle(themeColors.textMuted)
                 .frame(width: 22, alignment: .trailing)
-            UtilBar(value: util)
+            UtilBar(value: util, accent: themeColors.accent)
             Text("\(util)%")
                 .font(.system(size: 11, weight: .semibold, design: .rounded).monospacedDigit())
-                .foregroundStyle(ritualColorForUtil(util))
+                .foregroundStyle(ritualColorForUtil(util, accent: themeColors.accent))
                 .frame(width: 36, alignment: .trailing)
             Text(formatRemaining(remaining))
                 .font(.system(size: 10).monospacedDigit())
-                .foregroundStyle(textTertiary)
+                .foregroundStyle(themeColors.textMuted)
                 .frame(width: 48, alignment: .trailing)
         }
     }
@@ -1144,27 +1139,28 @@ struct UtilRow: View {
 
 struct ModelRow: View {
     let model: ModelQuota
+    let themeColors: EACCThemeColors
 
     var body: some View {
         VStack(spacing: 3) {
             HStack {
                 Text(model.displayName)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(textSecondary)
+                    .foregroundStyle(themeColors.textSecondary)
                     .lineLimit(1)
                 Spacer()
                 let reset = formatResetTime(model.resetTime)
                 if !reset.isEmpty {
                     Text(reset)
                         .font(.system(size: 9).monospacedDigit())
-                        .foregroundStyle(textTertiary)
+                        .foregroundStyle(themeColors.textMuted)
                 }
             }
             HStack(spacing: 8) {
-                UtilBar(value: model.utilization)
+                UtilBar(value: model.utilization, accent: themeColors.accent)
                 Text("\(model.utilization)%")
                     .font(.system(size: 10, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(ritualColorForUtil(model.utilization))
+                    .foregroundStyle(ritualColorForUtil(model.utilization, accent: themeColors.accent))
                     .frame(width: 32, alignment: .trailing)
             }
         }
@@ -1175,6 +1171,7 @@ struct ModelRow: View {
 
 struct UtilBar: View {
     let value: Int
+    let accent: Color
 
     var body: some View {
         GeometryReader { geo in
@@ -1192,7 +1189,7 @@ struct UtilBar: View {
     }
 
     private var barGradient: some ShapeStyle {
-        let c = ritualColorForUtil(value)
+        let c = ritualColorForUtil(value, accent: accent)
         return AnyShapeStyle(
             .linearGradient(
                 colors: [c.opacity(0.5), c],
@@ -1204,6 +1201,7 @@ struct UtilBar: View {
 
 struct SessionRow: View {
     let session: CodingSession
+    let themeColors: EACCThemeColors
     @State private var isPulsing = false
 
     var body: some View {
@@ -1213,10 +1211,10 @@ struct SessionRow: View {
                 HStack(spacing: 6) {
                     Image(systemName: session.tool.icon)
                         .font(.system(size: 10))
-                        .foregroundStyle(textSecondary)
+                        .foregroundStyle(themeColors.textSecondary)
                     Text(session.projectName)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(textPrimary)
+                        .foregroundStyle(themeColors.textPrimary)
                         .lineLimit(1)
                 }
                 Text(detailLine)
@@ -1231,13 +1229,13 @@ struct SessionRow: View {
                     .foregroundStyle(statusColor)
                 Text(timeAgo(session.lastActivity))
                     .font(.system(size: 9).monospacedDigit())
-                    .foregroundStyle(textTertiary)
+                    .foregroundStyle(themeColors.textMuted)
             }
         }
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(cardBg)
+                .fill(themeColors.cardBg)
                 .shadow(color: .black.opacity(0.04), radius: 1, y: 1)
         )
         .overlay(
@@ -1303,9 +1301,9 @@ struct SessionRow: View {
 
     private var statusColor: Color {
         switch session.pulse {
-        case .hot: return cyanAccent
-        case .warm: return goldAccent
-        case .listening: return goldAccent.opacity(0.9)
+        case .hot: return themeColors.accent
+        case .warm: return themeColors.accent.opacity(0.7)
+        case .listening: return themeColors.accent.opacity(0.5)
         case .drowsy: return purpleAccent.opacity(0.7)
         case .sleeping: return .gray
         }
@@ -1313,17 +1311,17 @@ struct SessionRow: View {
 
     private var signalColor: Color {
         switch session.pulse {
-        case .hot, .warm: return textSecondary
-        case .listening: return goldAccent.opacity(0.9)
-        case .drowsy: return textTertiary
-        case .sleeping: return textTertiary
+        case .hot, .warm: return themeColors.textSecondary
+        case .listening: return themeColors.accent.opacity(0.7)
+        case .drowsy: return themeColors.textMuted
+        case .sleeping: return themeColors.textMuted
         }
     }
 
     private var statusBorderColor: Color {
         switch session.status {
-        case .working: return cyanAccent.opacity(0.25)
-        case .waitingForInput: return goldAccent.opacity(0.25)
+        case .working: return themeColors.accent.opacity(0.25)
+        case .waitingForInput: return themeColors.accent.opacity(0.15)
         default: return .clear
         }
     }
@@ -1441,12 +1439,15 @@ struct MatrixRainView: View {
 
 // MARK: - EACC Helpers
 
-func ritualColorForUtil(_ v: Int) -> Color {
-    if v < 50 { return cyanAccent }
-    if v < 80 { return goldAccent }
+/// Gold color used as a mid-range utilization indicator (theme-independent).
+private let utilGold = Color(red: 1.0, green: 0.78, blue: 0.2)
+
+func ritualColorForUtil(_ v: Int, accent: Color) -> Color {
+    if v < 50 { return accent }
+    if v < 80 { return utilGold }
     return redAccent
 }
 
-func colorForUtil(_ v: Int) -> Color {
-    ritualColorForUtil(v)
+func colorForUtil(_ v: Int, accent: Color) -> Color {
+    ritualColorForUtil(v, accent: accent)
 }
