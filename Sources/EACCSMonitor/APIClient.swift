@@ -3,16 +3,18 @@ import Foundation
 // MARK: - Config
 
 enum Config {
-    static let apiBase = "http://seasonsolt.myds.me:8888/api/v1/admin"
-    static let bearerToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbWFpbCI6InRoaW5Ac3ViMmFwaS5sb2NhbCIsInJvbGUiOiJhZG1pbiIsInRva2VuX3ZlcnNpb24iOjAsImV4cCI6MTc3MzgyNzM4MSwibmJmIjoxNzczNzQwOTgxLCJpYXQiOjE3NzM3NDA5ODF9.b2psDZ5oFFeHCKd5NfKK-4MhTgTWddDS2fLxrQZHFWs"
-    static let sessionToken = "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..qX2Y4huODLB3r3c-.Gp58Zrz4UrLyyAQbLjF7VH-4HqjJQh26ECbs5wSfPt-Z_lX4rYitNdATXeApQ0WZ-rqUJoILH1zUiyMhSYV8cS5rB1xLwcVlWwsP_d4DP2vvMlyPNjmrN2SPdgcq_mLKtbzdi3TBV4NX3z4aQlIV28PAZCxyGwrEOpidZwP0WJeA60FNrimKzwh1z2Zyxb9nLcsprhO9uCkiLRt39F6uD1IQFyTgHAAeYjgWbmu-OFzEjg8jdLgAflTntbVS4BbsitHMyTnRnMNQUrJZRdPSz1ts_72Oj9de7sVl9cgs4FzyEJsKqd-sGP6Kkgst9eeGW0fRI_IqTWaloRdinNw0bJKoDa8ugH-FfbinOr0KHiGBR1zkTdcYRsS_3DZbsSGzVz3_aTckgVzvNtQmXx_nf6Jhz14Rix1T_-PAYoOZvmrKOyKLV5Dz1sPUcAzgsvZbNRJ1HU1cm8vD-8LhNNOMlz4Xhf5w-xefbHycoxRmXLJT0-gH2K2UuNWsL5uZNfYj1LGzjffqro0m2L6Pt6HMgOLucxfa-3JJIKm8FRVbxao3bAob5l7fMZSpLrqcph9CGiEpG6y2SVV9Kev7ZHZcJ8DWiz5TZ6zxTww6LE25ZU3Jr_y3u2fTdhrZPzePxbOqUFbREbXop9RljMtirW-k9VzJcZ1e9-1AhAVSaMuvATp0AP_ywoGo6G83MBQv0BQMBUy2OmRnjhxauLiWUV318X8XulmOoeqEZKjqqLFEFyDquE4PMptOguB94D_oiUwoQTnDu-KiAlCY5WwE8pphmak23NpGQC5bpTm4Tx_iiKi3r91lipVC0spmGsdmxKzDNXH9Pbh2mwmgggiC8xNE7AgmirHSjnjbHp4zFMscVRbiJWjckIUOBFQO3HZcap1wmyouypNsVcMOYwpy2QCaRIp2rSXGID5zTt3yA_0lOJq803oNKjk0fY89MPHzrx73Hn0gHYYaKRK1lAwmV0SYM5n0o6Rrcfp9CL_4iz3t-HmFCWOYrub9B2rtDprgpum-y9-qzJeyTOPR226xYc6tllr8PwgZDUIBBgKNrjPBNPzZormC7cfn_CXonFQrVNqud-qpQDr3yntpIu2pNbdcZtcVGDfR8f12_HESsflAwrc2PmlWiHNpblt93LQbsC6-K6BU_V5QyC0l6wmhNiq2OtpZ-VFe8OE2ZPgoDMU3IYBeYIyZoZnFUCwLcR_-OyOPs2E-WlRFdkaRP6FQVXxmE9TdoY6MpQ7BGfA7l4QHWV3275lJY2ksPKFzP2zTHuJ6f6uqTT2eDTUp7IKEH5VpXZ0M30SxU2cniEqiDeAAjQ-pC27QL4PX4OizRs4dGDQuOlqsfbKJTDbXIdtqToseFf7pzeftdnN-l_jLrn_5Zub9DDBYL3DPj19iTqKFk9jmx9wb1IAa7nVSb9EE0pcfn4kVeB5wv9kBR6Uy_S4zbAC8Z6dLyWJqrd0s4SNnnT-v8tS7bpwBrtUjqNjryHB8zYSrw56nPJCbD7XLISuKtS-VBEbfi4-yoKU79gwCws49GNgkqY966wAXA4PDNQSIghLU5MSviKuiW7YsjNqTAx6YlvYd4X8lPqkECvzegdxClX7Cb6-U9cYry8NFdiYgqsjlY_gQRcA3_tTIhV2cBQDWx57XeYFTO54Zi-kaDb9x06aGtJCyqGpvAwxGCz2xxCnrEzdryV0toOFqkAKETuAFl5xTMgslJTRMP27DICigSF7pAcD9hCoqAiehPnu2T0xXfaJE4BngNZO92E2w1osX6zN5tZkaA5zNN7fRq40qV6dOQQNbnCTh2dnQNeFvz8q4xMDjWn-G9Cxi1msDC4wjd3uPmpButmyFsTswvpRQYyNuAjhft7GmUxjJGkabZoyKO_G7ywDYRhCLKy6lhq5tYiU4TOCDHaFNs6616JZ3zCb5Zulfktkv0G3wFK9TLcoZiyfP_7qhj9Sjrx2kx5YbLpY5SakECZZsMgdGRLmlIdNx_AqKreGsKottdsfYADdG14vQ8F5jGzyTTobFW-jMLp0jigrCuu4dS6G7Y6fsveu9C6D7Rh9Q6UbTR8EBubnvFRRB39_lNmnOknUxHGkjcJvODg0fSoiaseXHJIuv3kKQT-A0obrnDWGo2QLX7pwFIXYC9A8keCntYXoC-k3cLc8mYOOpwW_dEu_jO8uKxmYSRNYt2zHxNFIXtDWFlHX8zxjdhXsngN5ia4b7jUnyZwqsQc0ehoCG_4i6MWYJJ40uq0e2ZG5b8NrwLfElAVT_-vjel_k9a4DTCfXIJhEhjX14gArZ2Zxdx9TWkUH87TvOtxKa4KFTUex_VGI_E2Uh82qcpEPoIx6LUHZlsPiRdlriCktGgM5_aeeyjEPXOYSY7awECGqLyoY_Xvh_hjxfMy3OumR9bnGrz6TuBdUJa5j4KGuhB4BymD32BcOhj2FRxo13Pn53_TkBdlPax0nXcZePITgh8InLfPLndyK5MPJV-GK7_qiBAa20abFZMN2TTvkMMZDj2xmynnr4SnpTfyWFG45NOmMYr-Xw3gddz9zQFjf7BoO-99CPWbDkDhAif8NKpJWriZ2EPZOH6Axap5xDtN8zz9_hdOORTUxUV7UXgEpKnwq6yHW50pjFGRCDbViDiaRSZOccki3AY5kGHxttGCZq3MNEU6ezq_Ct-qSe1yBDi1LeUa9dfZISspcg0nr-eRPQ_SNZnbkxfAKehhaL4q3g0oq-YduhiK9_Mha57zSGGbqmdUN5vJOKs1LXM5-QEa8VnQR4xRD1LtuZmNLl9xIAfwcsmvApJtKokV1o3pWIclNcqMRSUJg9PDzKmHEsbeYEI-DrpHgrT1prxn3VIAb5zPPgAn6fgR1q0bsZ5M-mmPD2YGHTzM6LehvVZw2OfkB90BQk9hQhJ1f5wKFm0NliiPqhBumIF6X-6ocgpyDIp00loUYyisyKfCGnkDkXpPXkDl2UL0Sa3XJJEXgsY0YZ5zlgqC_MTELYKMAgkBqwMpcCeI4ZMMXld3z5Hpx4hlSHadqZLlUHTcSWcix6Hy17NPj2SbbjDhz0gchoQzKmyUhr_DS0u_wBEBj3gb8i5fYtY7dFsMfvLupPhWAju6CYqX5CCXLlmOtAS431xZf2T2ZRMJF9bBN0VS9mt_xC0YZGxEAFU9I0rGx8SMINOLHGyV9aNzWOvyvidr1vu62xsgac9aKS_I_MyX4MJoexCPtCw34WZaD2-sihpLxaH8ZNiDJpukJOkn2bTt8fvbEnI2Mc8oermaMQIGczI44VFH2xeOtQSY26fAvhkwyAVIZCN6ieKbhti2OSGfnIDQbVc7ztT7CRxMs4PdUsnKYa9y5S8D7YBB8VEmIjxuYDU6WF_Q9OnQ9vFeRYKktdx1j5M5llGp_N6u_PQV8QUs79mXBrjRObLrWMfi83G_dEuLVJ99GHieDkcE0kdotm31rrJ453vx86QmV3jV4UR270Kq7ixWva0iWK-lXBRoxkM-2G-nG0uOAPlqJUtbxkKBpMYiC9FDMyc0o-TxFQSssg_mltC5gZ_Wza81yAlswmOTuROMVmjAIx_TkCFonAd7LAaF4qu-BMX7upjTZFkCl2.jZdPwKVriHH545zNJafacw"
-    static let authSession = "Mjg3NjVhMDMtMmRhNi00MDdjLWIzMDMtMjQzZmEwMTkwZGFj"
-    static let refreshInterval: TimeInterval = 30
+    static let apiBase = "http://seasonsolt.myds.me:8888/api/v1"
+    static let loginEmail = "thin@sub2api.local"
+    static let loginPassword = "season2026"
+
+    // Claude channel — ai.benwk.io (sub2api, refresh token auth)
+    static let claudeApiBase = "https://ai.benwk.io/api/v1"
+    static let claudeRefreshToken = "rt_bd9cbfa51fdd42bf2b0ac51fb4fc3b9d167f852e4d5d6ffb99d2f760e480bd1e"
 }
 
 // MARK: - Models
 
-struct Account: Identifiable {
+struct Account: Identifiable, Sendable {
     let id: Int
     let name: String
     let platform: String
@@ -21,7 +23,6 @@ struct Account: Identifiable {
     var icon: String {
         switch platform {
         case "openai": return "cube.transparent"
-        case "anthropic": return "brain.head.profile"
         case "antigravity": return "arrow.up.right.circle"
         default: return "server.rack"
         }
@@ -30,33 +31,32 @@ struct Account: Identifiable {
     var platformColor: String {
         switch platform {
         case "openai": return "openai"
-        case "anthropic": return "anthropic"
         case "antigravity": return "antigravity"
         default: return "gray"
         }
     }
 }
 
-struct WindowUsage {
+struct WindowUsage: Sendable {
     let utilization: Int
     let remainingSeconds: Int
     let requests: Int
     let tokens: Int
 }
 
-struct ModelQuota: Identifiable {
+struct ModelQuota: Identifiable, Sendable {
     let id: String
     let displayName: String
     let utilization: Int
     let resetTime: String
 }
 
-enum UsageData {
+enum UsageData: Sendable {
     case openai(fiveHour: WindowUsage, sevenDay: WindowUsage)
     case antigravity(fiveHour: WindowUsage, models: [ModelQuota], tier: String, credits: Int)
 }
 
-struct AccountWithUsage: Identifiable {
+struct AccountWithUsage: Identifiable, Sendable {
     let id: Int
     let account: Account
     let usage: UsageData?
@@ -87,6 +87,27 @@ struct AccountWithUsage: Identifiable {
     }
 }
 
+struct ClaudeStats: Sendable {
+    let name: String
+    let dailyCost: Double
+    let weeklyOpusCost: Double
+    let totalCost: Double
+    let formattedTotalCost: String
+    let totalRequests: Int
+    let totalTokens: Int
+    let dailyCostLimit: Double
+    let weeklyOpusCostLimit: Double
+}
+
+struct ProviderSummary: Identifiable {
+    let id: String
+    let name: String
+    let platform: String
+    let icon: String
+    let personalStats: ClaudeStats?
+    let capacityData: AccountWithUsage?
+}
+
 enum TestState: Equatable {
     case idle
     case testing
@@ -96,8 +117,9 @@ enum TestState: Equatable {
 
 // MARK: - API Client
 
-final class APIClient: NSObject, URLSessionDelegate {
+final class APIClient: NSObject, URLSessionDelegate, @unchecked Sendable {
     static let shared = APIClient()
+    private var accessToken: String?
     private lazy var session: URLSession = {
         URLSession(configuration: .default, delegate: self, delegateQueue: nil)
     }()
@@ -111,30 +133,74 @@ final class APIClient: NSObject, URLSessionDelegate {
         return (.performDefaultHandling, nil)
     }
 
+    private func login() async -> Bool {
+        guard let url = URL(string: Config.apiBase + "/auth/login") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 15
+        req.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "email": Config.loginEmail,
+            "password": Config.loginPassword,
+        ])
+
+        guard let (data, _) = try? await session.data(for: req),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["code"] as? Int == 0,
+              let inner = json["data"] as? [String: Any],
+              let token = inner["access_token"] as? String
+        else { return false }
+
+        accessToken = token
+        return true
+    }
+
     private func makeRequest(path: String) -> URLRequest {
-        var req = URLRequest(url: URL(string: Config.apiBase + path)!)
+        var req = URLRequest(url: URL(string: Config.apiBase + "/admin" + path)!)
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue("Bearer \(Config.bearerToken)", forHTTPHeaderField: "Authorization")
+        if let token = accessToken {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        req.setValue(
-            "next-auth.session-token=\(Config.sessionToken); AUTH_SESSION=\(Config.authSession)",
-            forHTTPHeaderField: "Cookie")
         req.timeoutInterval = 15
         return req
     }
 
     private func fetchJSON(path: String) async -> [String: Any]? {
         let req = makeRequest(path: path)
-        guard let (data, _) = try? await session.data(for: req),
-            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            json["code"] as? Int == 0,
-            let inner = json["data"] as? [String: Any]
+        guard let (data, resp) = try? await session.data(for: req) else { return nil }
+        let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 401 { return nil }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["code"] as? Int == 0,
+              let inner = json["data"] as? [String: Any]
         else { return nil }
         return inner
     }
 
+    private func fetchJSONWithRetry(
+        path: String, maxRetries: Int = 1, baseDelay: TimeInterval = 2
+    ) async -> [String: Any]? {
+        // Ensure we have a token, login if needed
+        if accessToken == nil {
+            _ = await login()
+        }
+
+        for attempt in 0...maxRetries {
+            if let result = await fetchJSON(path: path) {
+                return result
+            }
+            // On first failure, try re-login then retry
+            if attempt < maxRetries {
+                _ = await login()
+                try? await Task.sleep(for: .seconds(baseDelay))
+            }
+        }
+        return nil
+    }
+
     func fetchAccounts() async -> [Account] {
-        guard let data = await fetchJSON(path: "/accounts"),
+        guard let data = await fetchJSONWithRetry(path: "/accounts"),
             let items = data["items"] as? [[String: Any]]
         else { return [] }
 
@@ -142,15 +208,17 @@ final class APIClient: NSObject, URLSessionDelegate {
             guard let id = item["id"] as? Int, let name = item["name"] as? String else {
                 return nil
             }
+            let platform = item["platform"] as? String ?? ""
+            if platform == "anthropic" { return nil }
             return Account(
                 id: id, name: name,
-                platform: item["platform"] as? String ?? "",
+                platform: platform,
                 type: item["type"] as? String ?? "")
         }
     }
 
     func fetchUsage(accountId: Int) async -> UsageData? {
-        guard let data = await fetchJSON(path: "/accounts/\(accountId)/usage?timezone=Asia%2FShanghai")
+        guard let data = await fetchJSONWithRetry(path: "/accounts/\(accountId)/usage?timezone=Asia%2FShanghai")
         else { return nil }
 
         if let quota = data["antigravity_quota"] as? [String: [String: Any]] {
@@ -195,6 +263,89 @@ final class APIClient: NSObject, URLSessionDelegate {
             remainingSeconds: dict["remaining_seconds"] as? Int ?? 0,
             requests: stats?["requests"] as? Int ?? 0,
             tokens: stats?["tokens"] as? Int ?? 0
+        )
+    }
+
+    // MARK: - Claude Channel (ai.benwk.io)
+
+    private var claudeAccessToken: String?
+    private var claudeRefreshToken: String = Config.claudeRefreshToken
+
+    private func claudeRefresh() async -> Bool {
+        guard let url = URL(string: Config.claudeApiBase + "/auth/refresh") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 15
+        req.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "refresh_token": claudeRefreshToken,
+        ])
+
+        guard let (data, _) = try? await session.data(for: req),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let code = json["code"] as? Int, code == 0,
+              let inner = json["data"] as? [String: Any],
+              let token = inner["access_token"] as? String
+        else { return false }
+
+        claudeAccessToken = token
+        if let newRefresh = inner["refresh_token"] as? String {
+            claudeRefreshToken = newRefresh
+        }
+        return true
+    }
+
+    func fetchClaudeStats() async -> ClaudeStats? {
+        if claudeAccessToken == nil {
+            _ = await claudeRefresh()
+        }
+        for attempt in 0...1 {
+            if let result = await fetchClaudeStatsOnce() {
+                return result
+            }
+            if attempt < 1 {
+                _ = await claudeRefresh()
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+        return nil
+    }
+
+    private func fetchClaudeStatsOnce() async -> ClaudeStats? {
+        guard let url = URL(string: Config.claudeApiBase + "/usage/dashboard/stats?timezone=Asia%2FShanghai"),
+              let token = claudeAccessToken
+        else { return nil }
+
+        var req = URLRequest(url: url)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        req.timeoutInterval = 15
+
+        guard let (data, resp) = try? await session.data(for: req) else { return nil }
+        let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 401 { claudeAccessToken = nil; return nil }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["code"] as? Int == 0,
+              let d = json["data"] as? [String: Any]
+        else { return nil }
+
+        let totalCost = d["total_cost"] as? Double ?? 0
+        let todayCost = d["today_cost"] as? Double ?? 0
+        let totalRequests = d["total_requests"] as? Int ?? 0
+        let totalTokens = d["total_tokens"] as? Int ?? 0
+
+        return ClaudeStats(
+            name: "Bruce",
+            dailyCost: todayCost,
+            weeklyOpusCost: 0,
+            totalCost: totalCost,
+            formattedTotalCost: String(format: "$%.2f", totalCost),
+            totalRequests: totalRequests,
+            totalTokens: totalTokens,
+            dailyCostLimit: 0,
+            weeklyOpusCostLimit: 0
         )
     }
 

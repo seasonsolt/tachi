@@ -2,20 +2,23 @@ import Foundation
 
 // MARK: - Session Models
 
-struct CodingSession: Identifiable {
+struct CodingSession: Identifiable, Sendable {
     let id: String
     let tool: CodingTool
     let projectPath: String
     let slug: String
     let status: SessionStatus
     let lastActivity: Date
+    let signal: SessionSignal
+    let pulse: SessionPulse
 
     var projectName: String {
-        (projectPath as NSString).lastPathComponent
+        let name = (projectPath as NSString).lastPathComponent
+        return name.isEmpty ? projectPath : name
     }
 }
 
-enum CodingTool: String {
+enum CodingTool: String, Sendable {
     case claudeCode = "Claude Code"
     case codex = "Codex"
 
@@ -27,7 +30,7 @@ enum CodingTool: String {
     }
 }
 
-enum SessionStatus {
+enum SessionStatus: Sendable {
     case working
     case waitingForInput
     case idle
@@ -43,10 +46,47 @@ enum SessionStatus {
     }
 }
 
+enum SessionSignal: Sendable {
+    case booting
+    case reasoning
+    case tooling
+    case responding
+    case awaitingUser
+    case quiet
+    case completed
+
+    var label: String {
+        switch self {
+        case .booting: return "Fresh prompt scent"
+        case .reasoning: return "Thinking"
+        case .tooling: return "Tool clatter"
+        case .responding: return "Reply streaming"
+        case .awaitingUser: return "Watching for you"
+        case .quiet: return "Thread warmth"
+        case .completed: return "Curled up"
+        }
+    }
+}
+
+enum SessionPulse: Int, Sendable {
+    case sleeping = 0
+    case drowsy = 1
+    case listening = 2
+    case warm = 3
+    case hot = 4
+}
+
 // MARK: - Session Monitor
 
 final class SessionMonitor {
     static let shared = SessionMonitor()
+
+    private struct SessionTrace {
+        let status: SessionStatus
+        let signal: SessionSignal
+        let pulse: SessionPulse
+        let lastActivity: Date
+    }
 
     private let home = NSHomeDirectory()
     private var claudeDir: String { home + "/.claude/projects" }
@@ -57,7 +97,10 @@ final class SessionMonitor {
         var sessions: [CodingSession] = []
         sessions.append(contentsOf: scanClaudeSessions())
         sessions.append(contentsOf: scanCodexSessions())
-        sessions.sort { $0.lastActivity > $1.lastActivity }
+        sessions.sort { lhs, rhs in
+            if lhs.pulse != rhs.pulse { return lhs.pulse.rawValue > rhs.pulse.rawValue }
+            return lhs.lastActivity > rhs.lastActivity
+        }
         return sessions
     }
 
@@ -80,12 +123,12 @@ final class SessionMonitor {
                     modified > cutoff
                 else { continue }
 
+                let recentEntries = readRecentJsonlEntries(path: filePath, limit: 12)
+                let lastEntry = recentEntries.first
                 let sessionId = String(file.dropLast(6))
-                let lastEntry = readLastJsonlEntry(path: filePath)
                 let cwd = lastEntry?["cwd"] as? String ?? decodeDirName(dir)
                 let slug = lastEntry?["slug"] as? String ?? ""
-                let lastType = lastEntry?["type"] as? String ?? ""
-                let status = statusFromTimestamp(modified: modified, lastType: lastType)
+                let trace = claudeTrace(recentEntries: recentEntries, fallbackDate: modified)
 
                 sessions.append(
                     CodingSession(
@@ -93,49 +136,45 @@ final class SessionMonitor {
                         tool: .claudeCode,
                         projectPath: cwd,
                         slug: slug,
-                        status: status,
-                        lastActivity: modified
+                        status: trace.status,
+                        lastActivity: trace.lastActivity,
+                        signal: trace.signal,
+                        pulse: trace.pulse
                     ))
             }
         }
 
-        // Keep only the most recent session per project
         var best: [String: CodingSession] = [:]
-        for s in sessions {
-            if let existing = best[s.projectPath] {
-                if s.lastActivity > existing.lastActivity { best[s.projectPath] = s }
+        for session in sessions {
+            if let existing = best[session.projectPath] {
+                if session.lastActivity > existing.lastActivity { best[session.projectPath] = session }
             } else {
-                best[s.projectPath] = s
+                best[session.projectPath] = session
             }
         }
         return Array(best.values)
     }
 
-    private func statusFromTimestamp(modified: Date, lastType: String) -> SessionStatus {
-        let age = Date().timeIntervalSince(modified)
-        if age < 15 {
-            // File changed in last 15s — actively writing
-            switch lastType {
-            case "assistant", "progress":
-                return .working
+    private func claudeTrace(recentEntries: [[String: Any]], fallbackDate: Date) -> SessionTrace {
+        for entry in recentEntries {
+            let timestamp = parseISO(entry["timestamp"] as? String ?? "") ?? fallbackDate
+            switch entry["type"] as? String ?? "" {
+            case "assistant":
+                return trace(for: replySignal(at: timestamp), timestamp: timestamp)
             case "user":
-                return .waitingForInput
+                return trace(for: .booting, timestamp: timestamp)
+            case "progress":
+                if let data = entry["data"] as? [String: Any],
+                    data["type"] as? String == "hook_progress"
+                {
+                    return trace(for: .tooling, timestamp: timestamp)
+                }
+                return trace(for: .reasoning, timestamp: timestamp)
             default:
-                return .working
+                continue
             }
         }
-        if age < 300 {
-            // Changed in last 5 min — likely waiting for input or paused
-            switch lastType {
-            case "assistant", "progress":
-                return .waitingForInput
-            case "user":
-                return .waitingForInput
-            default:
-                return .idle
-            }
-        }
-        return .completed
+        return trace(for: .quiet, timestamp: fallbackDate)
     }
 
     // MARK: - Codex
@@ -150,7 +189,7 @@ final class SessionMonitor {
         let lines = content.split(separator: "\n")
         var sessions: [CodingSession] = []
 
-        for line in lines.suffix(10).reversed() {
+        for line in lines.suffix(12).reversed() {
             guard let ld = line.data(using: .utf8),
                 let json = try? JSONSerialization.jsonObject(with: ld) as? [String: Any],
                 let sessionId = json["id"] as? String,
@@ -160,68 +199,205 @@ final class SessionMonitor {
                 updated > cutoff
             else { continue }
 
-            let status = codexSessionStatus(sessionId: sessionId, updated: updated)
+            let filePath = locateCodexSessionFile(sessionId: sessionId, updated: updated)
+            let recentEntries = filePath.map { readRecentJsonlEntries(path: $0, limit: 16) } ?? []
+            let trace = codexTrace(recentEntries: recentEntries, fallbackDate: updated)
+            let cwd = codexWorkspace(from: recentEntries)
+            let projectPath = cwd ?? threadName
+            let slug = cwd == nil || threadName == projectPath ? "" : threadName
+
             sessions.append(
                 CodingSession(
                     id: sessionId,
                     tool: .codex,
-                    projectPath: threadName,
-                    slug: "",
-                    status: status,
-                    lastActivity: updated
+                    projectPath: projectPath,
+                    slug: slug,
+                    status: trace.status,
+                    lastActivity: trace.lastActivity,
+                    signal: trace.signal,
+                    pulse: trace.pulse
                 ))
         }
         return sessions
     }
 
-    private func codexSessionStatus(sessionId: String, updated: Date) -> SessionStatus {
-        // Try to find and read the actual session file
+    private func locateCodexSessionFile(sessionId: String, updated: Date) -> String? {
         let df = DateFormatter()
         df.dateFormat = "yyyy/MM/dd"
         let dayPath = codexSessions + "/" + df.string(from: updated)
-        let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(atPath: dayPath),
+        guard let files = try? FileManager.default.contentsOfDirectory(atPath: dayPath),
             let match = files.first(where: { $0.contains(sessionId) })
-        else {
-            let age = Date().timeIntervalSince(updated)
-            return age < 300 ? .idle : .completed
+        else { return nil }
+        return dayPath + "/" + match
+    }
+
+    private func codexWorkspace(from recentEntries: [[String: Any]]) -> String? {
+        for entry in recentEntries {
+            guard entry["type"] as? String == "turn_context",
+                let payload = entry["payload"] as? [String: Any],
+                let cwd = payload["cwd"] as? String,
+                !cwd.isEmpty
+            else { continue }
+            return cwd
         }
-        let filePath = dayPath + "/" + match
-        guard let entry = readLastJsonlEntry(path: filePath),
-            let payload = entry["payload"] as? [String: Any],
-            let type = payload["type"] as? String
-        else {
-            let age = Date().timeIntervalSince(updated)
-            return age < 300 ? .idle : .completed
+        return nil
+    }
+
+    private func codexTrace(recentEntries: [[String: Any]], fallbackDate: Date) -> SessionTrace {
+        for entry in recentEntries {
+            let timestamp = parseISO(entry["timestamp"] as? String ?? "") ?? fallbackDate
+            let topType = entry["type"] as? String ?? ""
+            let payload = entry["payload"] as? [String: Any]
+
+            switch topType {
+            case "event_msg":
+                switch payload?["type"] as? String ?? "" {
+                case "agent_message":
+                    return trace(for: replySignal(at: timestamp), timestamp: timestamp)
+                case "agent_reasoning":
+                    return trace(for: .reasoning, timestamp: timestamp)
+                case "user_message":
+                    return trace(for: .booting, timestamp: timestamp)
+                case "task_complete":
+                    return trace(for: .completed, timestamp: timestamp)
+                default:
+                    continue
+                }
+            case "response_item":
+                switch payload?["type"] as? String ?? "" {
+                case "function_call", "web_search_call":
+                    return trace(for: .tooling, timestamp: timestamp)
+                case "function_call_output":
+                    return trace(for: replySignal(at: timestamp), timestamp: timestamp)
+                case "reasoning":
+                    return trace(for: .reasoning, timestamp: timestamp)
+                case "message":
+                    let role = payload?["role"] as? String ?? ""
+                    if role == "assistant" {
+                        return trace(for: replySignal(at: timestamp), timestamp: timestamp)
+                    }
+                    if role == "user" {
+                        return trace(for: .booting, timestamp: timestamp)
+                    }
+                case "task_started":
+                    return trace(for: .booting, timestamp: timestamp)
+                case "task_complete":
+                    return trace(for: .completed, timestamp: timestamp)
+                default:
+                    continue
+                }
+            default:
+                continue
+            }
         }
-        switch type {
-        case "task_started", "agent_message": return .working
-        case "task_complete": return .completed
-        case "user_message": return .waitingForInput
-        default: return .idle
+        return trace(for: .quiet, timestamp: fallbackDate)
+    }
+
+    // MARK: - Trace Mapping
+
+    private func replySignal(at timestamp: Date) -> SessionSignal {
+        let age = Date().timeIntervalSince(timestamp)
+        return age < 18 ? .responding : .awaitingUser
+    }
+
+    private func trace(for signal: SessionSignal, timestamp: Date) -> SessionTrace {
+        let age = Date().timeIntervalSince(timestamp)
+        let status: SessionStatus
+        let pulse: SessionPulse
+
+        switch signal {
+        case .booting, .reasoning, .tooling:
+            if age < 90 {
+                status = .working
+            } else if age < 300 {
+                status = .idle
+            } else {
+                status = .completed
+            }
+
+            if age < 10 {
+                pulse = .hot
+            } else if age < 45 {
+                pulse = .warm
+            } else if age < 180 {
+                pulse = .listening
+            } else if age < 300 {
+                pulse = .drowsy
+            } else {
+                pulse = .sleeping
+            }
+
+        case .responding:
+            if age < 20 {
+                status = .working
+            } else if age < 300 {
+                status = .waitingForInput
+            } else {
+                status = .completed
+            }
+
+            if age < 10 {
+                pulse = .hot
+            } else if age < 45 {
+                pulse = .warm
+            } else if age < 180 {
+                pulse = .listening
+            } else if age < 300 {
+                pulse = .drowsy
+            } else {
+                pulse = .sleeping
+            }
+
+        case .awaitingUser:
+            status = age < 600 ? .waitingForInput : .idle
+
+            if age < 180 {
+                pulse = .listening
+            } else if age < 600 {
+                pulse = .drowsy
+            } else {
+                pulse = .sleeping
+            }
+
+        case .quiet:
+            status = age < 300 ? .idle : .completed
+            pulse = age < 180 ? .drowsy : .sleeping
+
+        case .completed:
+            status = .completed
+            pulse = .sleeping
         }
+
+        return SessionTrace(status: status, signal: signal, pulse: pulse, lastActivity: timestamp)
     }
 
     // MARK: - Helpers
 
-    private func readLastJsonlEntry(path: String) -> [String: Any]? {
-        guard let fh = FileHandle(forReadingAtPath: path) else { return nil }
+    private func readRecentJsonlEntries(
+        path: String, limit: Int, maxBytes: UInt64 = 131_072
+    ) -> [[String: Any]] {
+        guard let fh = FileHandle(forReadingAtPath: path) else { return [] }
         defer { fh.closeFile() }
+
         let fileSize = fh.seekToEndOfFile()
-        guard fileSize > 0 else { return nil }
-        let readSize = min(fileSize, 8192)
+        guard fileSize > 0 else { return [] }
+
+        let readSize = min(fileSize, maxBytes)
         fh.seek(toFileOffset: fileSize - readSize)
         let data = fh.readDataToEndOfFile()
-        guard let str = String(data: data, encoding: .utf8) else { return nil }
+        guard let str = String(data: data, encoding: .utf8) else { return [] }
+
+        var results: [[String: Any]] = []
         for line in str.split(separator: "\n").reversed() {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty,
-                let d = trimmed.data(using: .utf8),
-                let json = try? JSONSerialization.jsonObject(with: d) as? [String: Any]
+                let raw = trimmed.data(using: .utf8),
+                let json = try? JSONSerialization.jsonObject(with: raw) as? [String: Any]
             else { continue }
-            return json
+            results.append(json)
+            if results.count == limit { break }
         }
-        return nil
+        return results
     }
 
     private func decodeDirName(_ encoded: String) -> String {
@@ -231,10 +407,10 @@ final class SessionMonitor {
     }
 
     private func parseISO(_ str: String) -> Date? {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: str) { return d }
-        f.formatOptions = [.withInternetDateTime]
-        return f.date(from: str)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: str) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: str)
     }
 }
