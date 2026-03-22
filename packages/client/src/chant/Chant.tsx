@@ -6,7 +6,7 @@ import { THEMES } from '@ritual-screen/shared';
 export function Chant() {
   const theme = useStore((s) => s.theme);
   const t = THEMES[theme];
-  const { playing, toggle, volume, setVolume } = useAudio();
+  const { audioSource, error, playing, ready, toggle, volume, setVolume } = useAudio();
   const [hovered, setHovered] = useState(false);
 
   const handleVolumeChange = useCallback(
@@ -22,8 +22,9 @@ export function Chant() {
         ...styles.container,
         fontFamily: t.dataFont,
         opacity: hovered ? 0.96 : 0.78,
-        background: `linear-gradient(270deg, ${t.bg}ee 0%, ${t.bg}d0 68%, transparent 100%)`,
-        textShadow: `0 0 14px ${t.accentGlow}`,
+        background: `linear-gradient(270deg, ${t.surfaceStrong} 0%, ${t.surfaceSoft} 68%, transparent 100%)`,
+        textShadow: `0 0 10px ${t.accentGlow}`,
+        borderTop: `1px solid ${t.surfaceBorder}`,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -40,7 +41,12 @@ export function Chant() {
         onChange={handleVolumeChange}
         style={styles.slider}
       />
-      <span style={styles.track}>ambient</span>
+      <div style={styles.trackBlock}>
+        <span style={styles.track}>{audioSource.label}</span>
+        <span style={styles.meta}>
+          {error ? error : ready ? audioSource.kind : 'loading'}
+        </span>
+      </div>
     </div>
   );
 }
@@ -48,8 +54,8 @@ export function Chant() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     position: 'absolute',
-    bottom: 24,
-    right: 24,
+    bottom: 0,
+    right: 0,
     display: 'flex',
     alignItems: 'center',
     gap: 8,
@@ -57,7 +63,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-muted)',
     transition: 'opacity 0.4s ease',
     zIndex: 5,
-    padding: '8px 0 8px 28px',
+    padding: '12px 24px 12px 32px',
   },
   playBtn: {
     background: 'none',
@@ -88,5 +94,24 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: 1,
     fontSize: 9,
     color: 'var(--text-secondary)',
+    maxWidth: 132,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  trackBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+    minWidth: 0,
+  },
+  meta: {
+    fontSize: 9,
+    letterSpacing: 0.8,
+    color: 'var(--text-muted)',
+    maxWidth: 160,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
   },
 };

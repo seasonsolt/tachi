@@ -17,7 +17,7 @@ export function LaughingMan() {
 
   return (
     <div style={styles.container}>
-      <svg viewBox="-170 -170 340 340" xmlns="http://www.w3.org/2000/svg">
+      <svg viewBox="-260 -260 520 520" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <path id="lm-text-path" d="m123,0a123,123 0,0 1-246,0a123,123 0,0 1 246,0" />
         </defs>
@@ -28,10 +28,10 @@ export function LaughingMan() {
           <circle r="150" fill={bg} />
           <text
             fill={c}
-            fontSize="28"
             fontStretch="condensed"
             fontFamily="Impact, 'Arial Narrow', sans-serif"
             opacity="0.18"
+            style={{ fontSize: '24px', letterSpacing: '1px' }}
           >
             <textPath href="#lm-text-path">
               I thought what I'd do was, I'd pretend I was one of those deaf-mutes
@@ -60,13 +60,13 @@ export function LaughingMan() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     position: 'absolute',
-    top: '45%',
+    top: '40%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    width: '65vh',
-    height: '65vh',
-    maxWidth: '650px',
-    maxHeight: '650px',
+    width: '95vh',
+    height: '95vh',
+    maxWidth: '950px',
+    maxHeight: '950px',
     pointerEvents: 'none',
     zIndex: 2,
   },

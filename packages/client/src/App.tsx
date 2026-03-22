@@ -9,6 +9,9 @@ import { Scripture } from './scripture/Scripture';
 import { Chant } from './chant/Chant';
 import { Sessions } from './sessions/Sessions';
 import { Setup } from './setup/Setup';
+import { useAudioController } from './hooks/useAudio';
+import { useFocusTimerController } from './hooks/useFocusTimer';
+import { FocusTimer } from './focus/FocusTimer';
 
 export function App() {
   const theme = useStore((s) => s.theme);
@@ -17,6 +20,8 @@ export function App() {
   const toggleSetup = useStore((s) => s.toggleSetup);
   const { send } = useWebSocket();
   useApiPolling();
+  useAudioController();
+  useFocusTimerController();
   const t = THEMES[theme];
 
   useEffect(() => {
@@ -36,6 +41,9 @@ export function App() {
 
   const cssVars = {
     '--bg': t.bg,
+    '--surface-strong': t.surfaceStrong,
+    '--surface-soft': t.surfaceSoft,
+    '--surface-border': t.surfaceBorder,
     '--fire-core': t.fireCore,
     '--fire-edge': t.fireEdge,
     '--particle-color': t.particleColor,
@@ -67,6 +75,7 @@ export function App() {
         <AltarScene />
         <Scripture />
         <Sessions />
+        <FocusTimer />
         <Pulse />
         <Chant />
         <button
@@ -160,8 +169,13 @@ const globalStyles = `
     pointer-events: none;
     z-index: 3;
     background:
-      linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.08) 16%, rgba(0, 0, 0, 0.04) 55%, rgba(0, 0, 0, 0.34) 100%),
+      linear-gradient(180deg, var(--surface-strong) 0%, rgba(0, 0, 0, 0.14) 16%, rgba(0, 0, 0, 0.04) 55%, var(--surface-soft) 100%),
       linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0%, transparent 18%, transparent 82%, rgba(0, 0, 0, 0.22) 100%);
+  }
+
+  @keyframes haloBreathe {
+    0%, 100% { opacity: 0.8; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.04); }
   }
 
   .focus-halo {
@@ -170,9 +184,10 @@ const globalStyles = `
     pointer-events: none;
     z-index: 4;
     background:
-      radial-gradient(circle at 50% 44%, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.12) 20%, transparent 42%),
+      radial-gradient(circle at 50% 44%, var(--surface-soft) 0%, rgba(0, 0, 0, 0.12) 20%, transparent 42%),
       radial-gradient(circle at 15% 85%, rgba(0, 0, 0, 0.3) 0%, transparent 30%),
       radial-gradient(circle at 85% 85%, rgba(0, 0, 0, 0.28) 0%, transparent 28%);
+    animation: haloBreathe 8s ease-in-out infinite;
   }
 
   @keyframes laughingManSpin {
@@ -293,8 +308,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   setupButton: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    bottom: 12,
+    left: '50%',
+    transform: 'translateX(-50%)',
     background: 'none',
     border: 'none',
     color: 'var(--text-secondary)',

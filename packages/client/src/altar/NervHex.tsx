@@ -81,7 +81,7 @@ export function NervHex() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     position: 'absolute',
-    top: '45%',
+    top: '40%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
     width: '55vh',

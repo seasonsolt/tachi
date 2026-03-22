@@ -8,6 +8,30 @@ import {
 import type { WSMessage, WSClientMessage } from '@ritual-screen/shared';
 
 const MAX_RETRIES_BEFORE_WEB_MODE = 3;
+const LS_SERVER_URL = 'ritual-server-url';
+
+/** Read ?server= from URL params, persist to localStorage */
+function resolveServerUrl(): string | null {
+  const params = new URLSearchParams(location.search);
+  const fromUrl = params.get('server');
+  if (fromUrl) {
+    localStorage.setItem(LS_SERVER_URL, fromUrl);
+    return fromUrl;
+  }
+  return localStorage.getItem(LS_SERVER_URL);
+}
+
+export function getServerUrl(): string | null {
+  return localStorage.getItem(LS_SERVER_URL);
+}
+
+export function setServerUrl(url: string | null): void {
+  if (url) {
+    localStorage.setItem(LS_SERVER_URL, url);
+  } else {
+    localStorage.removeItem(LS_SERVER_URL);
+  }
+}
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -19,6 +43,12 @@ export function useWebSocket() {
   const { setTokenData, setWsConnected, setMilestone, setMode, setSessions } = useStore();
 
   const getUrl = useCallback(() => {
+    const customServer = resolveServerUrl();
+    if (customServer) {
+      // Custom server: always use ws:// (local dev server)
+      const host = customServer.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      return `ws://${host}/ws`;
+    }
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${location.host}/ws`;
   }, []);

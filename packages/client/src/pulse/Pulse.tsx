@@ -21,7 +21,7 @@ function AnimatedValue({ value, style }: { value: string; style?: React.CSSPrope
   }, [value]);
 
   return (
-    <span style={{ ...style, opacity: fading ? 0.4 : 1, transition: 'opacity 0.15s ease' }}>
+    <span style={{ ...style, opacity: fading ? 0.4 : 1, filter: fading ? 'blur(2px)' : 'blur(0px)', transition: 'all 0.15s ease' }}>
       {display}
     </span>
   );
@@ -90,8 +90,9 @@ export function Pulse() {
         ...styles.container,
         fontFamily: t.dataFont,
         opacity: hovered ? 0.95 : 0.82,
-        background: `linear-gradient(90deg, ${t.bg}ee 0%, ${t.bg}d2 68%, transparent 100%)`,
-        textShadow: `0 0 16px ${t.accentGlow}`,
+        background: `linear-gradient(90deg, ${t.surfaceStrong} 0%, ${t.surfaceSoft} 68%, transparent 100%)`,
+        textShadow: `0 0 12px ${t.accentGlow}`,
+        borderTop: `1px solid ${t.surfaceBorder}`,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -100,6 +101,18 @@ export function Pulse() {
         <span style={styles.label}>rate</span>
         <AnimatedValue value={rateDisplay} style={styles.value} />
       </div>
+      {tokenData && tokenData.totalTokens > 0 && (
+        <>
+          <div style={styles.divider} />
+          <div style={styles.row}>
+            <span style={styles.label}>total</span>
+            <span style={styles.value}>
+              <AnimatedValue value={formatTokenCount(tokenData.totalTokens)} />{' '}
+              <span style={styles.cost}><AnimatedValue value={formatUSD(tokenData.totalCostUSD)} /></span>
+            </span>
+          </div>
+        </>
+      )}
       {showBreakdown && <div style={styles.wideDivider} />}
       {!showBreakdown && <div style={styles.divider} />}
       <div style={styles.row}>
@@ -152,8 +165,8 @@ export function Pulse() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     position: 'absolute',
-    bottom: 24,
-    left: 24,
+    bottom: 0,
+    left: 0,
     opacity: 0.5,
     fontSize: 13,
     lineHeight: 1.8,
@@ -161,7 +174,7 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 5,
     transition: 'opacity 0.3s ease',
     cursor: 'default',
-    padding: '10px 42px 14px 0',
+    padding: '16px 42px 16px 24px',
     minWidth: 220,
   },
   row: {
