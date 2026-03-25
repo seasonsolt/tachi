@@ -52,8 +52,13 @@ struct EACCMonitorApp: App {
         MenuBarExtra {
             ContentView(vm: vm)
         } label: {
-            Text(vm.isLoading && vm.items.isEmpty && vm.sessions.isEmpty ? "\u{23f3}" : vm.menuBarText)
-                .font(.system(size: 12, weight: .medium).monospacedDigit())
+            ZStack(alignment: .leading) {
+                Text(vm.menuBarWidthTemplate)
+                    .hidden()
+                Text(vm.isLoading && vm.items.isEmpty && vm.sessions.isEmpty ? "\u{23f3}" : vm.menuBarText)
+            }
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .fixedSize()
                 .task {
                     FloatingPetWindowController.shared.show(vm: vm)
                 }

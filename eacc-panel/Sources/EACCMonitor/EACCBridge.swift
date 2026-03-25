@@ -23,7 +23,7 @@ final class EACCBridge: @unchecked Sendable {
     /// RecipeRuntime integration — dynamic sources feed into token aggregation
     var recipeRuntime: RecipeRuntime? {
         didSet {
-            recipeRuntime?.onSourceUpdate = { [weak self] id, data in
+            recipeRuntime?.addSourceUpdateHandler { [weak self] id, data in
                 self?.updateDynamicSource(id: id, data: data)
             }
         }

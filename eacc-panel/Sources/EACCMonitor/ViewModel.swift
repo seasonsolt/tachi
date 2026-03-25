@@ -37,9 +37,9 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
         case .automatic: return "Auto (follows theme)"
         case .defaultOrb: return "Orb"
         case .laughingMan: return "笑い男 Laughing Man"
-        case .matrixAgent: return "Matrix Agent"
-        case .amberEye: return "Amber Eye"
-        case .voidMonolith: return "Void Monolith"
+        case .matrixAgent: return "母体代码 Matrix Code"
+        case .amberEye: return "レプリカント Replicant"
+        case .voidMonolith: return "モノリス Monolith"
         }
     }
 
@@ -122,17 +122,71 @@ final class ViewModel {
     var menuAnimationFrame = 0
     var companionPersonaMode: CompanionPersonaMode = ViewModel.loadCompanionPersonaMode()
     var selectedTheme: EACCThemeName = ViewModel.loadTheme()
+    var companionCelebrationSequence = 0
+    var companionCelebrationTitle = ""
 
     // Agent
     var agentMessages: [AgentMessage] = []
     var agentInput: String = ""
     var agentIsThinking = false
-    var agentNeedsAPIKey: Bool { agent?.apiKey == nil || (agent?.apiKey?.isEmpty ?? true) }
-    var agent: AgentCore?
-    var recipeRuntime: RecipeRuntime?
+    var agentHasAPIKey = false
+    var agent: AgentCore? {
+        didSet { agentHasAPIKey = agent?.apiKey != nil && !(agent?.apiKey?.isEmpty ?? true) }
+    }
+    var recipeRuntime: RecipeRuntime? {
+        didSet { wireRecipeUpdates() }
+    }
+
+    // Recipe source data — updated by RecipeRuntime callbacks
+    var recipeSources: [RecipeSourceInfo] = []
+
+    struct RecipeSourceInfo: Identifiable {
+        let id: String
+        let name: String
+        var data: EACCSourceData
+    }
+
+    private func wireRecipeUpdates() {
+        recipeRuntime?.addSourceUpdateHandler { [weak self] id, data in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let idx = self.recipeSources.firstIndex(where: { $0.id == id }) {
+                    self.recipeSources[idx].data = data
+                } else {
+                    let recipes = RecipeStore.loadAll()
+                    let name = recipes.first(where: { $0.id == id })?.name ?? id
+                    self.recipeSources.append(RecipeSourceInfo(id: id, name: name, data: data))
+                }
+            }
+        }
+    }
 
     var themeColors: EACCThemeColors {
         EACCThemeColors.forTheme(selectedTheme)
+    }
+
+    var panelThemeColors: EACCThemeColors {
+        switch companionPersona {
+        case .defaultOrb:
+            return themeColors
+        case .laughingMan:
+            return EACCThemeColors(
+                bg: Color(red: 0.03, green: 0.06, blue: 0.09),
+                cardBg: Color(red: 0.05, green: 0.09, blue: 0.12),
+                cardBorder: Color(red: 0.0, green: 0.84, blue: 1.0).opacity(0.18),
+                accent: Color(red: 0.0, green: 0.84, blue: 1.0),
+                accentEdge: Color(red: 0.09, green: 0.43, blue: 0.79),
+                textPrimary: Color(red: 0.93, green: 0.98, blue: 1.0),
+                textSecondary: Color(red: 0.69, green: 0.84, blue: 0.91),
+                textMuted: Color(red: 0.45, green: 0.62, blue: 0.70)
+            )
+        case .matrixAgent:
+            return EACCThemeColors.forTheme(.matrix)
+        case .amberEye:
+            return EACCThemeColors.forTheme(.amber)
+        case .voidMonolith:
+            return EACCThemeColors.forTheme(.voidTheme)
+        }
     }
 
     var refreshInterval: TimeInterval {
@@ -200,6 +254,158 @@ final class ViewModel {
         }.first
     }
 
+    var companionTaskPreviewSessions: [CodingSession] {
+        activeSessions.sorted { lhs, rhs in
+            if lhs.status != rhs.status {
+                return sessionPriority(lhs.status) < sessionPriority(rhs.status)
+            }
+            if lhs.pulse != rhs.pulse { return lhs.pulse.rawValue > rhs.pulse.rawValue }
+            return lhs.lastActivity > rhs.lastActivity
+        }
+    }
+
+    var companionTaskSession: CodingSession? {
+        companionTaskPreviewSessions.first
+    }
+
+    var companionTaskVisibleSessions: [CodingSession] {
+        Array(companionTaskPreviewSessions.prefix(3))
+    }
+
+    var companionTaskOverflowCount: Int {
+        max(0, companionTaskPreviewSessions.count - companionTaskVisibleSessions.count)
+    }
+
+    var shouldShowCompanionTaskPreview: Bool {
+        companionTaskSession != nil
+    }
+
+    var companionTaskHeader: String {
+        let activeCount = activeSessions.count
+        if activeCount > 0 {
+            return activeCount == 1 ? "Current task" : "\(activeCount) active tasks"
+        }
+        return "No active task"
+    }
+
+    var companionTaskSummary: String {
+        if let session = companionTaskSession {
+            if let summary = session.primaryTaskText {
+                return summary
+            }
+            return session.projectName
+        }
+        return "Hover again after a live coding session wakes up."
+    }
+
+    var companionTaskContext: String {
+        if activeSessions.count > 1 {
+            return companionTaskOverflowCount > 0
+                ? "+\(companionTaskOverflowCount) more active tasks"
+                : ""
+        }
+        return ""
+    }
+
+    var companionTaskFooter: String? {
+        let footer = companionTaskContext.trimmingCharacters(in: .whitespacesAndNewlines)
+        return footer.isEmpty ? nil : footer
+    }
+
+    @MainActor
+    func openCompanionTask(_ session: CodingSession) {
+        SessionLauncher.open(session)
+    }
+
+    func companionTaskLine(for session: CodingSession) -> String {
+        let candidates = [
+            compactTaskPreviewText(session.taskTitle),
+            compactTaskPreviewText(session.taskSummary),
+            compactTaskPreviewText(session.slug)
+        ].compactMap { $0 }
+
+        if let candidate = candidates.first(where: {
+            isMeaningfulTaskPreview($0, projectName: session.projectName)
+        }) {
+            return candidate
+        }
+        return session.projectName
+    }
+
+    func companionTaskProject(for session: CodingSession) -> String {
+        session.projectName
+    }
+
+    func companionTaskShowsProjectBadge(for session: CodingSession) -> Bool {
+        companionTaskLine(for: session).caseInsensitiveCompare(session.projectName) != .orderedSame
+    }
+
+    func companionTaskMeta(for session: CodingSession) -> String {
+        "\(session.tool.rawValue) · \(session.signal.compactLabel)"
+    }
+
+    private func compactTaskPreviewText(_ raw: String?) -> String? {
+        guard var text = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            return nil
+        }
+
+        text = text.replacingOccurrences(
+            of: #"^\s*[=\-:#>\[\]\(\)]+\s*"#,
+            with: "",
+            options: .regularExpression
+        )
+        text = text.replacingOccurrences(
+            of: #"\s*[=\-:#>\[\]\(\)]+\s*$"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        for delimiter in ["。", "！", "？", ". ", "! ", "? ", "\n"] {
+            if let range = text.range(of: delimiter) {
+                let head = String(text[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if head.count >= 10 {
+                    text = head
+                    break
+                }
+            }
+        }
+
+        if let range = text.range(of: ": "),
+            text.distance(from: text.startIndex, to: range.lowerBound) < 18
+        {
+            let tail = String(text[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if tail.count >= 10 {
+                text = tail
+            }
+        }
+
+        guard !looksLikeOnlyAPath(text) else { return nil }
+
+        if text.count > 84 {
+            return String(text.prefix(81)) + "..."
+        }
+        return text
+    }
+
+    private func isMeaningfulTaskPreview(_ text: String, projectName: String) -> Bool {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized.isEmpty { return false }
+        if normalized == projectName.lowercased() { return false }
+        if normalized == "codex" || normalized == "claude code" { return false }
+        return !looksLikeOnlyAPath(text)
+    }
+
+    private func looksLikeOnlyAPath(_ text: String) -> Bool {
+        let slashCount = text.filter { $0 == "/" }.count
+        if text.hasPrefix("/") && slashCount >= 2 {
+            return true
+        }
+        if text.contains("/Users/") || text.contains("/src/") || text.contains("/main/") {
+            return true
+        }
+        return false
+    }
+
     var companionMood: CompanionMood {
         if sessions.contains(where: { $0.pulse == .hot }) { return .feasting }
         if sessions.contains(where: { $0.status == .working || $0.pulse == .warm }) { return .alert }
@@ -263,6 +469,10 @@ final class ViewModel {
         return "\(face) \(weightedUtil)%"
     }
 
+    var menuBarWidthTemplate: String {
+        "O_O 100% [88]"
+    }
+
     @MainActor
     func refresh() async {
         async let usageTask: () = refreshUsage()
@@ -318,6 +528,7 @@ final class ViewModel {
     @MainActor
     func setAgentAPIKey(_ key: String) {
         agent?.setAPIKey(key)
+        agentHasAPIKey = true
         // Trigger onboarding after key is set
         if agentMessages.isEmpty {
             triggerOnboarding()
@@ -403,9 +614,12 @@ final class ViewModel {
 
     @MainActor
     private func refreshSessions() async {
-        sessions = await Task.detached {
+        let previousSessions = sessions
+        let updatedSessions = await Task.detached {
             SessionMonitor.shared.scanSessions()
         }.value
+        sessions = updatedSessions
+        handleCompletedTasks(previous: previousSessions, current: updatedSessions)
     }
 
     private func platformOrder(_ platform: String) -> Int {
@@ -414,6 +628,63 @@ final class ViewModel {
         case "antigravity": return 1
         default: return 2
         }
+    }
+
+    private func sessionPriority(_ status: SessionStatus) -> Int {
+        switch status {
+        case .working: return 0
+        case .waitingForInput: return 1
+        case .idle: return 2
+        case .completed: return 3
+        }
+    }
+
+    private var seenCompletedSessionKeys: Set<String> = []
+
+    @MainActor
+    private func handleCompletedTasks(previous: [CodingSession], current: [CodingSession]) {
+        let currentCompletedKeys = Set(
+            current
+                .filter { $0.status == .completed }
+                .map(completionKey(for:))
+        )
+
+        if previous.isEmpty && seenCompletedSessionKeys.isEmpty {
+            seenCompletedSessionKeys = currentCompletedKeys
+            return
+        }
+
+        let previousByID = Dictionary(uniqueKeysWithValues: previous.map { ($0.id, $0) })
+        let newlyCompleted = current.filter { session in
+            guard session.status == .completed else { return false }
+            let key = completionKey(for: session)
+            guard !seenCompletedSessionKeys.contains(key) else { return false }
+            guard let old = previousByID[session.id] else { return false }
+            return old.status != .completed
+        }
+
+        seenCompletedSessionKeys.formUnion(currentCompletedKeys)
+        if seenCompletedSessionKeys.count > 256 {
+            seenCompletedSessionKeys = Set(seenCompletedSessionKeys.suffix(128))
+        }
+
+        guard let latestCompletion = newlyCompleted.max(by: { $0.lastActivity < $1.lastActivity }) else {
+            return
+        }
+        triggerCompanionCelebration(for: latestCompletion, totalCount: newlyCompleted.count)
+    }
+
+    private func completionKey(for session: CodingSession) -> String {
+        "\(session.id)-\(session.status.label)-\(session.lastActivity.timeIntervalSince1970)"
+    }
+
+    @MainActor
+    private func triggerCompanionCelebration(for session: CodingSession, totalCount: Int) {
+        companionCelebrationTitle = totalCount > 1
+            ? "\(totalCount) tasks completed"
+            : (session.primaryTaskText ?? session.projectName)
+        companionCelebrationSequence += 1
+        NotificationManager.shared.playTaskCompletionCue()
     }
 
     private static let companionPersonaModeKey = "companionPersonaMode"

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import UserNotifications
 
@@ -37,6 +38,18 @@ final class NotificationManager: @unchecked Sendable {
             trigger: nil
         )
         UNUserNotificationCenter.current().add(request)
+    }
+
+    @MainActor
+    func playTaskCompletionCue() {
+        let preferredNames = ["Glass", "Hero", "Ping"]
+        for name in preferredNames {
+            if let sound = NSSound(named: NSSound.Name(name)) {
+                sound.play()
+                return
+            }
+        }
+        NSSound.beep()
     }
 
     private var canUseUserNotifications: Bool {

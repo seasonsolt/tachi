@@ -57,11 +57,14 @@ final class AgentCore: @unchecked Sendable {
     init() {
         self.tools = AgentTools.allTools()
 
-        // Auto-detect credentials from environment → saved config → nil
+        // Load saved config first, then override with env vars if present
+        let saved = Self.loadConfig()
         let env = Self.detectEnvironment()
-        self.apiBaseURL = env.baseURL
-        self.authStyle = env.authStyle
-        self.apiKey = env.apiKey ?? Self.loadAPIKey()
+
+        // Priority: env vars > saved config > defaults
+        self.apiKey = env.apiKey ?? saved.apiKey
+        self.apiBaseURL = env.baseURL != "https://api.anthropic.com" ? env.baseURL : (saved.baseURL ?? env.baseURL)
+        self.authStyle = env.apiKey != nil ? env.authStyle : (saved.authStyle ?? env.authStyle)
         self.conversationHistory = Self.loadHistory()
 
         // Detect all provider keys from environment
@@ -277,11 +280,19 @@ final class AgentCore: @unchecked Sendable {
     // MARK: - Anthropic API Call
 
     private func callAPI(system: String, messages: [[String: Any]]) async -> [[String: Any]]? {
-        guard let key = apiKey, !key.isEmpty else { return nil }
+        guard let key = apiKey, !key.isEmpty else {
+            NSLog("[AgentCore] No API key available")
+            return nil
+        }
 
         // Build URL from base (supports custom proxies like claude.benwk.io)
         let base = apiBaseURL.hasSuffix("/") ? String(apiBaseURL.dropLast()) : apiBaseURL
-        guard let url = URL(string: "\(base)/v1/messages") else { return nil }
+        guard let url = URL(string: "\(base)/v1/messages") else {
+            NSLog("[AgentCore] Invalid URL: \(base)/v1/messages")
+            return nil
+        }
+
+        NSLog("[AgentCore] Calling \(url) with \(authStyle == .bearer ? "Bearer" : "x-api-key") auth")
 
         // Build tool definitions
         let toolDefs = tools.map { $0.definition }
@@ -294,7 +305,11 @@ final class AgentCore: @unchecked Sendable {
             "messages": messages,
         ]
 
-        guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+        guard JSONSerialization.isValidJSONObject(body),
+              let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
+            NSLog("[AgentCore] Failed to serialize request body")
+            return nil
+        }
 
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -317,8 +332,6 @@ final class AgentCore: @unchecked Sendable {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
 
             guard status == 200 else {
-                let errBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-                NSLog("[AgentCore] API error \(status): \(errBody)")
                 return nil
             }
 
@@ -342,7 +355,12 @@ final class AgentCore: @unchecked Sendable {
             "You can probe APIs, create/update collector recipes, query collected data, and inspect the system for AI tools.",
             "",
             "When the user asks you to set up tracking for a new API, use http_probe first to understand the API format, then create_recipe to configure the collector.",
-            "Always be concise and direct.",
+            "Always be concise and direct. Respond in the same language as the user.",
+            "",
+            "IMPORTANT: When a user gives you a URL that returns HTML (a SPA/web app), the real data is behind an API endpoint, not in the HTML.",
+            "Use http_probe to fetch the page's JavaScript bundle, then look for API routes in the JS code.",
+            "Common pattern: SPA URLs like /admin-next/api-stats?apiId=X have backing APIs like POST /apiStats/api/user-stats with body {\"apiId\":\"X\"}.",
+            "When you find the API, probe it to get the actual JSON data, then report the usage to the user.",
         ]
 
         // Detected providers from environment
@@ -387,20 +405,41 @@ final class AgentCore: @unchecked Sendable {
         agentDir.appendingPathComponent("config.json")
     }()
 
-    private static func loadAPIKey() -> String? {
-        guard let data = try? Data(contentsOf: configPath),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let key = json["apiKey"] as? String, !key.isEmpty
-        else { return nil }
-        return key
+    private struct SavedConfig {
+        let apiKey: String?
+        let baseURL: String?
+        let authStyle: AuthStyle?
     }
 
-    private func saveAPIKey(_ key: String) {
+    private static func loadConfig() -> SavedConfig {
+        guard let data = try? Data(contentsOf: configPath),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return SavedConfig(apiKey: nil, baseURL: nil, authStyle: nil) }
+
+        let key = json["apiKey"] as? String
+        let base = json["baseURL"] as? String
+        let style: AuthStyle? = (json["authStyle"] as? String) == "bearer" ? .bearer : (key != nil ? .xApiKey : nil)
+
+        return SavedConfig(apiKey: key?.isEmpty == true ? nil : key, baseURL: base, authStyle: style)
+    }
+
+    private static func loadAPIKey() -> String? {
+        return loadConfig().apiKey
+    }
+
+    private func saveConfig() {
         try? FileManager.default.createDirectory(at: Self.agentDir, withIntermediateDirectories: true)
-        let json: [String: Any] = ["apiKey": key]
+        var json: [String: Any] = [:]
+        if let key = apiKey { json["apiKey"] = key }
+        json["baseURL"] = apiBaseURL
+        json["authStyle"] = authStyle == .bearer ? "bearer" : "x-api-key"
         if let data = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted) {
             try? data.write(to: Self.configPath)
         }
+    }
+
+    private func saveAPIKey(_ key: String) {
+        saveConfig()
     }
 
     // MARK: - Conversation history persistence (~/.eacc/agent/history.json)
@@ -415,11 +454,26 @@ final class AgentCore: @unchecked Sendable {
         guard let data = try? Data(contentsOf: historyPath),
               let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
         else { return [] }
-        // Keep only last N messages
-        if arr.count > maxHistoryMessages {
-            return Array(arr.suffix(maxHistoryMessages))
+
+        // Strip invalid fields and restore content blocks
+        let cleaned = arr.compactMap { msg -> [String: Any]? in
+            var entry = msg
+            // Remove content_type (legacy bug — Anthropic API rejects extra fields)
+            entry.removeValue(forKey: "content_type")
+            // If content was serialized as a JSON string of blocks, restore it
+            if let contentStr = entry["content"] as? String,
+               contentStr.hasPrefix("["),
+               let blockData = contentStr.data(using: .utf8),
+               let blocks = try? JSONSerialization.jsonObject(with: blockData) as? [[String: Any]] {
+                entry["content"] = blocks
+            }
+            return entry
         }
-        return arr
+
+        if cleaned.count > maxHistoryMessages {
+            return Array(cleaned.suffix(maxHistoryMessages))
+        }
+        return cleaned
     }
 
     private func saveHistory() {
@@ -432,22 +486,9 @@ final class AgentCore: @unchecked Sendable {
 
         try? FileManager.default.createDirectory(at: Self.agentDir, withIntermediateDirectories: true)
 
-        // Filter to only serializable entries (flatten tool_use content blocks to strings)
-        let serializable = history.map { msg -> [String: Any] in
-            var entry = msg
-            if let content = msg["content"] {
-                if content is String {
-                    // Already a string — fine
-                } else if let blocks = content as? [[String: Any]] {
-                    // Convert content blocks to a JSON string for storage
-                    if let data = try? JSONSerialization.data(withJSONObject: blocks),
-                       let str = String(data: data, encoding: .utf8) {
-                        entry["content"] = str
-                        entry["content_type"] = "blocks"
-                    }
-                }
-            }
-            return entry
+        // Ensure all entries are JSON-serializable (content blocks are already valid)
+        let serializable = history.filter { msg in
+            JSONSerialization.isValidJSONObject(msg)
         }
 
         if let data = try? JSONSerialization.data(withJSONObject: serializable, options: .prettyPrinted) {

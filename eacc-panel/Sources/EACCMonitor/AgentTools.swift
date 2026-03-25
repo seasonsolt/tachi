@@ -54,6 +54,7 @@ final class AgentTools {
                         "auth_key_name": ["type": "string", "description": "Config key name for the API key"],
                         "auth_key_value": ["type": "string", "description": "The actual API key value"],
                         "headers": ["type": "object"],
+                        "body": ["type": "string", "description": "POST request body (JSON string, e.g. {\"apiId\":\"xxx\"})"],
                         "poll_interval_ms": ["type": "integer", "default": 60000],
                         "extract_total_tokens": ["type": "string", "description": "JSONPath to extract total tokens"],
                         "extract_cost": ["type": "string", "description": "JSONPath to extract cost in USD"],
@@ -195,9 +196,11 @@ final class AgentTools {
             return "{\"error\": \"Recipe '\(id)' already exists. Use update_recipe to modify it.\"}"
         }
 
-        // Write recipe JSON
+        // Write recipe JSON — ensure enabled defaults to true
+        var recipe = input
+        if recipe["enabled"] == nil { recipe["enabled"] = true }
         do {
-            let data = try JSONSerialization.data(withJSONObject: input, options: .prettyPrinted)
+            let data = try JSONSerialization.data(withJSONObject: recipe, options: .prettyPrinted)
             try data.write(to: filePath)
             return "{\"success\": true, \"message\": \"Recipe '\(id)' created at \(filePath.path)\"}"
         } catch {

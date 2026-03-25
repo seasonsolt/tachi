@@ -8,8 +8,34 @@ final class RecipeRuntime: @unchecked Sendable {
     private let lock = NSLock()
     private var activeCollectors: [String: RecipeCollector] = [:]
 
-    /// Called when a recipe's data updates
-    var onSourceUpdate: ((String, EACCSourceData) -> Void)?
+    /// Called when a recipe's data updates (supports multiple listeners)
+    private var sourceUpdateHandlers: [(String, EACCSourceData) -> Void] = []
+
+    func addSourceUpdateHandler(_ handler: @escaping (String, EACCSourceData) -> Void) {
+        lock.lock()
+        sourceUpdateHandlers.append(handler)
+        lock.unlock()
+    }
+
+    /// Legacy single-callback setter (for backward compat)
+    var onSourceUpdate: ((String, EACCSourceData) -> Void)? {
+        didSet {
+            if let handler = onSourceUpdate {
+                lock.lock()
+                sourceUpdateHandlers.append(handler)
+                lock.unlock()
+            }
+        }
+    }
+
+    private func notifySourceUpdate(id: String, data: EACCSourceData) {
+        lock.lock()
+        let handlers = sourceUpdateHandlers
+        lock.unlock()
+        for handler in handlers {
+            handler(id, data)
+        }
+    }
 
     // MARK: - Lifecycle
 
@@ -85,7 +111,7 @@ final class RecipeRuntime: @unchecked Sendable {
             self.lock.lock()
             self.activeCollectors[recipe.id]?.lastData = data
             self.lock.unlock()
-            self.onSourceUpdate?(recipe.id, data)
+            self.notifySourceUpdate(id: recipe.id, data: data)
         }
     }
 }
@@ -145,59 +171,138 @@ private final class RecipeCollector: @unchecked Sendable {
               let url = URL(string: endpoint)
         else { return }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = recipe.method ?? "GET"
-        request.timeoutInterval = 30
-
-        // Auth
-        if let authType = recipe.authType, let keyValue = recipe.authKeyValue {
-            switch authType {
-            case .bearer:
-                request.setValue("Bearer \(keyValue)", forHTTPHeaderField: "Authorization")
-            case .header:
-                request.setValue(keyValue, forHTTPHeaderField: "x-api-key")
-            case .none:
-                break
+        // Build base request
+        func makeRequest(bodyOverride: String? = nil) -> URLRequest {
+            var req = URLRequest(url: url)
+            req.httpMethod = recipe.method ?? "GET"
+            req.timeoutInterval = 30
+            if let authType = recipe.authType, let keyValue = recipe.authKeyValue {
+                switch authType {
+                case .bearer: req.setValue("Bearer \(keyValue)", forHTTPHeaderField: "Authorization")
+                case .header: req.setValue(keyValue, forHTTPHeaderField: "x-api-key")
+                case .none: break
+                }
             }
+            if let headers = recipe.headers {
+                for (key, value) in headers { req.setValue(value, forHTTPHeaderField: key) }
+            }
+            let body = bodyOverride ?? recipe.body
+            if let body, !body.isEmpty { req.httpBody = body.data(using: .utf8) }
+            return req
         }
 
-        // Extra headers
-        if let headers = recipe.headers {
-            for (key, value) in headers {
-                request.setValue(value, forHTTPHeaderField: key)
+        // If recipe has todayBody/monthBody, do 3 parallel requests
+        let hasPeriods = recipe.todayBody != nil || recipe.monthBody != nil
+
+        if hasPeriods {
+            let group = DispatchGroup()
+            var totalData: EACCSourceData = .empty
+            var todayTokens = 0, todayCost = 0.0
+            var monthTokens = 0, monthCost = 0.0
+
+            // Main request (alltime)
+            group.enter()
+            URLSession.shared.dataTask(with: makeRequest()) { [weak self] data, _, error in
+                defer { group.leave() }
+                guard let self, error == nil, let data,
+                      let json = try? JSONSerialization.jsonObject(with: data) else { return }
+                totalData = self.extractSourceData(from: json)
+            }.resume()
+
+            // Today request
+            if let todayBody = recipe.todayBody {
+                group.enter()
+                URLSession.shared.dataTask(with: makeRequest(bodyOverride: todayBody)) { data, _, error in
+                    defer { group.leave() }
+                    guard error == nil, let data,
+                          let json = try? JSONSerialization.jsonObject(with: data) else { return }
+                    let (tokens, cost) = Self.sumModelArray(json)
+                    todayTokens = tokens; todayCost = cost
+                }.resume()
             }
-        }
 
-        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            guard let self else { return }
+            // Month request
+            if let monthBody = recipe.monthBody {
+                group.enter()
+                URLSession.shared.dataTask(with: makeRequest(bodyOverride: monthBody)) { data, _, error in
+                    defer { group.leave() }
+                    guard error == nil, let data,
+                          let json = try? JSONSerialization.jsonObject(with: data) else { return }
+                    let (tokens, cost) = Self.sumModelArray(json)
+                    monthTokens = tokens; monthCost = cost
+                }.resume()
+            }
 
-            if let error {
-                NSLog("[RecipeRuntime] Poll error for \(self.recipe.id): \(error.localizedDescription)")
-                let errorData = EACCSourceData(
-                    connected: false, totalTokens: self.lastData.totalTokens,
-                    todayTokens: self.lastData.todayTokens, monthTokens: self.lastData.monthTokens,
-                    costUSD: self.lastData.costUSD, todayCostUSD: self.lastData.todayCostUSD,
-                    monthCostUSD: self.lastData.monthCostUSD, inputTokens: self.lastData.inputTokens,
-                    outputTokens: self.lastData.outputTokens, lastUpdated: self.lastData.lastUpdated
+            group.notify(queue: queue) {
+                let merged = EACCSourceData(
+                    connected: totalData.connected,
+                    totalTokens: totalData.totalTokens,
+                    todayTokens: todayTokens,
+                    monthTokens: monthTokens,
+                    costUSD: totalData.costUSD,
+                    todayCostUSD: todayCost,
+                    monthCostUSD: monthCost,
+                    inputTokens: totalData.inputTokens,
+                    outputTokens: totalData.outputTokens,
+                    lastUpdated: Int(Date().timeIntervalSince1970 * 1000)
                 )
-                onUpdate(errorData)
-                return
+                onUpdate(merged)
             }
-
-            guard let data,
-                  let json = try? JSONSerialization.jsonObject(with: data)
-            else {
-                NSLog("[RecipeRuntime] Parse error for \(self.recipe.id)")
-                return
-            }
-
-            let sourceData = self.extractSourceData(from: json)
-            onUpdate(sourceData)
+        } else {
+            // Simple single request
+            URLSession.shared.dataTask(with: makeRequest()) { [weak self] data, _, error in
+                guard let self else { return }
+                if let error {
+                    NSLog("[RecipeRuntime] Poll error for \(self.recipe.id): \(error.localizedDescription)")
+                    onUpdate(EACCSourceData(
+                        connected: false, totalTokens: self.lastData.totalTokens,
+                        todayTokens: self.lastData.todayTokens, monthTokens: self.lastData.monthTokens,
+                        costUSD: self.lastData.costUSD, todayCostUSD: self.lastData.todayCostUSD,
+                        monthCostUSD: self.lastData.monthCostUSD, inputTokens: self.lastData.inputTokens,
+                        outputTokens: self.lastData.outputTokens, lastUpdated: self.lastData.lastUpdated
+                    ))
+                    return
+                }
+                guard let data, let json = try? JSONSerialization.jsonObject(with: data) else { return }
+                onUpdate(self.extractSourceData(from: json))
+            }.resume()
         }
-        task.resume()
+    }
+
+    /// Sum tokens and cost from a model-stats array response: { data: [{ allTokens, costs: { total } }] }
+    private static func sumModelArray(_ json: Any) -> (tokens: Int, cost: Double) {
+        guard let root = json as? [String: Any],
+              let arr = root["data"] as? [[String: Any]]
+        else { return (0, 0) }
+        var tokens = 0, cost = 0.0
+        for model in arr {
+            tokens += (model["allTokens"] as? Int) ?? 0
+            if let costs = model["costs"] as? [String: Any] {
+                cost += (costs["total"] as? Double) ?? 0
+            }
+        }
+        return (tokens, cost)
     }
 
     private func extractSourceData(from json: Any) -> EACCSourceData {
+        // Auto-detect model-stats array response: { data: [{ allTokens, costs }] }
+        if let root = json as? [String: Any], let arr = root["data"] as? [[String: Any]], !arr.isEmpty,
+           arr[0]["allTokens"] != nil || arr[0]["costs"] != nil {
+            let (tokens, cost) = Self.sumModelArray(json)
+            var input = 0, output = 0
+            for m in arr {
+                input += (m["inputTokens"] as? Int) ?? 0
+                output += (m["outputTokens"] as? Int) ?? 0
+            }
+            return EACCSourceData(
+                connected: true, totalTokens: tokens, todayTokens: 0, monthTokens: 0,
+                costUSD: cost, todayCostUSD: 0, monthCostUSD: 0,
+                inputTokens: input, outputTokens: output,
+                lastUpdated: Int(Date().timeIntervalSince1970 * 1000)
+            )
+        }
+
+        // Standard JSONPath extraction
         let totalTokens: Int
         if let path = recipe.extractTotalTokens {
             totalTokens = Self.extractInt(from: json, path: path)
@@ -260,6 +365,20 @@ private final class RecipeCollector: @unchecked Sendable {
         guard let rawPath = recipe.watchPath else { return }
         let path = rawPath.replacingOccurrences(of: "~", with: NSHomeDirectory())
 
+        // For directory-scanning parsers (codex-sessions), use timer instead of file watch
+        if recipe.parseScript == "codex-sessions" {
+            readFileAndNotify(path: path, onUpdate: onUpdate)
+            let interval = Double(recipe.pollIntervalMs ?? 120000) / 1000.0
+            let src = DispatchSource.makeTimerSource(queue: queue)
+            src.schedule(deadline: .now() + interval, repeating: interval)
+            src.setEventHandler { [weak self] in
+                self?.readFileAndNotify(path: path, onUpdate: onUpdate)
+            }
+            timer = src
+            src.resume()
+            return
+        }
+
         // Initial read
         readFileAndNotify(path: path, onUpdate: onUpdate)
 
@@ -316,9 +435,105 @@ private final class RecipeCollector: @unchecked Sendable {
                   let parsed = StatsWatcher.parseStats(data: data)
             else { return }
             onUpdate(parsed)
+        case "codex-sessions":
+            let data = Self.scanCodexSessions()
+            onUpdate(data)
         default:
             NSLog("[RecipeRuntime] Unknown parseScript: \(parseScript)")
         }
+    }
+
+    // MARK: - Codex session scanner
+
+    /// Scan all Codex session .jsonl files and sum up token usage.
+    /// Each session's last `total_token_usage` entry gives that session's total.
+    private static func scanCodexSessions() -> EACCSourceData {
+        let home = NSHomeDirectory()
+        let sessionsDir = home + "/.codex/sessions"
+        let archivedDir = home + "/.codex/archived_sessions"
+        let fm = FileManager.default
+
+        var files: [String] = []
+        if let enumerator = fm.enumerator(atPath: sessionsDir) {
+            while let file = enumerator.nextObject() as? String {
+                if file.hasSuffix(".jsonl") {
+                    files.append(sessionsDir + "/" + file)
+                }
+            }
+        }
+        if let archived = try? fm.contentsOfDirectory(atPath: archivedDir) {
+            for f in archived where f.hasSuffix(".jsonl") {
+                files.append(archivedDir + "/" + f)
+            }
+        }
+
+        let today = Self.todayString()
+        let month = String(today.prefix(7))
+
+        var totalTokens = 0, todayTokens = 0, monthTokens = 0
+        var totalInput = 0, totalOutput = 0
+
+        for file in files {
+            guard let data = fm.contents(atPath: file),
+                  let content = String(data: data, encoding: .utf8)
+            else { continue }
+
+            var sessionDate: String?
+            var lastTotal = 0, lastInput = 0, lastOutput = 0
+
+            for line in content.components(separatedBy: "\n") {
+                guard !line.isEmpty,
+                      let entry = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+                else { continue }
+
+                // Get session date from first entry's timestamp
+                if sessionDate == nil, let ts = entry["timestamp"] as? String, ts.count >= 10 {
+                    sessionDate = String(ts.prefix(10))
+                }
+
+                // Look for total_token_usage in payload.info
+                if let payload = entry["payload"] as? [String: Any],
+                   let info = payload["info"] as? [String: Any],
+                   let usage = info["total_token_usage"] as? [String: Any] {
+                    lastTotal = (usage["total_tokens"] as? Int) ?? 0
+                    lastInput = (usage["input_tokens"] as? Int) ?? 0
+                    lastOutput = (usage["output_tokens"] as? Int) ?? 0
+                }
+            }
+
+            totalTokens += lastTotal
+            totalInput += lastInput
+            totalOutput += lastOutput
+            if let d = sessionDate {
+                if d == today { todayTokens += lastTotal }
+                if d.hasPrefix(month) { monthTokens += lastTotal }
+            }
+        }
+
+        // Estimate cost using OpenAI pricing (codex uses OpenAI models)
+        // Approximate: $2.50/1M input, $10/1M output for GPT-4.1
+        let costUSD = Double(totalInput) * 2.5 / 1_000_000.0 + Double(totalOutput) * 10.0 / 1_000_000.0
+        let todayCost = Double(todayTokens) * 5.0 / 1_000_000.0  // blended rate
+        let monthCost = Double(monthTokens) * 5.0 / 1_000_000.0
+
+        return EACCSourceData(
+            connected: true,
+            totalTokens: totalTokens,
+            todayTokens: todayTokens,
+            monthTokens: monthTokens,
+            costUSD: costUSD,
+            todayCostUSD: todayCost,
+            monthCostUSD: monthCost,
+            inputTokens: totalInput,
+            outputTokens: totalOutput,
+            lastUpdated: Int(Date().timeIntervalSince1970 * 1000)
+        )
+    }
+
+    private static func todayString() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
     }
 
     // MARK: - JSONPath-like extraction

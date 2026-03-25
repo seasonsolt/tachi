@@ -95,12 +95,12 @@ export const THEMES: Record<ThemeName, Theme> = {
     scriptureFont: '"Space Grotesk", "Inter", sans-serif',
     dataFont: '"Fira Code", "JetBrains Mono", monospace',
   },
-  // 黑客帝國 — The Matrix
-  // Green digital rain, awakening, "There is no spoon"
+  // 黑客帝國 — Matrix Code
+  // Digital rain, machine surveillance, red pill choice, seeing the code behind reality
   matrix: {
     name: 'matrix',
-    label: 'The Matrix',
-    labelZh: '黑客帝國',
+    label: 'Matrix Code',
+    labelZh: '母体代码',
     isLightTheme: false,
     bg: '#000000',
     surfaceStrong: 'rgba(3, 10, 5, 0.9)',
