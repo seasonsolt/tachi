@@ -7,6 +7,8 @@ struct CodingSession: Identifiable, Sendable {
     let tool: CodingTool
     let projectPath: String
     let slug: String
+    let taskTitle: String?
+    let taskSummary: String?
     let status: SessionStatus
     let lastActivity: Date
     let signal: SessionSignal
@@ -15,6 +17,11 @@ struct CodingSession: Identifiable, Sendable {
     var projectName: String {
         let name = (projectPath as NSString).lastPathComponent
         return name.isEmpty ? projectPath : name
+    }
+
+    var primaryTaskText: String? {
+        let candidates = [taskSummary, taskTitle, slug]
+        return candidates.first(where: { ($0 ?? "").isEmpty == false }) ?? nil
     }
 }
 
@@ -66,6 +73,18 @@ enum SessionSignal: Sendable {
         case .completed: return "Curled up"
         }
     }
+
+    var compactLabel: String {
+        switch self {
+        case .booting: return "starting"
+        case .reasoning: return "thinking"
+        case .tooling: return "tooling"
+        case .responding: return "replying"
+        case .awaitingUser: return "waiting"
+        case .quiet: return "warm"
+        case .completed: return "done"
+        }
+    }
 }
 
 enum SessionPulse: Int, Sendable {
@@ -86,6 +105,11 @@ final class SessionMonitor {
         let signal: SessionSignal
         let pulse: SessionPulse
         let lastActivity: Date
+    }
+
+    private struct CodexIndexMetadata {
+        let threadName: String
+        let updated: Date
     }
 
     private let home = NSHomeDirectory()
@@ -128,6 +152,7 @@ final class SessionMonitor {
                 let sessionId = String(file.dropLast(6))
                 let cwd = lastEntry?["cwd"] as? String ?? decodeDirName(dir)
                 let slug = lastEntry?["slug"] as? String ?? ""
+                let projectName = sanitizeTaskText((cwd as NSString).lastPathComponent)
                 let trace = claudeTrace(recentEntries: recentEntries, fallbackDate: modified)
 
                 sessions.append(
@@ -136,6 +161,11 @@ final class SessionMonitor {
                         tool: .claudeCode,
                         projectPath: cwd,
                         slug: slug,
+                        taskTitle: sanitizeTaskText(slug) ?? projectName,
+                        taskSummary: claudeTaskSummary(
+                            recentEntries: recentEntries,
+                            fallback: sanitizeTaskText(slug) ?? projectName
+                        ),
                         status: trace.status,
                         lastActivity: trace.lastActivity,
                         signal: trace.signal,
@@ -181,57 +211,63 @@ final class SessionMonitor {
 
     private func scanCodexSessions() -> [CodingSession] {
         let fm = FileManager.default
-        guard let data = fm.contents(atPath: codexIndex),
-            let content = String(data: data, encoding: .utf8)
-        else { return [] }
-
         let cutoff = Date().addingTimeInterval(-3600)
-        let lines = content.split(separator: "\n")
-        var sessions: [CodingSession] = []
+        let indexMetadata = loadCodexIndexMetadata(cutoff: cutoff)
+        let recentFiles = recentCodexSessionFiles(cutoff: cutoff, limit: 96)
+        var sessionsByID: [String: CodingSession] = [:]
 
-        for line in lines.suffix(12).reversed() {
-            guard let ld = line.data(using: .utf8),
-                let json = try? JSONSerialization.jsonObject(with: ld) as? [String: Any],
-                let sessionId = json["id"] as? String,
-                let threadName = json["thread_name"] as? String,
-                let updatedStr = json["updated_at"] as? String,
-                let updated = parseISO(updatedStr),
-                updated > cutoff
-            else { continue }
+        for filePath in recentFiles {
+            let recentEntries = readRecentJsonlEntries(path: filePath, limit: 40, maxBytes: 262_144)
+            let metaEntry = readFirstJsonlEntry(path: filePath, maxBytes: 524_288)
+            let metaPayload = metaEntry?["payload"] as? [String: Any]
+            let fileName = (filePath as NSString).lastPathComponent
+            let inferredID = fileName
+                .replacingOccurrences(of: ".jsonl", with: "")
+                .components(separatedBy: "-")
+                .suffix(5)
+                .joined(separator: "-")
+            let sessionId = (metaPayload?["id"] as? String) ?? inferredID
 
-            let filePath = locateCodexSessionFile(sessionId: sessionId, updated: updated)
-            let recentEntries = filePath.map { readRecentJsonlEntries(path: $0, limit: 16) } ?? []
+            let modified = ((try? fm.attributesOfItem(atPath: filePath))?[.modificationDate] as? Date)
+                ?? Date.distantPast
+            let updated = indexMetadata[sessionId]?.updated ?? modified
             let trace = codexTrace(recentEntries: recentEntries, fallbackDate: updated)
-            let cwd = codexWorkspace(from: recentEntries)
-            let projectPath = cwd ?? threadName
-            let slug = cwd == nil || threadName == projectPath ? "" : threadName
+            let threadName = sanitizeTaskText(indexMetadata[sessionId]?.threadName)
+            let cwd = codexWorkspace(from: recentEntries, metaPayload: metaPayload)
+            let projectPath = cwd ?? threadName ?? "Codex"
+            let slug = threadName == nil || threadName == projectPath ? "" : (threadName ?? "")
+            let projectName = sanitizeTaskText((projectPath as NSString).lastPathComponent)
+            let taskTitle = threadName ?? projectName
 
-            sessions.append(
-                CodingSession(
-                    id: sessionId,
-                    tool: .codex,
-                    projectPath: projectPath,
-                    slug: slug,
-                    status: trace.status,
-                    lastActivity: trace.lastActivity,
-                    signal: trace.signal,
-                    pulse: trace.pulse
-                ))
+            let session = CodingSession(
+                id: sessionId,
+                tool: .codex,
+                projectPath: projectPath,
+                slug: slug,
+                taskTitle: taskTitle,
+                taskSummary: codexTaskSummary(
+                    recentEntries: recentEntries,
+                    fallback: taskTitle ?? projectName
+                ),
+                status: trace.status,
+                lastActivity: trace.lastActivity,
+                signal: trace.signal,
+                pulse: trace.pulse
+            )
+
+            if let existing = sessionsByID[sessionId] {
+                if session.lastActivity > existing.lastActivity {
+                    sessionsByID[sessionId] = session
+                }
+            } else {
+                sessionsByID[sessionId] = session
+            }
         }
-        return sessions
+
+        return Array(sessionsByID.values)
     }
 
-    private func locateCodexSessionFile(sessionId: String, updated: Date) -> String? {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy/MM/dd"
-        let dayPath = codexSessions + "/" + df.string(from: updated)
-        guard let files = try? FileManager.default.contentsOfDirectory(atPath: dayPath),
-            let match = files.first(where: { $0.contains(sessionId) })
-        else { return nil }
-        return dayPath + "/" + match
-    }
-
-    private func codexWorkspace(from recentEntries: [[String: Any]]) -> String? {
+    private func codexWorkspace(from recentEntries: [[String: Any]], metaPayload: [String: Any]?) -> String? {
         for entry in recentEntries {
             guard entry["type"] as? String == "turn_context",
                 let payload = entry["payload"] as? [String: Any],
@@ -240,7 +276,73 @@ final class SessionMonitor {
             else { continue }
             return cwd
         }
-        return nil
+        return sanitizeTaskText(metaPayload?["cwd"] as? String)
+    }
+
+    private func loadCodexIndexMetadata(cutoff: Date) -> [String: CodexIndexMetadata] {
+        guard let data = FileManager.default.contents(atPath: codexIndex),
+            let content = String(data: data, encoding: .utf8)
+        else { return [:] }
+
+        var metadata: [String: CodexIndexMetadata] = [:]
+        for line in content.split(separator: "\n").reversed() {
+            guard let ld = line.data(using: .utf8),
+                let json = try? JSONSerialization.jsonObject(with: ld) as? [String: Any],
+                let sessionId = json["id"] as? String,
+                let threadName = json["thread_name"] as? String,
+                let updatedStr = json["updated_at"] as? String,
+                let updated = parseISO(updatedStr),
+                updated > cutoff
+            else { continue }
+            metadata[sessionId] = CodexIndexMetadata(threadName: threadName, updated: updated)
+            if metadata.count >= 64 { break }
+        }
+        return metadata
+    }
+
+    private func recentCodexSessionFiles(cutoff: Date, limit: Int) -> [String] {
+        guard let enumerator = FileManager.default.enumerator(atPath: codexSessions) else { return [] }
+
+        var files: [(path: String, modified: Date)] = []
+        while let relativePath = enumerator.nextObject() as? String {
+            guard relativePath.hasSuffix(".jsonl") else { continue }
+            let fullPath = codexSessions + "/" + relativePath
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+                let modified = attrs[.modificationDate] as? Date,
+                modified > cutoff
+            else { continue }
+            files.append((path: fullPath, modified: modified))
+        }
+
+        return files
+            .sorted { $0.modified > $1.modified }
+            .prefix(limit)
+            .map(\.path)
+    }
+
+    private func codexTaskSummary(recentEntries: [[String: Any]], fallback: String?) -> String? {
+        for entry in recentEntries {
+            let topType = entry["type"] as? String ?? ""
+            let payload = entry["payload"] as? [String: Any]
+
+            switch topType {
+            case "event_msg":
+                guard payload?["type"] as? String == "user_message" else { continue }
+                if let summary = extractText(from: payload?["message"] ?? payload?["content"]) {
+                    return summary
+                }
+            case "response_item":
+                guard payload?["type"] as? String == "message",
+                    payload?["role"] as? String == "user"
+                else { continue }
+                if let summary = extractText(from: payload?["content"]) {
+                    return summary
+                }
+            default:
+                continue
+            }
+        }
+        return sanitizeTaskText(fallback)
     }
 
     private func codexTrace(recentEntries: [[String: Any]], fallbackDate: Date) -> SessionTrace {
@@ -248,26 +350,31 @@ final class SessionMonitor {
             let timestamp = parseISO(entry["timestamp"] as? String ?? "") ?? fallbackDate
             let topType = entry["type"] as? String ?? ""
             let payload = entry["payload"] as? [String: Any]
+            let payloadType = payload?["type"] as? String ?? ""
 
             switch topType {
             case "event_msg":
-                switch payload?["type"] as? String ?? "" {
+                switch payloadType {
                 case "agent_message":
                     return trace(for: replySignal(at: timestamp), timestamp: timestamp)
+                case "agent_message_delta":
+                    return trace(for: .responding, timestamp: timestamp)
                 case "agent_reasoning":
                     return trace(for: .reasoning, timestamp: timestamp)
-                case "user_message":
+                case "user_message", "task_started":
                     return trace(for: .booting, timestamp: timestamp)
                 case "task_complete":
                     return trace(for: .completed, timestamp: timestamp)
+                case let kind where kind.hasSuffix("_begin") || kind.contains("command") || kind.contains("tool"):
+                    return trace(for: .tooling, timestamp: timestamp)
                 default:
                     continue
                 }
             case "response_item":
-                switch payload?["type"] as? String ?? "" {
-                case "function_call", "web_search_call":
+                switch payloadType {
+                case let kind where kind.hasSuffix("_call"):
                     return trace(for: .tooling, timestamp: timestamp)
-                case "function_call_output":
+                case let kind where kind.hasSuffix("_call_output"):
                     return trace(for: replySignal(at: timestamp), timestamp: timestamp)
                 case "reasoning":
                     return trace(for: .reasoning, timestamp: timestamp)
@@ -279,8 +386,6 @@ final class SessionMonitor {
                     if role == "user" {
                         return trace(for: .booting, timestamp: timestamp)
                     }
-                case "task_started":
-                    return trace(for: .booting, timestamp: timestamp)
                 case "task_complete":
                     return trace(for: .completed, timestamp: timestamp)
                 default:
@@ -291,6 +396,16 @@ final class SessionMonitor {
             }
         }
         return trace(for: .quiet, timestamp: fallbackDate)
+    }
+
+    private func claudeTaskSummary(recentEntries: [[String: Any]], fallback: String?) -> String? {
+        for entry in recentEntries {
+            guard entry["type"] as? String == "user" else { continue }
+            if let summary = extractText(from: entry["message"] ?? entry["content"]) {
+                return summary
+            }
+        }
+        return sanitizeTaskText(fallback)
     }
 
     // MARK: - Trace Mapping
@@ -400,10 +515,76 @@ final class SessionMonitor {
         return results
     }
 
+    private func readFirstJsonlEntry(path: String, maxBytes: Int = 32_768) -> [String: Any]? {
+        guard let fh = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { fh.closeFile() }
+
+        var buffer = Data()
+        while buffer.count < maxBytes {
+            let chunk = fh.readData(ofLength: min(65_536, maxBytes - buffer.count))
+            guard !chunk.isEmpty else { break }
+            buffer.append(chunk)
+            if buffer.firstIndex(of: 0x0A) != nil { break }
+        }
+
+        guard let newlineIndex = buffer.firstIndex(of: 0x0A) ?? buffer.indices.last,
+            let raw = Data(buffer[...newlineIndex]).split(separator: 0x0A).first,
+            let json = try? JSONSerialization.jsonObject(with: raw) as? [String: Any]
+        else { return nil }
+        return json
+    }
+
     private func decodeDirName(_ encoded: String) -> String {
         var path = encoded
         if path.hasPrefix("-") { path = String(path.dropFirst()) }
         return "/" + path.replacingOccurrences(of: "-", with: "/")
+    }
+
+    private func extractText(from raw: Any?) -> String? {
+        if let text = raw as? String {
+            return sanitizeTaskText(text)
+        }
+
+        if let dict = raw as? [String: Any] {
+            if let text = dict["text"] as? String {
+                return sanitizeTaskText(text)
+            }
+            if let content = dict["content"] {
+                return extractText(from: content)
+            }
+            if let message = dict["message"] {
+                return extractText(from: message)
+            }
+        }
+
+        if let array = raw as? [Any] {
+            let text = array.compactMap { item -> String? in
+                if let string = item as? String {
+                    return string
+                }
+                if let dict = item as? [String: Any] {
+                    return extractText(from: dict["text"] ?? dict["content"] ?? dict["message"])
+                }
+                return nil
+            }.joined(separator: " ")
+            return sanitizeTaskText(text)
+        }
+
+        return nil
+    }
+
+    private func sanitizeTaskText(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let squashed = raw
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !squashed.isEmpty else { return nil }
+        guard squashed.count > 120 else { return squashed }
+        return String(squashed.prefix(117)) + "..."
     }
 
     private func parseISO(_ str: String) -> Date? {
