@@ -1,22 +1,11 @@
 # EACC Screen
 
-Full-screen web experience that frames AI token consumption as a sacred "offering" ritual. Designed for a second monitor during vibe coding sessions.
+Use the repo-wide guide at `../AGENTS.md` as the primary instruction file.
 
-## Quick Start
-```bash
-pnpm install
-pnpm -F @eacc/client build
-pnpm -F cli dev
-```
-
-## Architecture
-- `packages/shared` — Types, constants, scriptures, milestones
-- `packages/cli` — Node.js server (Hono + WebSocket) on port 3666
-- `packages/client` — Vite + React SPA with CSS particles
-- `packages/worker` — Cloudflare Worker CORS proxy
-
-## Design System
-Always read DESIGN.md before making any visual or UI decisions.
-All font choices, colors, spacing, and aesthetic direction are defined there.
-Do not deviate without explicit user approval.
-In QA mode, flag any code that doesn't match DESIGN.md.
+Screen-specific reminders:
+- This app is the full-screen ritual display, not a generic dashboard.
+- Read `DESIGN.md` before making any visual change.
+- Keep the altar composition desktop-first; mobile stays a simple blocker message below `768px`.
+- Preserve the four shared themes: `cyber`, `matrix`, `amber`, `void`.
+- Keep `0px` border radius and the existing opacity hierarchy.
+- When changing shared protocol, theme, pricing, or session tracking behavior, also check `eacc-panel` for matching updates.

@@ -28,11 +28,13 @@ struct CodingSession: Identifiable, Sendable {
 enum CodingTool: String, Sendable {
     case claudeCode = "Claude Code"
     case codex = "Codex"
+    case openCode = "OpenCode"
 
     var icon: String {
         switch self {
         case .claudeCode: return "brain.head.profile"
         case .codex: return "cube.transparent"
+        case .openCode: return "terminal"
         }
     }
 }
@@ -116,11 +118,13 @@ final class SessionMonitor {
     private var claudeDir: String { home + "/.claude/projects" }
     private var codexIndex: String { home + "/.codex/session_index.jsonl" }
     private var codexSessions: String { home + "/.codex/sessions" }
+    private var openCodeDB: String { home + "/.local/share/opencode/opencode.db" }
 
     func scanSessions() -> [CodingSession] {
         var sessions: [CodingSession] = []
         sessions.append(contentsOf: scanClaudeSessions())
         sessions.append(contentsOf: scanCodexSessions())
+        sessions.append(contentsOf: scanOpenCodeSessions())
         sessions.sort { lhs, rhs in
             if lhs.pulse != rhs.pulse { return lhs.pulse.rawValue > rhs.pulse.rawValue }
             return lhs.lastActivity > rhs.lastActivity
@@ -398,6 +402,119 @@ final class SessionMonitor {
         return trace(for: .quiet, timestamp: fallbackDate)
     }
 
+    // MARK: - OpenCode
+
+    private func scanOpenCodeSessions() -> [CodingSession] {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: openCodeDB) else { return [] }
+
+        let cutoff = Date().addingTimeInterval(-3600)
+        let query = [
+            "select s.id, s.slug, s.directory, s.title, s.time_created, s.time_updated",
+            "from session s",
+            "where s.time_archived is null and s.time_updated >= \(Int64(cutoff.timeIntervalSince1970 * 1000))",
+            "order by s.time_updated desc",
+            "limit 64;"
+        ].joined(separator: " ")
+
+        let rows = runSQLiteLines(database: openCodeDB, sql: query)
+        var sessions: [CodingSession] = []
+
+        for row in rows {
+            let columns = row.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            guard columns.count >= 6 else { continue }
+
+            let sessionId = columns[0]
+            let slug = columns[1]
+            let directory = columns[2]
+            let title = openCodeTaskTitle(title: columns[3], slug: slug)
+            let createdAtMs = Double(columns[4]) ?? 0
+            let updatedAtMs = Double(columns[5]) ?? 0
+            let recentMessages = readOpenCodeMessages(sessionId: sessionId)
+            let latestMessage = recentMessages.first
+            let latestUserMessage = recentMessages.first(where: { ($0["role"] as? String) == "user" })
+
+            let fallbackDate = updatedAtMs > 0
+                ? Date(timeIntervalSince1970: updatedAtMs / 1000)
+                : Date(timeIntervalSince1970: createdAtMs / 1000)
+            let trace = openCodeTrace(latestMessage: latestMessage, fallbackDate: fallbackDate)
+            let projectName = sanitizeTaskText((directory as NSString).lastPathComponent)
+            let safeSlug = sanitizeTaskText(slug) ?? ""
+            let fallbackTitle = title ?? sanitizeTaskText(safeSlug) ?? projectName
+
+            sessions.append(
+                CodingSession(
+                    id: sessionId,
+                    tool: .openCode,
+                    projectPath: directory,
+                    slug: safeSlug,
+                    taskTitle: fallbackTitle,
+                    taskSummary: openCodeTaskSummary(
+                        latestMessage: latestMessage,
+                        latestUserMessage: latestUserMessage,
+                        fallback: fallbackTitle
+                    ),
+                    status: trace.status,
+                    lastActivity: trace.lastActivity,
+                    signal: trace.signal,
+                    pulse: trace.pulse
+                ))
+        }
+
+        return sessions
+    }
+
+    private func openCodeTaskSummary(
+        latestMessage: [String: Any]?, latestUserMessage: [String: Any]?, fallback: String?
+    ) -> String? {
+        if let summary = extractText(from: latestUserMessage?["summary"]) {
+            return summary
+        }
+        if let summary = extractText(from: latestUserMessage?["content"] ?? latestUserMessage?["message"]) {
+            return summary
+        }
+        if let summary = extractText(from: latestMessage?["summary"]) {
+            return summary
+        }
+        return sanitizeTaskText(fallback)
+    }
+
+    private func openCodeTaskTitle(title rawTitle: String?, slug rawSlug: String?) -> String? {
+        let title = sanitizeTaskText(rawTitle)
+        if let title, !title.hasPrefix("New session - ") {
+            return title
+        }
+        return sanitizeTaskText(rawSlug)
+    }
+
+    private func openCodeTrace(latestMessage: [String: Any]?, fallbackDate: Date) -> SessionTrace {
+        guard let latestMessage else {
+            return trace(for: .quiet, timestamp: fallbackDate)
+        }
+
+        let time = latestMessage["time"] as? [String: Any]
+        let completedAt = millisToDate(time?["completed"])
+        let createdAt = millisToDate(time?["created"])
+        let timestamp = completedAt ?? createdAt ?? fallbackDate
+        let role = latestMessage["role"] as? String ?? ""
+
+        switch role {
+        case "user":
+            return trace(for: .booting, timestamp: timestamp)
+        case "assistant":
+            if completedAt == nil {
+                return trace(for: .responding, timestamp: timestamp)
+            }
+            let finish = latestMessage["finish"] as? String ?? ""
+            if finish == "tool-calls" {
+                return trace(for: .tooling, timestamp: timestamp)
+            }
+            return trace(for: replySignal(at: timestamp), timestamp: timestamp)
+        default:
+            return trace(for: .quiet, timestamp: timestamp)
+        }
+    }
+
     private func claudeTaskSummary(recentEntries: [[String: Any]], fallback: String?) -> String? {
         for entry in recentEntries {
             guard entry["type"] as? String == "user" else { continue }
@@ -538,6 +655,60 @@ final class SessionMonitor {
         var path = encoded
         if path.hasPrefix("-") { path = String(path.dropFirst()) }
         return "/" + path.replacingOccurrences(of: "-", with: "/")
+    }
+
+    private func runSQLiteLines(database: String, sql: String) -> [String] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        process.arguments = ["-separator", "\t", database, sql]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return []
+        }
+
+        guard process.terminationStatus == 0 else { return [] }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8) else { return [] }
+        return output
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map(String.init)
+    }
+
+    private func readOpenCodeMessages(sessionId: String, limit: Int = 8) -> [[String: Any]] {
+        let sql = [
+            "select data",
+            "from message",
+            "where session_id = \(quoteSQLite(sessionId))",
+            "order by time_updated desc",
+            "limit \(limit);"
+        ].joined(separator: " ")
+        return runSQLiteLines(database: openCodeDB, sql: sql)
+            .compactMap(parseJSONString)
+    }
+
+    private func quoteSQLite(_ value: String) -> String {
+        "'\(value.replacingOccurrences(of: "'", with: "''"))'"
+    }
+
+    private func parseJSONString(_ raw: String) -> [String: Any]? {
+        guard let data = raw.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        return json
+    }
+
+    private func millisToDate(_ raw: Any?) -> Date? {
+        if let value = raw as? Double { return Date(timeIntervalSince1970: value / 1000) }
+        if let value = raw as? Int { return Date(timeIntervalSince1970: Double(value) / 1000) }
+        if let value = raw as? Int64 { return Date(timeIntervalSince1970: Double(value) / 1000) }
+        return nil
     }
 
     private func extractText(from raw: Any?) -> String? {

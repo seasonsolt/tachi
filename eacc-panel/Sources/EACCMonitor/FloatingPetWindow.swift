@@ -145,6 +145,7 @@ struct DesktopPetView: View {
                     mood: vm.companionMood,
                     accent: vm.companionPetAccent,
                     themeColors: vm.themeColors,
+                    hasMotion: vm.companionHasMotion,
                     motionScale: 0.12
                 )
                 .scaleEffect(isCelebrating ? 1.12 : 1.0)

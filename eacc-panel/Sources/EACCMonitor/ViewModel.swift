@@ -150,15 +150,21 @@ final class ViewModel {
         recipeRuntime?.addSourceUpdateHandler { [weak self] id, data in
             DispatchQueue.main.async {
                 guard let self else { return }
-                if let idx = self.recipeSources.firstIndex(where: { $0.id == id }) {
-                    self.recipeSources[idx].data = data
-                } else {
-                    let recipes = RecipeStore.loadAll()
-                    let name = recipes.first(where: { $0.id == id })?.name ?? id
-                    self.recipeSources.append(RecipeSourceInfo(id: id, name: name, data: data))
-                }
+                let recipes = RecipeStore.loadAll()
+                let name = recipes.first(where: { $0.id == id })?.name ?? id
+                self.upsertSource(id: id, name: name, data: data)
             }
         }
+    }
+
+    @MainActor
+    func upsertSource(id: String, name: String, data: EACCSourceData) {
+        if let idx = recipeSources.firstIndex(where: { $0.id == id }) {
+            recipeSources[idx].data = data
+            return
+        }
+
+        recipeSources.append(RecipeSourceInfo(id: id, name: name, data: data))
     }
 
     var themeColors: EACCThemeColors {
@@ -391,7 +397,9 @@ final class ViewModel {
         let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if normalized.isEmpty { return false }
         if normalized == projectName.lowercased() { return false }
-        if normalized == "codex" || normalized == "claude code" { return false }
+        if normalized == "codex" || normalized == "claude code" || normalized == "opencode" {
+            return false
+        }
         return !looksLikeOnlyAPath(text)
     }
 
@@ -416,6 +424,10 @@ final class ViewModel {
 
     var companionPersona: CompanionPersona {
         companionPersonaMode.personaOverride ?? selectedTheme.defaultPersona
+    }
+
+    var companionHasMotion: Bool {
+        !activeSessions.isEmpty
     }
 
     var companionHeadline: String {

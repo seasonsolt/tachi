@@ -106,6 +106,7 @@ struct EACCThemeColors {
 struct BladeRunnerPetView: View {
     let mood: CompanionMood
     let accent: Color
+    var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
 
     @State private var isFloating = false
@@ -128,10 +129,12 @@ struct BladeRunnerPetView: View {
         }
         .frame(width: 108, height: 108)
         .offset(y: isFloating ? -3 * motionScale : 3 * motionScale)
+        .animation(hasMotion ? .easeInOut(duration: 2.2).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isFloating)
         .onAppear {
-            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
-                isFloating = true
-            }
+            isFloating = hasMotion
+        }
+        .onChange(of: hasMotion) { _, enabled in
+            isFloating = enabled
         }
     }
 
@@ -267,6 +270,7 @@ struct BladeRunnerPetView: View {
 struct MatrixPetView: View {
     let mood: CompanionMood
     let accent: Color
+    var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
 
     @State private var isFloating = false
@@ -279,7 +283,7 @@ struct MatrixPetView: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 18.0)) { timeline in
-            let time = timeline.date.timeIntervalSinceReferenceDate
+            let time = hasMotion ? timeline.date.timeIntervalSinceReferenceDate : 0
 
             ZStack {
                 // Keep only a tiny atmospheric core, not a visible silhouette.
@@ -299,13 +303,14 @@ struct MatrixPetView: View {
             .frame(width: 108, height: 108)
             .offset(y: isFloating ? -3 * motionScale : 3 * motionScale)
         }
+        .animation(hasMotion ? .easeInOut(duration: 1.8).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isFloating)
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-                isFloating = true
-            }
-            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
-                isGlowing = true
-            }
+            isFloating = hasMotion
+            isGlowing = hasMotion
+        }
+        .onChange(of: hasMotion) { _, enabled in
+            isFloating = enabled
+            isGlowing = enabled
         }
     }
 
@@ -358,19 +363,23 @@ struct MatrixPetView: View {
         for column in 0..<Self.columnCount {
             let drift = CGFloat(sin(time * 0.55 + Double(column) * 0.7)) * 2.4
             let x = stepX * CGFloat(column + 1) + drift
-            let speed = 20.0 + Double(column % 4) * 4.0
+            let speed = 28.0 + Double(column % 4) * 6.0
             let seed = Double(column) * 0.37
-            let headY = CGFloat((time * speed + seed * 40).truncatingRemainder(dividingBy: Double(height + 28)) - 20)
+            let travel = time * speed + seed * 40
+            let cycleSpan = Double(height + 28)
+            let cycle = Int(floor(travel / cycleSpan))
+            let headY = CGFloat(travel.truncatingRemainder(dividingBy: cycleSpan) - 20)
 
             for trail in 0..<Self.trailLength {
                 let y = headY - CGFloat(trail) * stepY
                 guard y > -16, y < height + 10 else { continue }
 
-                let glyphIndex = Int((time * 8) + Double(column * 5 + trail * 11)) % Self.glyphs.count
+                let glyphIndex = stableGlyphIndex(column: column, trail: trail, cycle: cycle)
                 let glyph = Self.glyphs[glyphIndex]
                 let alphaBase = max(0.12, 1.0 - (Double(trail) * 0.18))
-                let alpha = alphaBase * screenOpacity
-                let glowAlpha = alpha * (trail == 0 ? 0.34 : 0.16)
+                let flicker = glyphFlicker(time: time, column: column, trail: trail, cycle: cycle)
+                let alpha = alphaBase * screenOpacity * flicker.alpha
+                let glowAlpha = alpha * (trail == 0 ? (0.34 * flicker.glow) : 0.16)
                 let color: Color = trail == 0
                     ? .white.opacity(min(0.78, alpha + 0.10))
                     : green.opacity(alpha * 0.72)
@@ -388,18 +397,18 @@ struct MatrixPetView: View {
 
                 if trail == 0 {
                     var specular = context.resolve(Text(glyph).font(font))
-                    specular.shading = .color(Color.white.opacity(0.22 * screenOpacity))
+                    specular.shading = .color(Color.white.opacity(0.22 * screenOpacity * flicker.glow))
                     context.draw(specular, at: CGPoint(x: x - 0.35, y: y - 0.45), anchor: .center)
 
                     var glow = context.resolve(Text(glyph).font(font))
-                    glow.shading = .color(green.opacity(0.28 * screenOpacity))
+                    glow.shading = .color(green.opacity(0.28 * screenOpacity * flicker.glow))
                     context.drawLayer { layer in
-                        layer.addFilter(.blur(radius: 2.6))
+                        layer.addFilter(.blur(radius: 2.6 + (1.2 * flicker.bloom)))
                         layer.draw(glow, at: CGPoint(x: x, y: y), anchor: .center)
                     }
                 } else if trail <= 2 {
                     var ghost = context.resolve(Text(glyph).font(font))
-                    ghost.shading = .color(green.opacity(0.08 * screenOpacity))
+                    ghost.shading = .color(green.opacity(0.08 * screenOpacity * flicker.ghost))
                     context.draw(ghost, at: CGPoint(x: x, y: y + 0.8), anchor: .center)
                 }
             }
@@ -416,6 +425,48 @@ struct MatrixPetView: View {
             context.fill(Path(noiseRect), with: .color(green.opacity(0.04 * screenOpacity)))
         }
     }
+
+    private func stableGlyphIndex(column: Int, trail: Int, cycle: Int) -> Int {
+        var value = UInt64(truncatingIfNeeded: column &* 73856093)
+        value ^= UInt64(truncatingIfNeeded: trail &* 19349663)
+        value ^= UInt64(truncatingIfNeeded: cycle &* 83492791)
+        value = value &* 1103515245 &+ 12345
+        return Int(value % UInt64(Self.glyphs.count))
+    }
+
+    private func glyphFlicker(time: TimeInterval, column: Int, trail: Int, cycle: Int) -> (
+        alpha: Double, glow: Double, bloom: Double, ghost: Double
+    ) {
+        let seed = Double(column) * 0.91 + Double(trail) * 1.73 + Double(cycle) * 0.37
+        let primary = (sin(time * 6.4 + seed) + 1) * 0.5
+        let secondary = (sin(time * 13.2 + seed * 1.9) + 1) * 0.5
+        let tertiary = (sin(time * 3.8 + seed * 0.63) + 1) * 0.5
+
+        if trail == 0 {
+            return (
+                alpha: 0.90 + primary * 0.38 + tertiary * 0.14,
+                glow: 1.08 + secondary * 0.72,
+                bloom: 0.70 + primary * 1.15,
+                ghost: 1.0
+            )
+        }
+
+        if trail <= 2 {
+            return (
+                alpha: 0.78 + primary * 0.30 + tertiary * 0.10,
+                glow: 0.92 + secondary * 0.34,
+                bloom: 0.28 + primary * 0.44,
+                ghost: 0.94 + secondary * 0.30
+            )
+        }
+
+        return (
+            alpha: 0.74 + primary * 0.24 + tertiary * 0.08,
+            glow: 0.94 + secondary * 0.22,
+            bloom: 0.18 + primary * 0.24,
+            ghost: 0.88 + secondary * 0.24
+        )
+    }
 }
 
 // MARK: - Void Pet View — モノリス (Monolith)
@@ -427,6 +478,7 @@ struct MatrixPetView: View {
 struct VoidPetView: View {
     let mood: CompanionMood
     let accent: Color
+    var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
 
     @State private var isBreathing = false
@@ -468,7 +520,7 @@ struct VoidPetView: View {
                     .fill(Color.white.opacity(star.alpha * starAlpha))
                     .frame(width: star.size, height: star.size)
                     .offset(x: star.x, y: star.y)
-                    .opacity(starTwinkle && i % 3 == 0 ? 0.3 : 1.0)
+                    .opacity(hasMotion && starTwinkle && i % 3 == 0 ? 0.3 : 1.0)
             }
 
             // Edge glow — Star Gate color hints (violet/blue emanation)
@@ -521,13 +573,14 @@ struct VoidPetView: View {
                 .shadow(color: apexColor.opacity(0.4), radius: 4)
         }
         .frame(width: 108, height: 108)
+        .animation(hasMotion ? .easeInOut(duration: 4.0).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isBreathing)
         .onAppear {
-            withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
-                isBreathing = true
-            }
-            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
-                starTwinkle = true
-            }
+            isBreathing = hasMotion
+            starTwinkle = hasMotion
+        }
+        .onChange(of: hasMotion) { _, enabled in
+            isBreathing = enabled
+            starTwinkle = enabled
         }
     }
 

@@ -31,6 +31,8 @@ final class EACCBridge: @unchecked Sendable {
 
     /// Called on main thread when theme changes (from file watcher or WebSocket client)
     var onThemeChanged: ((String) -> Void)?
+    /// Called on main thread when local Claude Code stats change
+    var onClaudeCodeChanged: ((EACCSourceData) -> Void)?
 
     init(wsServer: WebSocketServer, statsWatcher: StatsWatcher, sessionsWatcher: SessionsWatcher, themeWatcher: ThemeWatcher) {
         self.wsServer = wsServer
@@ -178,6 +180,9 @@ final class EACCBridge: @unchecked Sendable {
         lock.lock()
         claudeCodeSource = data
         lock.unlock()
+        DispatchQueue.main.async { [weak self] in
+            self?.onClaudeCodeChanged?(data)
+        }
         broadcastTokenUpdate()
     }
 

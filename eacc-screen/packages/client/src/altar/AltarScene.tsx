@@ -29,6 +29,10 @@ function MatrixRain() {
     const columns = Math.floor(canvas.width / fontSize);
     const drops: number[] = Array.from({ length: columns }, () => Math.random() * -100);
     const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF';
+    const glyphs: string[] = Array.from(
+      { length: columns },
+      () => chars[Math.floor(Math.random() * chars.length)],
+    );
 
     let lastTime = 0;
     const draw = (time: number) => {
@@ -54,7 +58,7 @@ function MatrixRain() {
       const centerY = canvas.height * 0.45;
 
       for (let i = 0; i < columns; i++) {
-        const char = chars[Math.floor(Math.random() * chars.length)];
+        const char = glyphs[i];
         const x = i * fontSize;
         const y = drops[i] * fontSize;
 
@@ -63,23 +67,30 @@ function MatrixRain() {
         const dy = Math.abs(y - centerY) / (canvas.height * 0.25);
         const distFromCenter = Math.sqrt(dx * dx + dy * dy);
         const centerFade = Math.min(1, Math.max(0.1, distFromCenter));
+        const pulse = 0.7 + (((Math.sin((time * 0.0085) + (i * 0.9) + (drops[i] * 0.16)) + 1) * 0.5) * 0.55);
+        const glowBias = (Math.sin((time * 0.016) + (i * 1.7)) + 1) * 0.5;
+        const bloom = 4 + (glowBias * 8);
 
-        // Head character is bright white-green
-        if (Math.random() > 0.3) {
+        // Every visible glyph breathes, with occasional brighter heads.
+        if (glowBias > 0.7) {
           ctx.fillStyle = '#00ff41';
-          ctx.globalAlpha = 0.9 * centerFade;
+          ctx.globalAlpha = Math.min(1, pulse * 0.95) * centerFade;
         } else {
           ctx.fillStyle = '#80ff80';
-          ctx.globalAlpha = 1 * centerFade;
+          ctx.globalAlpha = Math.min(1, pulse * 1.08) * centerFade;
         }
+        ctx.shadowColor = '#00ff41';
+        ctx.shadowBlur = bloom * centerFade;
         ctx.fillText(char, x, y);
+        ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
 
         // Reset drop to top when it reaches bottom
         if (y > canvas.height && Math.random() > 0.975) {
           drops[i] = 0;
+          glyphs[i] = chars[Math.floor(Math.random() * chars.length)];
         }
-        drops[i]++;
+        drops[i] += 1.35;
       }
 
       animRef.current = requestAnimationFrame(draw);
