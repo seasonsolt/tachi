@@ -66,12 +66,17 @@ export interface ClaudeCodeStats {
 
 // === Session Info ===
 
+export type SessionTool = 'claude_code' | 'codex' | 'open_code';
+
 export interface SessionInfo {
   pid: number;
   sessionId: string;
   cwd: string;
   startedAt: number;
   alive: boolean;
+  tool?: SessionTool;
+  taskTitle?: string;
+  taskSummary?: string;
 }
 
 // === WebSocket Messages ===

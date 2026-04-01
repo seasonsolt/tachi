@@ -31,6 +31,9 @@ struct EACCMonitorApp: App {
         bridge.onThemeChanged = { [vm] theme in
             vm.handleExternalThemeChange(theme)
         }
+        bridge.onClaudeCodeChanged = { [vm] data in
+            vm.upsertSource(id: "claude-code", name: "Claude Code", data: data)
+        }
 
         // Connect Agent + RecipeRuntime to ViewModel + Bridge
         vm.agent = agentCore

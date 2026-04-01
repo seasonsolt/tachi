@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../stores/store';
 import { THEMES } from '@eacc/shared';
+import type { SessionInfo, SessionTool } from '@eacc/shared';
 
-interface WorkspaceGroup {
-  cwd: string;
+interface SessionRow {
+  id: string;
   fullPath: string;
   projectName: string;
   trail: string;
   startedAt: number;
-  sessionCount: number;
+  tool?: SessionTool;
+  taskLabel?: string;
 }
 
 function formatDuration(startedAt: number, now: number): string {
@@ -45,6 +47,56 @@ function compactPath(cwd: string): { projectName: string; trail: string; fullPat
   return { projectName, trail, fullPath };
 }
 
+function sessionToolLabel(tool?: SessionTool): string | null {
+  switch (tool) {
+    case 'claude_code':
+      return 'CLAUDE';
+    case 'codex':
+      return 'CODEX';
+    case 'open_code':
+      return 'OPEN';
+    default:
+      return null;
+  }
+}
+
+function compactTaskText(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  let text = raw.trim();
+  if (!text) return undefined;
+
+  text = text.replace(/^\s*[=\-:#>\[\]()]+\s*/, '').replace(/\s*[=\-:#>\[\]()]+\s*$/, '');
+
+  for (const delimiter of ['。', '！', '？', '. ', '! ', '? ', '\n']) {
+    const index = text.indexOf(delimiter);
+    if (index >= 10) {
+      text = text.slice(0, index).trim();
+      break;
+    }
+  }
+
+  const colonIndex = text.indexOf(': ');
+  if (colonIndex > 0 && colonIndex < 18) {
+    const tail = text.slice(colonIndex + 2).trim();
+    if (tail.length >= 10) {
+      text = tail;
+    }
+  }
+
+  if (!text || looksLikeOnlyAPath(text)) return undefined;
+  return text.length <= 84 ? text : `${text.slice(0, 81)}...`;
+}
+
+function looksLikeOnlyAPath(text: string): boolean {
+  const slashCount = Array.from(text).filter((char) => char === '/').length;
+  if (text.startsWith('/') && slashCount >= 2) return true;
+  return text.includes('/Users/') || text.includes('/src/') || text.includes('/main/');
+}
+
+function taskLabelForSession(session: SessionInfo): string | undefined {
+  return compactTaskText(session.taskSummary) ?? compactTaskText(session.taskTitle);
+}
+
 export function Sessions() {
   const mode = useStore((s) => s.mode);
   const sessions = useStore((s) => s.sessions);
@@ -58,36 +110,26 @@ export function Sessions() {
     return () => window.clearInterval(interval);
   }, []);
 
-  const workspaces = useMemo<WorkspaceGroup[]>(() => {
-    const grouped = new Map<string, WorkspaceGroup>();
-
-    for (const session of sessions) {
-      const existing = grouped.get(session.cwd);
-      const pathInfo = compactPath(session.cwd);
-
-      if (existing) {
-        existing.sessionCount += 1;
-        existing.startedAt = Math.max(existing.startedAt, session.startedAt);
-        continue;
-      }
-
-      grouped.set(session.cwd, {
-        cwd: session.cwd,
-        fullPath: pathInfo.fullPath,
-        projectName: pathInfo.projectName,
-        trail: pathInfo.trail,
-        startedAt: session.startedAt,
-        sessionCount: 1,
+  const sessionRows = useMemo<SessionRow[]>(() => {
+    return [...sessions]
+      .sort((a, b) => b.startedAt - a.startedAt)
+      .map((session) => {
+        const pathInfo = compactPath(session.cwd);
+        return {
+          id: `${session.tool ?? 'session'}:${session.sessionId}:${session.pid}`,
+          fullPath: pathInfo.fullPath,
+          projectName: pathInfo.projectName,
+          trail: pathInfo.trail,
+          startedAt: session.startedAt,
+          tool: session.tool,
+          taskLabel: taskLabelForSession(session),
+        };
       });
-    }
-
-    return Array.from(grouped.values()).sort((a, b) => b.startedAt - a.startedAt);
   }, [sessions]);
 
-  const visibleCount = hovered ? workspaces.length : Math.min(workspaces.length, 4);
-  const visibleWorkspaces = workspaces.slice(0, visibleCount);
-  const hiddenCount = workspaces.length - visibleWorkspaces.length;
-  const hasMultipleSessions = sessions.length !== workspaces.length;
+  const visibleCount = hovered ? sessionRows.length : Math.min(sessionRows.length, 4);
+  const visibleSessions = sessionRows.slice(0, visibleCount);
+  const hiddenCount = sessionRows.length - visibleSessions.length;
 
   if (mode !== 'cli' || sessions.length === 0) return null;
 
@@ -106,36 +148,37 @@ export function Sessions() {
     >
       <div style={styles.summary}>
         <span style={styles.dot} />
-        <span style={styles.summaryLabel}>workspaces</span>
+        <span style={styles.summaryLabel}>sessions</span>
         <span style={styles.count}>
-          {workspaces.length}
+          {sessionRows.length}
         </span>
-        {hasMultipleSessions && (
-          <span style={styles.sessionMeta}>
-            {sessions.length} live
-          </span>
-        )}
+        <span style={styles.sessionMeta}>live</span>
       </div>
 
       <div style={styles.expanded}>
-        {visibleWorkspaces.map((workspace) => (
-          <div key={workspace.cwd} style={styles.sessionRow} title={workspace.fullPath}>
+        {visibleSessions.map((session) => (
+          <div key={session.id} style={styles.sessionRow} title={session.fullPath}>
             <div style={styles.pathBlock}>
-              <span style={styles.projectName}>{workspace.projectName}</span>
-              <span style={styles.sessionTrail}>{workspace.trail}</span>
+              <div style={styles.projectRow}>
+                <span style={styles.projectName}>{session.projectName}</span>
+                {session.tool && (
+                  <span style={styles.toolBadge}>{sessionToolLabel(session.tool)}</span>
+                )}
+              </div>
+              {session.taskLabel && (
+                <span style={styles.taskLine}>{session.taskLabel}</span>
+              )}
+              <span style={styles.sessionTrail}>{session.trail}</span>
             </div>
             <div style={styles.metaBlock}>
-              {workspace.sessionCount > 1 && (
-                <span style={styles.sessionCount}>x{workspace.sessionCount}</span>
-              )}
-              <span style={styles.sessionDuration}>{formatDuration(workspace.startedAt, now)}</span>
+              <span style={styles.sessionDuration}>{formatDuration(session.startedAt, now)}</span>
             </div>
           </div>
         ))}
         {hiddenCount > 0 && (
           <div style={styles.overflowRow}>
             <span style={styles.overflowText}>
-              +{hiddenCount} more workspace{hiddenCount !== 1 ? 's' : ''}
+              +{hiddenCount} more session{hiddenCount !== 1 ? 's' : ''}
             </span>
           </div>
         )}
@@ -218,12 +261,36 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: 0,
     gap: 2,
   },
+  projectRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+  },
   projectName: {
     color: 'var(--text-primary)',
     fontSize: 13,
     lineHeight: 1.2,
     letterSpacing: 0.1,
     fontVariantNumeric: 'tabular-nums',
+  },
+  toolBadge: {
+    color: 'var(--text-muted)',
+    fontSize: 8,
+    letterSpacing: 1,
+    textTransform: 'uppercase' as const,
+    opacity: 0.9,
+    flexShrink: 0,
+  },
+  taskLine: {
+    color: 'var(--text-secondary)',
+    fontSize: 11,
+    lineHeight: 1.35,
+    letterSpacing: 0.2,
+    whiteSpace: 'nowrap' as const,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: 220,
   },
   sessionTrail: {
     color: 'var(--text-secondary)',
@@ -242,12 +309,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     flexShrink: 0,
     minWidth: 72,
-  },
-  sessionCount: {
-    color: 'var(--text-muted)',
-    fontSize: 9,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase' as const,
   },
   sessionDuration: {
     color: 'var(--text-secondary)',

@@ -303,7 +303,7 @@ struct ContentView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
         }
-        .frame(maxHeight: 620)
+        .frame(minHeight: 420, maxHeight: 620)
     }
 
     private var companionSection: some View {
@@ -605,7 +605,8 @@ struct CompanionCard: View {
                 persona: vm.companionPersona,
                 mood: vm.companionMood,
                 accent: vm.companionPetAccent,
-                themeColors: panelColors
+                themeColors: panelColors,
+                hasMotion: vm.companionHasMotion
             )
 
             VStack(alignment: .leading, spacing: 8) {
@@ -770,20 +771,21 @@ struct CompanionPetView: View {
     let mood: CompanionMood
     let accent: Color
     let themeColors: EACCThemeColors
+    var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
 
     var body: some View {
         switch persona {
         case .defaultOrb:
-            DefaultCompanionPetView(mood: mood, accent: accent, themeColors: themeColors, motionScale: motionScale)
+            DefaultCompanionPetView(mood: mood, accent: accent, themeColors: themeColors, hasMotion: hasMotion, motionScale: motionScale)
         case .laughingMan:
-            LaughingManPetView(mood: mood, accent: accent, motionScale: motionScale)
+            LaughingManPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
         case .matrixAgent:
-            MatrixPetView(mood: mood, accent: accent, motionScale: motionScale)
+            MatrixPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
         case .amberEye:
-            BladeRunnerPetView(mood: mood, accent: accent, motionScale: motionScale)
+            BladeRunnerPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
         case .voidMonolith:
-            VoidPetView(mood: mood, accent: accent, motionScale: motionScale)
+            VoidPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
         }
     }
 }
@@ -792,6 +794,7 @@ private struct DefaultCompanionPetView: View {
     let mood: CompanionMood
     let accent: Color
     let themeColors: EACCThemeColors
+    var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
 
     @State private var isFloating = false
@@ -849,11 +852,15 @@ private struct DefaultCompanionPetView: View {
         }
         .frame(width: 108, height: 108)
         .offset(y: isFloating ? -3 * motionScale : 3 * motionScale)
-        .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: isFloating)
-        .animation(.linear(duration: 4.8).repeatForever(autoreverses: false), value: isOrbiting)
+        .animation(hasMotion ? .easeInOut(duration: 1.8).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isFloating)
+        .animation(hasMotion ? .linear(duration: 4.8).repeatForever(autoreverses: false) : .easeInOut(duration: 0.2), value: isOrbiting)
         .onAppear {
-            isFloating = true
-            isOrbiting = true
+            isFloating = hasMotion
+            isOrbiting = hasMotion
+        }
+        .onChange(of: hasMotion) { _, enabled in
+            isFloating = enabled
+            isOrbiting = enabled
         }
     }
 
@@ -921,6 +928,7 @@ private struct DefaultCompanionPetView: View {
 private struct LaughingManPetView: View {
     let mood: CompanionMood
     let accent: Color
+    var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
 
     @State private var isFloating = false
@@ -982,12 +990,14 @@ private struct LaughingManPetView: View {
         .frame(width: 108, height: 108)
         .offset(y: isFloating ? -3 * motionScale : 3 * motionScale)
         .onAppear {
-            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
-                isFloating = true
-            }
-            withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
-                isRotating = true
-            }
+            isFloating = hasMotion
+            isRotating = hasMotion
+        }
+        .animation(hasMotion ? .easeInOut(duration: 2.2).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isFloating)
+        .animation(hasMotion ? .linear(duration: 10).repeatForever(autoreverses: false) : .easeInOut(duration: 0.2), value: isRotating)
+        .onChange(of: hasMotion) { _, enabled in
+            isFloating = enabled
+            isRotating = enabled
         }
     }
 

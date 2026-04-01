@@ -45,6 +45,9 @@ struct EACCSessionInfo: Codable {
     let cwd: String
     let startedAt: Int
     let alive: Bool
+    let tool: String?
+    let taskTitle: String?
+    let taskSummary: String?
 }
 
 struct EACCMilestone: Codable {
