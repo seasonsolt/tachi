@@ -8,7 +8,7 @@ final class FloatingPetWindowController {
     private var panel: NSPanel?
 
     func show(vm: ViewModel) {
-        let initialSize = DesktopPetView.panelSize(for: vm, showingPreview: false)
+        let initialSize = DynamicIslandPanelView.panelSize(for: .idleLine)
         if let panel {
             updateContent(vm: vm, panel: panel)
             panel.orderFrontRegardless()
@@ -29,7 +29,7 @@ final class FloatingPetWindowController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        panel.isMovableByWindowBackground = true
+        panel.isMovableByWindowBackground = false
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.isReleasedWhenClosed = false
@@ -41,422 +41,386 @@ final class FloatingPetWindowController {
     }
 
     private func updateContent(vm: ViewModel, panel: NSPanel) {
-        let view = DesktopPetView(vm: vm) { [weak self, weak panel] size in
+        let view = DynamicIslandPanelView(vm: vm) { [weak self, weak panel] size in
             guard let self, let panel else { return }
             self.applySize(size, to: panel)
         }
-        if let hosting = panel.contentView as? NSHostingView<DesktopPetView> {
-            hosting.rootView = view
-        } else {
-            panel.contentView = NSHostingView(rootView: view)
-        }
+        panel.contentView = NSHostingView(rootView: view)
     }
 
     private func place(panel: NSPanel) {
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let frame = screen.visibleFrame
-        let x = frame.maxX - panel.frame.width - 24
-        let y = frame.minY + 72
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        panel.setFrame(targetFrame(for: panel.frame.size, on: screen), display: true)
     }
 
-    private func applySize(_ size: CGSize, to panel: NSPanel, animated: Bool = true) {
-        guard panel.frame.size != size else { return }
+    private func applySize(_ size: CGSize, to panel: NSPanel) {
         guard let screen = NSScreen.main ?? NSScreen.screens.first else {
             panel.setContentSize(size)
             return
         }
 
+        panel.setFrame(targetFrame(for: size, on: screen), display: true)
+    }
+
+    private func targetFrame(for size: CGSize, on screen: NSScreen) -> NSRect {
         let frame = screen.visibleFrame
-        let targetFrame = NSRect(
-            x: frame.maxX - size.width - 24,
-            y: frame.minY + 72,
+        return NSRect(
+            x: frame.midX - (size.width / 2),
+            y: frame.maxY - size.height - 8,
             width: size.width,
             height: size.height
         )
-
-        panel.setFrame(targetFrame, display: true)
     }
 }
 
-struct DesktopPetView: View {
-    private static let panelWidth: CGFloat = 276
-    private static let collapsedContentHeight: CGFloat = 148
-    private static let previewLift: CGFloat = 148
-    private static let previewOffsetY: CGFloat = 118
-    private static let horizontalPadding: CGFloat = 10
-    private static let verticalPadding: CGFloat = 12
+private struct DynamicIslandPanelView: View {
+    private static let idleWidth: CGFloat = 122
+    private static let idleHeight: CGFloat = 18
+    private static let capsuleWidth: CGFloat = 332
+    private static let capsuleHeight: CGFloat = 54
+    private static let detailHeight: CGFloat = 146
+    private static let eventCollapseSeconds: Double = 2.3
+    private static let detailCollapseSeconds: Double = 0.9
 
     let vm: ViewModel
     var onPanelSizeChange: ((CGSize) -> Void)? = nil
-    @State private var isHoveringCompanion = false
-    @State private var isHoveringTaskBubble = false
-    @State private var isCelebrating = false
-    @State private var celebrationToken = 0
-    @State private var isPreviewVisible = false
-    @State private var previewDismissTask: Task<Void, Never>? = nil
 
-    private var isShowingPreview: Bool {
-        isPreviewVisible && vm.shouldShowCompanionTaskPreview
+    @State private var isBreathing = false
+    @State private var isTransientlyExpanded = false
+    @State private var isDetailPresented = false
+    @State private var collapseTask: Task<Void, Never>? = nil
+    @State private var completionHeadline: String? = nil
+
+    private var panelColors: EACCThemeColors {
+        vm.panelThemeColors
     }
 
-    private var estimatedBubbleHeight: CGFloat {
-        Self.estimatedBubbleHeight(for: vm)
+    private var snapshot: IslandSnapshot {
+        vm.islandSnapshot
     }
 
-    private var contentHeight: CGFloat {
-        guard vm.shouldShowCompanionTaskPreview else { return Self.collapsedContentHeight }
-        return max(Self.collapsedContentHeight, estimatedBubbleHeight + Self.previewLift)
+    private var dominantSession: CodingSession? {
+        vm.dominantSession
     }
 
-    private var panelSize: CGSize {
-        CGSize(
-            width: Self.panelWidth,
-            height: contentHeight + (Self.verticalPadding * 2)
+    private var visibleMode: IslandVisibleMode {
+        IslandPresentation.resolveVisibleMode(
+            hasActiveSession: snapshot.hasActiveSession,
+            isDetailPresented: isDetailPresented,
+            isTransientlyExpanded: isTransientlyExpanded
         )
     }
 
+    private var panelSize: CGSize {
+        Self.panelSize(for: visibleMode)
+    }
+
+    private var islandHeadline: String {
+        if !snapshot.hasActiveSession, let completionHeadline, !completionHeadline.isEmpty {
+            return completionHeadline
+        }
+        guard let session = dominantSession else { return "No active task" }
+        return vm.companionTaskLine(for: session)
+    }
+
+    private var islandSubheadline: String {
+        if !snapshot.hasActiveSession, completionHeadline != nil {
+            return "completed just now"
+        }
+        guard let session = dominantSession else { return "awaiting session activity" }
+        return vm.companionTaskMeta(for: session)
+    }
+
+    private var detailFooter: String? {
+        guard snapshot.hasActiveSession, vm.companionTaskOverflowCount > 0 else { return nil }
+        return "+\(vm.companionTaskOverflowCount) more active"
+    }
+
+    private var pulseTint: Color {
+        switch snapshot.pulse {
+        case .hot:
+            return panelColors.accent
+        case .warm:
+            return panelColors.accent.opacity(0.75)
+        case .listening:
+            return panelColors.accentEdge.opacity(0.78)
+        case .drowsy:
+            return panelColors.textSecondary
+        case .sleeping, nil:
+            return panelColors.textMuted
+        }
+    }
+
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            if isShowingPreview {
-                taskBubble
-                    .offset(x: -8, y: isShowingPreview ? -Self.previewOffsetY : -(Self.previewOffsetY - 8))
-                    .opacity(isShowingPreview ? 1 : 0)
-                    .blur(radius: isShowingPreview ? 0 : 4)
-                    .animation(.easeOut(duration: 0.22), value: isShowingPreview)
-                    .onHover { hovering in
-                        isHoveringTaskBubble = hovering
-                        if hovering {
-                            showPreview()
-                        } else {
-                            schedulePreviewDismissIfNeeded()
-                        }
-                    }
+        VStack(spacing: visibleMode == .detailPopover ? 8 : 0) {
+            Button {
+                handleIslandTap()
+            } label: {
+                islandSurface
             }
+            .buttonStyle(.plain)
+            .help(snapshot.hasActiveSession ? "Open current session details" : "Waiting for active sessions")
 
-            ZStack {
-                if isCelebrating {
-                    TaskCompletionBurstView(accent: vm.companionPetAccent, token: celebrationToken)
-                        .offset(x: -8, y: -10)
-                }
-
-                CompanionPetView(
-                    persona: vm.companionPersona,
-                    mood: vm.companionMood,
-                    accent: vm.companionPetAccent,
-                    themeColors: vm.themeColors,
-                    hasMotion: vm.companionHasMotion,
-                    motionScale: 0.12
-                )
-                .scaleEffect(isCelebrating ? 1.12 : 1.0)
-                .rotationEffect(.degrees(isCelebrating ? 7 : 0))
-                .shadow(color: vm.companionPetAccent.opacity(isCelebrating ? 0.28 : 0.0), radius: 22, y: 4)
-                .frame(width: 124, height: 124)
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    isHoveringCompanion = hovering
-                    if hovering {
-                        showPreview()
-                    } else {
-                        schedulePreviewDismissIfNeeded()
-                    }
-                }
+            if visibleMode == .detailPopover {
+                detailPopover
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .frame(width: Self.panelWidth - (Self.horizontalPadding * 2), height: contentHeight, alignment: .bottomTrailing)
-        .padding(.horizontal, Self.horizontalPadding)
-        .padding(.vertical, Self.verticalPadding)
+        .frame(width: panelSize.width, height: panelSize.height, alignment: .top)
         .background(Color.clear)
         .onAppear {
             onPanelSizeChange?(panelSize)
+            withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                isBreathing = true
+            }
         }
-        .onChange(of: vm.shouldShowCompanionTaskPreview) { _, _ in
+        .onDisappear {
+            collapseTask?.cancel()
+        }
+        .onChange(of: visibleMode) { _, _ in
             onPanelSizeChange?(panelSize)
         }
-        .onChange(of: vm.companionTaskVisibleSessions.count) { _, _ in
-            onPanelSizeChange?(panelSize)
+        .onChange(of: snapshot) { oldValue, newValue in
+            handleSnapshotChange(from: oldValue, to: newValue)
         }
-        .onChange(of: vm.companionTaskOverflowCount) { _, _ in
-            onPanelSizeChange?(panelSize)
-        }
-        .onChange(of: vm.shouldShowCompanionTaskPreview) { _, newValue in
-            if !newValue {
-                previewDismissTask?.cancel()
-                isPreviewVisible = false
-                isHoveringTaskBubble = false
+        .onChange(of: isDetailPresented) { _, presented in
+            if presented {
+                collapseTask?.cancel()
+            } else if isTransientlyExpanded {
+                scheduleCollapse(after: Self.detailCollapseSeconds)
             }
         }
         .onChange(of: vm.companionCelebrationSequence) { _, newValue in
             guard newValue > 0 else { return }
-            celebrationToken = newValue
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.55)) {
-                isCelebrating = true
-            }
-            Task {
-                try? await Task.sleep(for: .milliseconds(950))
-                await MainActor.run {
-                    withAnimation(.easeOut(duration: 0.24)) {
-                        isCelebrating = false
-                    }
-                }
-            }
-        }
-        .onTapGesture {
-            Task { await vm.refreshSessionPulse() }
-        }
-        .contextMenu {
-            CompanionPersonaActions(vm: vm)
-        }
-        .help("Hover to peek at the current task, drag to move, or tap to sniff session activity")
-    }
-
-    private func showPreview() {
-        previewDismissTask?.cancel()
-        previewDismissTask = nil
-        guard vm.shouldShowCompanionTaskPreview else {
-            isPreviewVisible = false
-            return
-        }
-        withAnimation(.easeOut(duration: 0.16)) {
-            isPreviewVisible = true
+            completionHeadline = vm.companionCelebrationTitle
+            isDetailPresented = false
+            triggerTransientExpansion(after: Self.eventCollapseSeconds)
         }
     }
 
-    private func schedulePreviewDismissIfNeeded() {
-        previewDismissTask?.cancel()
-        guard !isHoveringCompanion && !isHoveringTaskBubble else { return }
-
-        previewDismissTask = Task {
-            try? await Task.sleep(for: .milliseconds(180))
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                guard !isHoveringCompanion && !isHoveringTaskBubble else { return }
-                withAnimation(.easeOut(duration: 0.16)) {
-                    isPreviewVisible = false
-                }
+    private var islandSurface: some View {
+        Group {
+            switch visibleMode {
+            case .idleLine:
+                idleLine
+            case .eventExpanded, .detailPopover:
+                capsule
             }
         }
     }
 
-    static func panelSize(for vm: ViewModel, showingPreview: Bool) -> CGSize {
-        let estimatedBubbleHeight = estimatedBubbleHeight(for: vm)
-        let contentHeight = showingPreview
-            ? max(collapsedContentHeight, estimatedBubbleHeight + previewLift)
-            : collapsedContentHeight
-        return CGSize(
-            width: panelWidth,
-            height: contentHeight + (verticalPadding * 2)
-        )
-    }
-
-    private static func estimatedBubbleHeight(for vm: ViewModel) -> CGFloat {
-        let taskCount = max(1, vm.companionTaskVisibleSessions.count)
-        let itemHeight: CGFloat = 78
-        let itemSpacing: CGFloat = CGFloat(max(0, taskCount - 1)) * 9
-        let footerHeight: CGFloat = vm.companionTaskFooter == nil ? 0 : 18
-        return 64 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
-    }
-
-    private var taskBubble: some View {
-        let panelColors = vm.panelThemeColors
-        let fillTint = LinearGradient(
-            colors: [
-                panelColors.accent.opacity(0.20),
-                panelColors.accentEdge.opacity(0.14),
-                panelColors.bg.opacity(0.28)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        let sheen = LinearGradient(
-            colors: [
-                Color.white.opacity(0.28),
-                Color.white.opacity(0.06),
-                Color.clear
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        let strokeGradient = LinearGradient(
-            colors: [
-                Color.white.opacity(0.38),
-                panelColors.accent.opacity(0.48),
-                panelColors.accentEdge.opacity(0.32)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-
-        return VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(panelColors.accent)
-                    .frame(width: 10, height: 10)
-                Text(vm.companionTaskHeader)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(panelColors.textPrimary)
-                Spacer()
-                CompanionPersonaMenu(
-                    vm: vm,
-                    accent: panelColors.accent
+    private var idleLine: some View {
+        Capsule()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        panelColors.accent.opacity(0.18),
+                        panelColors.accent.opacity(0.88),
+                        panelColors.accent.opacity(0.18)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
-            }
+            )
+            .frame(width: isBreathing ? 108 : 82, height: 6)
+            .shadow(color: panelColors.accent.opacity(isBreathing ? 0.32 : 0.18), radius: 14, y: 2)
+            .padding(.top, 6)
+    }
 
-            VStack(alignment: .leading, spacing: 7) {
-                ForEach(vm.companionTaskVisibleSessions) { session in
-                    Button {
-                        vm.openCompanionTask(session)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            if vm.companionTaskShowsProjectBadge(for: session) {
-                                Text(vm.companionTaskProject(for: session))
-                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(
-                                        Capsule()
-                                            .fill(panelColors.accent.opacity(0.12))
-                                    )
-                                    .foregroundStyle(panelColors.accent)
-                            }
+    private var capsule: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(pulseTint)
+                .frame(width: 9, height: 9)
+                .shadow(color: pulseTint.opacity(0.55), radius: 8)
 
-                            Text(vm.companionTaskLine(for: session))
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundStyle(panelColors.textPrimary)
-                                .lineLimit(2)
-
-                            HStack(spacing: 6) {
-                                Text(vm.companionTaskMeta(for: session))
-                                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                                    .foregroundStyle(panelColors.textSecondary)
-                                    .lineLimit(1)
-
-                                Spacer(minLength: 0)
-
-                                Image(systemName: "arrow.up.forward")
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .foregroundStyle(panelColors.accent.opacity(0.9))
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(fillTint.opacity(0.42))
-                            }
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.white.opacity(0.10), lineWidth: 0.6)
-                            }
-                    )
-                    .help("Open \(session.tool.rawValue)")
-                }
-            }
-
-            if let footer = vm.companionTaskFooter {
-                Text(footer)
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                    .foregroundStyle(panelColors.textMuted)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(islandHeadline)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(panelColors.textPrimary)
                     .lineLimit(1)
+
+                Text(islandSubheadline)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(panelColors.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            if let session = dominantSession, snapshot.hasActiveSession {
+                Image(systemName: session.tool.icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(panelColors.accent)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        Circle()
+                            .fill(panelColors.accent.opacity(0.10))
+                    )
+            } else {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(panelColors.textPrimary)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        Circle()
+                            .fill(panelColors.textMuted.opacity(0.16))
+                    )
             }
         }
         .padding(.horizontal, 14)
-        .padding(.top, 16)
-        .padding(.bottom, 20)
-        .frame(width: 242, alignment: .leading)
+        .padding(.vertical, 10)
+        .frame(width: Self.capsuleWidth, height: Self.capsuleHeight)
         .background(
-            ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(fillTint)
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(sheen)
-                    }
-                    .padding(.bottom, 14)
-
-                BubbleTail()
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        BubbleTail()
-                            .fill(fillTint)
-                    }
-                    .frame(width: 20, height: 18)
-                    .offset(x: 40, y: 2)
-            }
+            Capsule(style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    Capsule(style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    panelColors.cardBg.opacity(0.80),
+                                    panelColors.accent.opacity(0.12)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+                .overlay {
+                    Capsule(style: .continuous)
+                        .strokeBorder(panelColors.accent.opacity(0.20), lineWidth: 1)
+                }
         )
-        .overlay(
-            ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(strokeGradient, lineWidth: 1)
-                    .padding(.bottom, 14)
-
-                BubbleTail()
-                    .stroke(strokeGradient, lineWidth: 1)
-                    .frame(width: 20, height: 18)
-                    .offset(x: 40, y: 2)
-            }
-        )
-        .shadow(color: panelColors.accent.opacity(0.14), radius: 24, y: 10)
-        .shadow(color: .black.opacity(0.10), radius: 12, y: 6)
-        .fixedSize(horizontal: false, vertical: true)
+        .shadow(color: .black.opacity(0.18), radius: 24, y: 12)
+        .shadow(color: panelColors.accent.opacity(0.12), radius: 18, y: 6)
     }
-}
 
-private struct TaskCompletionBurstView: View {
-    let accent: Color
-    let token: Int
+    private var detailPopover: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("CURRENT SESSION")
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(panelColors.textMuted)
 
-    @State private var isAnimating = false
+            if let session = dominantSession {
+                Button {
+                    vm.openCompanionTask(session)
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
+                        isDetailPresented = false
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if vm.companionTaskShowsProjectBadge(for: session) {
+                            Text(vm.companionTaskProject(for: session))
+                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                .foregroundStyle(panelColors.accent)
+                        }
 
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(accent.opacity(0.36), lineWidth: 2)
-                .frame(width: 78, height: 78)
-                .scaleEffect(isAnimating ? 1.45 : 0.35)
-                .opacity(isAnimating ? 0 : 0.9)
+                        Text(vm.companionTaskLine(for: session))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(panelColors.textPrimary)
+                            .lineLimit(2)
 
-            ForEach(0..<10, id: \.self) { index in
-                let angle = (Double(index) / 10.0) * (.pi * 2)
-                Circle()
-                    .fill(index.isMultiple(of: 2) ? accent : Color.white.opacity(0.95))
-                    .frame(width: index.isMultiple(of: 3) ? 10 : 7, height: index.isMultiple(of: 3) ? 10 : 7)
-                    .offset(
-                        x: isAnimating ? cos(angle) * 58 : 0,
-                        y: isAnimating ? sin(angle) * 58 : 0
+                        HStack(spacing: 6) {
+                            Text(vm.companionTaskMeta(for: session))
+                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .foregroundStyle(panelColors.textSecondary)
+
+                            Spacer(minLength: 0)
+
+                            Image(systemName: "arrow.up.forward")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(panelColors.accent)
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(panelColors.cardBg.opacity(0.92))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .strokeBorder(panelColors.accent.opacity(0.14), lineWidth: 1)
+                            }
                     )
-                    .scaleEffect(isAnimating ? 0.75 : 0.2)
-                    .opacity(isAnimating ? 0 : 1)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let detailFooter {
+                Text(detailFooter)
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(panelColors.textSecondary)
             }
         }
-        .frame(width: 156, height: 156)
-        .id(token)
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.9)) {
-                isAnimating = true
+        .padding(12)
+        .frame(width: Self.capsuleWidth, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(panelColors.cardBg.opacity(0.78))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(panelColors.cardBorder.opacity(0.85), lineWidth: 1)
+                }
+        )
+        .shadow(color: .black.opacity(0.16), radius: 24, y: 14)
+    }
+
+    private func handleIslandTap() {
+        guard snapshot.hasActiveSession else { return }
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
+            isDetailPresented.toggle()
+        }
+    }
+
+    private func handleSnapshotChange(from oldValue: IslandSnapshot, to newValue: IslandSnapshot) {
+        if IslandPresentation.shouldAutoExpand(from: oldValue, to: newValue) {
+            completionHeadline = nil
+            triggerTransientExpansion(after: Self.eventCollapseSeconds)
+        }
+
+        if !newValue.hasActiveSession && !isTransientlyExpanded {
+            isDetailPresented = false
+        }
+    }
+
+    private func triggerTransientExpansion(after seconds: Double) {
+        collapseTask?.cancel()
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
+            isTransientlyExpanded = true
+        }
+        scheduleCollapse(after: seconds)
+    }
+
+    private func scheduleCollapse(after seconds: Double) {
+        collapseTask?.cancel()
+        collapseTask = Task {
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard !isDetailPresented else { return }
+                withAnimation(.easeOut(duration: 0.22)) {
+                    isTransientlyExpanded = false
+                    if !snapshot.hasActiveSession {
+                        completionHeadline = nil
+                    }
+                }
             }
         }
     }
-}
 
-struct BubbleTail: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: 0, y: 0))
-        path.addLine(to: CGPoint(x: rect.width, y: 0))
-        path.addLine(to: CGPoint(x: rect.width / 2, y: rect.height))
-        path.closeSubpath()
-        return path
+    static func panelSize(for mode: IslandVisibleMode) -> CGSize {
+        switch mode {
+        case .idleLine:
+            return CGSize(width: idleWidth, height: idleHeight)
+        case .eventExpanded:
+            return CGSize(width: capsuleWidth, height: capsuleHeight)
+        case .detailPopover:
+            return CGSize(width: capsuleWidth, height: detailHeight)
+        }
     }
 }

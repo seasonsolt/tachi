@@ -55,21 +55,11 @@ struct EACCMonitorApp: App {
         MenuBarExtra {
             ContentView(vm: vm)
         } label: {
-            ZStack(alignment: .leading) {
-                Text(vm.menuBarWidthTemplate)
-                    .hidden()
-                Text(vm.isLoading && vm.items.isEmpty && vm.sessions.isEmpty ? "\u{23f3}" : vm.menuBarText)
-            }
+            Text(menuBarGlyph)
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .fixedSize()
                 .task {
                     FloatingPetWindowController.shared.show(vm: vm)
-                }
-                .task {
-                    while !Task.isCancelled {
-                        try? await Task.sleep(for: .seconds(1))
-                        vm.advanceMenuAnimation()
-                    }
                 }
                 .task(id: vm.refreshInterval) {
                     await vm.refresh()
@@ -87,5 +77,12 @@ struct EACCMonitorApp: App {
                 }
         }
         .menuBarExtraStyle(.window)
+    }
+
+    private var menuBarGlyph: String {
+        if vm.isLoading && vm.items.isEmpty && vm.sessions.isEmpty {
+            return "\u{23f3}"
+        }
+        return vm.activeSessions.isEmpty ? "\u{2022}" : "\u{25c9}"
     }
 }

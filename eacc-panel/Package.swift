@@ -8,6 +8,11 @@ let package = Package(
         .executableTarget(
             name: "EACCMonitor",
             path: "Sources/EACCMonitor"
+        ),
+        .testTarget(
+            name: "EACCMonitorTests",
+            dependencies: ["EACCMonitor"],
+            path: "Tests/EACCMonitorTests"
         )
     ]
 )

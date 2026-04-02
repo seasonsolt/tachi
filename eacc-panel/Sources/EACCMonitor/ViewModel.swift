@@ -239,6 +239,15 @@ final class ViewModel {
         sessions.filter { $0.status == .working || $0.status == .waitingForInput }
     }
 
+    var islandSnapshot: IslandSnapshot {
+        IslandSnapshot(
+            dominantSessionID: dominantSession?.id,
+            signal: dominantSession?.signal,
+            pulse: dominantSession?.pulse,
+            hasActiveSession: !activeSessions.isEmpty
+        )
+    }
+
     var sessionRefreshInterval: TimeInterval { 5 }
 
     var workingSessionCount: Int {
