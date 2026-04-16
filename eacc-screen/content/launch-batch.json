@@ -1,0 +1,90 @@
+{
+  "phase1Domain": "e-acc.ai",
+  "deferredDomains": ["e-accs.com"],
+  "hoursPerWeek": "5-10",
+  "quarterTargets": {
+    "workflowPages": 8,
+    "comparisonPages": 4,
+    "northStarMonthlyRevenueUsd": 50
+  },
+  "launchBatch": [
+    {
+      "path": "/",
+      "pageType": "home",
+      "slug": "home",
+      "source": "content/pages/home.md",
+      "cluster": "core-entry",
+      "status": "launch"
+    },
+    {
+      "path": "/hub/ai-coding-workflows",
+      "pageType": "hub",
+      "slug": "ai-coding-workflows",
+      "source": "content/hubs/ai-coding-workflows.md",
+      "cluster": "ai-coding-workflows",
+      "status": "launch"
+    },
+    {
+      "path": "/hub/ai-agent-operations",
+      "pageType": "hub",
+      "slug": "ai-agent-operations",
+      "source": "content/hubs/ai-agent-operations.md",
+      "cluster": "ai-agent-operations",
+      "status": "launch"
+    },
+    {
+      "path": "/workflow/ship-an-ai-code-review-loop",
+      "pageType": "workflow",
+      "slug": "ship-an-ai-code-review-loop",
+      "source": "content/workflows/ship-an-ai-code-review-loop.md",
+      "cluster": "ai-coding-workflows",
+      "status": "launch"
+    },
+    {
+      "path": "/workflow/build-a-context-passing-debug-stack",
+      "pageType": "workflow",
+      "slug": "build-a-context-passing-debug-stack",
+      "source": "content/workflows/build-a-context-passing-debug-stack.md",
+      "cluster": "ai-coding-workflows",
+      "status": "launch"
+    },
+    {
+      "path": "/workflow/run-a-weekly-agent-ops-audit",
+      "pageType": "workflow",
+      "slug": "run-a-weekly-agent-ops-audit",
+      "source": "content/workflows/run-a-weekly-agent-ops-audit.md",
+      "cluster": "ai-agent-operations",
+      "status": "launch"
+    },
+    {
+      "path": "/compare/claude-code-vs-cursor-for-solo-repo-ships",
+      "pageType": "comparison",
+      "slug": "claude-code-vs-cursor-for-solo-repo-ships",
+      "source": "content/comparisons/claude-code-vs-cursor-for-solo-repo-ships.md",
+      "cluster": "ai-coding-workflows",
+      "status": "launch"
+    },
+    {
+      "path": "/ritual",
+      "pageType": "lab",
+      "slug": "ritual-lab",
+      "source": "content/pages/ritual-lab.md",
+      "cluster": "ritual-lab",
+      "status": "preserved"
+    }
+  ],
+  "nextWave": [
+    {
+      "path": "/hub/ai-automation-stacks",
+      "pageType": "hub",
+      "cluster": "ai-automation-stacks",
+      "status": "backlog"
+    },
+    {
+      "path": "/compare/claude-code-vs-openai-codex-for-solo-dev-loops",
+      "pageType": "comparison",
+      "cluster": "ai-coding-workflows",
+      "status": "backlog"
+    }
+  ]
+}

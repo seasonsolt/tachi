@@ -1,27 +1,28 @@
 ---
 slug: ai-coding-workflows
-title: AI coding workflows
+title: AI coding workflows for solo builders shipping every week
 cluster: ai-coding-workflows
-intent: tutorial-hub
+intent: hub
 ctaType: newsletter
 updatedAt: 2026-04-16
-monetizationMode: ads, affiliate, newsletter
-description: The cluster for shipping code faster with AI while keeping reviews, handoff, and cost discipline intact.
-related: /workflow/claude-code-ship-kit, /compare/claude-code-vs-cursor-for-shipping, /ritual
-hero: Start with repeatable coding loops that help a solo builder scope, build, review, and publish without turning the site into a generic news feed.
+monetizationMode: newsletter+ads
+pageType: hub
+primaryRoute: /hub/ai-coding-workflows
+featuredWorkflowSlugs:
+  - ship-an-ai-code-review-loop
+  - build-a-context-passing-debug-stack
+featuredComparisonSlugs:
+  - claude-code-vs-cursor-for-solo-repo-ships
+status: launch-batch
 ---
-## What belongs in this hub
 
-This hub exists for workflow pages that help a builder move from **blank repo to shipped artifact**. The content is written for a 5–10 hour week, so every page must justify its maintenance burden.
+# Cluster angle
+This hub is for solo builders who need practical, repeatable coding loops more than hype. The priority is shipping confidence: cleaner review passes, lower context loss, and faster debugging handoffs.
 
-## Publishing rule
+## Start here
+1. Build a durable AI code review loop.
+2. Add a context-passing debug stack for harder repo changes.
+3. Use support comparisons only after the workflow outcome is clear.
 
-1. Lead with a workflow that solves a concrete build problem.
-2. Link to one support comparison page only when the workflow creates commercial intent.
-3. Keep the ritual myth alive through a secondary route, not the root homepage.
-
-## Surface plan
-
-- Tutorials stay primary.
-- Comparisons exist to catch lower-funnel intent.
-- Ads can fill spare visual inventory, but the higher-value move is a tracked referral CTA or newsletter capture.
+## Monetization posture
+Newsletter capture stays primary. Ads can sit below the first workflow block, and tool CTAs should only appear where the workflow genuinely depends on them.
