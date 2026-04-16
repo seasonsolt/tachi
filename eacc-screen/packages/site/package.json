@@ -1,0 +1,11 @@
+{
+  "name": "@eacc/site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ./src/build.mjs",
+    "clean": "rm -rf dist",
+    "test": "node --test ./src/lib.test.mjs"
+  }
+}
