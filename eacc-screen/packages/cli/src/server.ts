@@ -12,6 +12,18 @@ import { startClaudeCodeCollector } from './collectors/claude-code.js';
 import { startAnthropicCollector } from './collectors/anthropic-api.js';
 import { startOpenAICollector } from './collectors/openai-api.js';
 import { startSessionCollector } from './collectors/claude-sessions.js';
+import {
+  buildOpsReport,
+  createContentRouteMap,
+  hashEmail,
+  isLabPath,
+  isRitualPath,
+  loadRevenueLedger,
+  loadRouteManifest,
+  readAnalyticsEvents,
+  resolveContentRoute,
+  writeAnalyticsEvent,
+} from './content-site.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -53,6 +65,7 @@ function buildTokenData(sources: {
 const THEME_DIR = join(homedir(), '.eacc');
 const THEME_FILE = join(THEME_DIR, 'theme.json');
 const LEGACY_THEME_FILE = join(homedir(), '.ritual-screen', 'theme.json');
+const CONTENT_ANALYTICS_FILE = join(THEME_DIR, 'site-analytics.ndjson');
 
 function readThemeFile(): ThemeName | null {
   try {
@@ -198,17 +211,25 @@ export function startServer(port: number): { close: () => void } {
     });
   });
 
-  // Serve static client files
-  const clientDistPath = join(__dirname, '..', '..', 'client', 'dist');
-  const bundledDistPath = join(__dirname, '..', 'client');
-  const staticRoot = existsSync(clientDistPath) ? clientDistPath : bundledDistPath;
+  const siteDistPath = join(__dirname, '..', '..', 'site', 'dist');
+  const ritualDistPath = join(__dirname, '..', '..', 'client', 'dist');
+  const bundledRitualPath = join(__dirname, '..', 'client');
+  const siteStaticRoot = existsSync(siteDistPath) ? siteDistPath : join(__dirname, '..', 'site');
+  const ritualStaticRoot = existsSync(ritualDistPath) ? ritualDistPath : bundledRitualPath;
+  const routeManifest = loadRouteManifest(siteStaticRoot);
+  const routeMap = createContentRouteMap(routeManifest);
+  const revenueLedger = loadRevenueLedger(siteStaticRoot);
 
   const MIME_TYPES: Record<string, string> = {
     '.html': 'text/html',
     '.js': 'application/javascript',
     '.css': 'text/css',
     '.json': 'application/json',
+    '.txt': 'text/plain',
+    '.xml': 'application/xml',
     '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
     '.svg': 'image/svg+xml',
     '.ico': 'image/x-icon',
     '.woff': 'font/woff',
@@ -218,23 +239,141 @@ export function startServer(port: number): { close: () => void } {
     '.wav': 'audio/wav',
   };
 
-  app.get('/*', (c) => {
-    const urlPath = c.req.path === '/' ? '/index.html' : c.req.path;
-    const filePath = join(staticRoot, urlPath);
+  function serveStaticFile(root: string, requestPath: string): Response | null {
+    const relativePath = requestPath === '/' ? 'index.html' : requestPath.replace(/^\/+/, '');
+    const filePath = join(root, relativePath);
 
     if (existsSync(filePath)) {
       const ext = extname(filePath);
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
       const content = readFileSync(filePath);
-      return c.body(content, 200, { 'Content-Type': contentType });
+      return new Response(content, {
+        status: 200,
+        headers: { 'Content-Type': contentType },
+      });
     }
 
-    // SPA fallback
-    const indexPath = join(staticRoot, 'index.html');
+    return null;
+  }
+
+  app.get('/api/ops/report', (c) => {
+    const report = buildOpsReport(routeManifest, revenueLedger, readAnalyticsEvents(CONTENT_ANALYTICS_FILE));
+    return c.json(report);
+  });
+
+  app.get('/out', (c) => {
+    const route = c.req.query('route');
+    if (!route) return c.text('Missing route', 400);
+
+    const contentRoute = resolveContentRoute(routeMap, route);
+    if (!contentRoute?.cta?.href) return c.text('Unknown outbound CTA', 404);
+
+    writeAnalyticsEvent(CONTENT_ANALYTICS_FILE, {
+      type: 'outbound_cta',
+      timestamp: new Date().toISOString(),
+      route: contentRoute.path,
+      cluster: contentRoute.cluster,
+      kind: contentRoute.kind,
+      href: contentRoute.cta.href,
+      ctaType: contentRoute.cta.type,
+      userAgent: c.req.header('user-agent'),
+    });
+
+    return c.redirect(contentRoute.cta.href, 302);
+  });
+
+  app.post('/newsletter', async (c) => {
+    const form = await c.req.formData();
+    const route = typeof form.get('route') === 'string' ? String(form.get('route')) : '';
+    const email = typeof form.get('email') === 'string' ? String(form.get('email')) : '';
+    if (!route || !email) return c.text('Missing route or email', 400);
+
+    const contentRoute = resolveContentRoute(routeMap, route);
+    if (!contentRoute) return c.text('Unknown content route', 404);
+
+    writeAnalyticsEvent(CONTENT_ANALYTICS_FILE, {
+      type: 'newsletter_capture',
+      timestamp: new Date().toISOString(),
+      route: contentRoute.path,
+      cluster: contentRoute.cluster,
+      kind: contentRoute.kind,
+      emailHash: hashEmail(email),
+      userAgent: c.req.header('user-agent'),
+    });
+
+    return c.html(`<!DOCTYPE html>
+<html lang="en" style="color-scheme: dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Subscription captured</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #060912; color: #eef5ff; font-family: Inter, system-ui, sans-serif; }
+      article { width: min(560px, calc(100vw - 32px)); padding: 32px; border: 1px solid rgba(123, 172, 255, 0.22); background: rgba(8, 16, 30, 0.96); }
+      a { color: #00d4ff; }
+    </style>
+  </head>
+  <body>
+    <article>
+      <p style="text-transform: uppercase; letter-spacing: 0.18em; color: #00d4ff;">newsletter capture</p>
+      <h1>You're on the weekly operating memo.</h1>
+      <p>We logged this subscription against <strong>${contentRoute.title}</strong> so the content layer can attribute what actually earns trust.</p>
+      <p><a href="${contentRoute.path}">Return to the page</a> or <a href="/api/ops/report">inspect the ops report</a>.</p>
+    </article>
+  </body>
+</html>`);
+  });
+
+  app.get('/lab', (c) => c.redirect('/ritual', 302));
+  app.get('/lab/*', (c) => c.redirect('/ritual', 302));
+
+  app.get('/ritual', (c) => {
+    const response = serveStaticFile(ritualStaticRoot, '/index.html');
+    if (response) return response;
+    return c.text('Ritual shell not found', 404);
+  });
+
+  app.get('/ritual/*', (c) => {
+    const ritualPath = c.req.path.replace(/^\/ritual/, '') || '/index.html';
+    const fileResponse = serveStaticFile(ritualStaticRoot, ritualPath);
+    if (fileResponse) return fileResponse;
+
+    const indexPath = join(ritualStaticRoot, 'index.html');
     if (existsSync(indexPath)) {
       const content = readFileSync(indexPath, 'utf-8');
       return c.html(content);
     }
+
+    return c.text('Not found', 404);
+  });
+
+  app.get('/*', (c) => {
+    const contentRoute = resolveContentRoute(routeMap, c.req.path);
+    if (contentRoute) {
+      const response = serveStaticFile(siteStaticRoot, contentRoute.artifact);
+      if (response) {
+        writeAnalyticsEvent(CONTENT_ANALYTICS_FILE, {
+          type: 'pageview',
+          timestamp: new Date().toISOString(),
+          route: contentRoute.path,
+          cluster: contentRoute.cluster,
+          kind: contentRoute.kind,
+          userAgent: c.req.header('user-agent'),
+        });
+        return response;
+      }
+    }
+
+    if (isRitualPath(c.req.path)) {
+      return c.redirect('/ritual', 302);
+    }
+
+    if (isLabPath(c.req.path)) {
+      return c.redirect('/ritual', 302);
+    }
+
+    const fileResponse = serveStaticFile(siteStaticRoot, c.req.path);
+    if (fileResponse) return fileResponse;
 
     return c.text('Not found', 404);
   });

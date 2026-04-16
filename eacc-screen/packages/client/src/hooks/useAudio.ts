@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useStore, type AudioSource } from '../stores/store';
 
-const AMBIENT_URL = '/audio/ambient.mp3';
+const AMBIENT_URL = `${import.meta.env.BASE_URL}audio/ambient.mp3`;
 const LS_AUDIO_VOLUME = 'ritual-audio-volume';
 const LS_AUDIO_YOUTUBE_URL = 'ritual-audio-youtube-url';
 export const DEFAULT_YOUTUBE_URL = 'https://www.youtube.com/watch?v=OWz7HiR6H-0';

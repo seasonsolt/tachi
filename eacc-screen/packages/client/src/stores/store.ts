@@ -49,7 +49,7 @@ interface EACCStore {
 
 const DEFAULT_AUDIO_SOURCE: AudioSource = {
   kind: 'default',
-  url: '/audio/ambient.mp3',
+  url: `${import.meta.env.BASE_URL}audio/ambient.mp3`,
   label: 'ambient',
 };
 
