@@ -1,0 +1,39 @@
+{
+  "owner": "content-ops",
+  "phaseOneDomain": "e-acc.ai",
+  "deferredDomains": ["e-accs.com"],
+  "weeks": [
+    {
+      "weekStart": "2026-03-23",
+      "ads": 4.25,
+      "affiliate": 9.5,
+      "sponsorship": 0,
+      "other": 0,
+      "notes": "First crawlable launch batch live."
+    },
+    {
+      "weekStart": "2026-03-30",
+      "ads": 5.1,
+      "affiliate": 11.75,
+      "sponsorship": 0,
+      "other": 0,
+      "notes": "Workflow pages started earning tracked CTA clicks."
+    },
+    {
+      "weekStart": "2026-04-06",
+      "ads": 6.2,
+      "affiliate": 13.4,
+      "sponsorship": 0,
+      "other": 0,
+      "notes": "Comparison support page increased lower-funnel intent."
+    },
+    {
+      "weekStart": "2026-04-13",
+      "ads": 6.8,
+      "affiliate": 14.25,
+      "sponsorship": 0,
+      "other": 0,
+      "notes": "Newsletter capture layer added to every core route."
+    }
+  ]
+}
