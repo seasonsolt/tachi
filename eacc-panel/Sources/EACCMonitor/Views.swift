@@ -783,9 +783,9 @@ struct CompanionPetView: View {
         case .matrixAgent:
             MatrixPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
         case .amberEye:
-            BladeRunnerPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
+            OrigamiUnicornPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
         case .voidMonolith:
-            VoidPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
+            MonolithPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
         }
     }
 }
@@ -932,7 +932,7 @@ private struct LaughingManPetView: View {
     var motionScale: CGFloat = 1.0
 
     @State private var isFloating = false
-    @State private var isRotating = false
+    @State private var rotationStartDate = Date()
 
     private let teal = Color(red: 0, green: 85.0 / 255.0, blue: 119.0 / 255.0)
 
@@ -977,10 +977,20 @@ private struct LaughingManPetView: View {
             }
 
             // Layer 2: Rotating text ring (Canvas, drawn once, GPU-rotated)
-            Canvas { context, size in
-                drawRingText(&context, size)
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                Canvas { context, size in
+                    drawRingText(&context, size)
+                }
+                .rotationEffect(
+                    .degrees(
+                        LaughingManMotion.rotationDegrees(
+                            at: timeline.date,
+                            startDate: rotationStartDate,
+                            hasMotion: hasMotion
+                        )
+                    )
+                )
             }
-            .rotationEffect(.degrees(isRotating ? -360 : 0))
 
             // Layer 3: Static face (Canvas, redraws only on mood change)
             Canvas { context, size in
@@ -990,14 +1000,26 @@ private struct LaughingManPetView: View {
         .frame(width: 108, height: 108)
         .offset(y: isFloating ? -3 * motionScale : 3 * motionScale)
         .onAppear {
-            isFloating = hasMotion
-            isRotating = hasMotion
+            rotationStartDate = .now
+            withAnimation(
+                hasMotion
+                    ? .easeInOut(duration: 2.2).repeatForever(autoreverses: true)
+                    : .easeInOut(duration: 0.2)
+            ) {
+                isFloating = hasMotion
+            }
         }
-        .animation(hasMotion ? .easeInOut(duration: 2.2).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isFloating)
-        .animation(hasMotion ? .linear(duration: 10).repeatForever(autoreverses: false) : .easeInOut(duration: 0.2), value: isRotating)
         .onChange(of: hasMotion) { _, enabled in
-            isFloating = enabled
-            isRotating = enabled
+            if enabled {
+                rotationStartDate = .now
+            }
+            withAnimation(
+                enabled
+                    ? .easeInOut(duration: 2.2).repeatForever(autoreverses: true)
+                    : .easeInOut(duration: 0.2)
+            ) {
+                isFloating = enabled
+            }
         }
     }
 

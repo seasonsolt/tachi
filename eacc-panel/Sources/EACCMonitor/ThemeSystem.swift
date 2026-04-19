@@ -98,168 +98,363 @@ struct EACCThemeColors {
     }
 }
 
-// MARK: - Blade Runner Pet View — レプリカント (Replicant)
-// Organic almond eye with amber iris, radial striations, dilating pupil.
-// Inspired by Blade Runner's Voight-Kampff close-ups — alive, warm, watching.
-// Eye openness changes with mood like the Voight-Kampff measuring emotional response.
+// MARK: - Blade Runner Pet View — 折り紙ユニコーン (Origami Unicorn)
+// The origami unicorn is the stronger Blade Runner symbol:
+// memory, implanted meaning, and the uneasy line between human and artifact.
+// Keep it cold and faceted, with only a little amber city light on the folds.
 
-struct BladeRunnerPetView: View {
+struct OrigamiUnicornPetView: View {
     let mood: CompanionMood
     let accent: Color
     var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
 
-    @State private var isFloating = false
+    @State private var rotationStartDate = Date()
 
+    private let paperHighlight = Color(red: 0.93, green: 0.94, blue: 0.97)
+    private let paperMain = Color(red: 0.64, green: 0.68, blue: 0.74)
+    private let paperShade = Color(red: 0.35, green: 0.39, blue: 0.46)
+    private let paperDeep = Color(red: 0.10, green: 0.11, blue: 0.14)
     private let amber = Color(red: 0.91, green: 0.57, blue: 0.16)
-    private let deepAmber = Color(red: 0.69, green: 0.35, blue: 0.09)
 
     var body: some View {
         ZStack {
-            // Warm ambient glow
-            Circle()
-                .fill(amber.opacity(glowLevel))
-                .frame(width: 100, height: 100)
-                .blur(radius: 16)
+            ZStack {
+                Ellipse()
+                    .fill(Color.black.opacity(0.14))
+                    .frame(width: 72, height: 14)
+                    .blur(radius: 6)
 
-            // Canvas-rendered organic eye
-            Canvas { context, size in
-                drawEye(&context, size)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.16, green: 0.17, blue: 0.20),
+                                Color(red: 0.05, green: 0.05, blue: 0.07)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 66, height: 12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                    )
+
+                Capsule()
+                    .fill(Color.white.opacity(0.16))
+                    .frame(width: 38, height: 2)
+                    .offset(y: -2)
+            }
+            .offset(y: 36)
+
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.28),
+                            Color.white.opacity(0.08)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 3, height: 18)
+                .offset(y: 25)
+
+            Ellipse()
+                .fill(Color.black.opacity(shadowOpacity))
+                .frame(width: 86, height: 22)
+                .blur(radius: 14)
+                .offset(x: -2, y: 30)
+
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                ZStack {
+                    Ellipse()
+                        .fill(accent.opacity(ambientGlowOpacity * 0.22))
+                        .frame(width: 74, height: 28)
+                        .blur(radius: 16)
+                        .offset(x: -6, y: 12)
+
+                    Circle()
+                        .fill(amber.opacity(hornGlowOpacity))
+                        .frame(width: 18, height: 18)
+                        .blur(radius: 12)
+                        .offset(x: 22, y: -26)
+
+                    Canvas { context, size in
+                        drawOrigamiUnicorn(&context, size)
+                    }
+                    .offset(x: -1, y: 2)
+                }
+                .rotation3DEffect(
+                    .degrees(rotationDegrees(at: timeline.date)),
+                    axis: (x: 0, y: 1, z: 0),
+                    anchor: .center,
+                    perspective: 0.7
+                )
             }
         }
         .frame(width: 108, height: 108)
-        .offset(y: isFloating ? -3 * motionScale : 3 * motionScale)
-        .animation(hasMotion ? .easeInOut(duration: 2.2).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isFloating)
         .onAppear {
-            isFloating = hasMotion
+            rotationStartDate = .now
         }
         .onChange(of: hasMotion) { _, enabled in
-            isFloating = enabled
+            if enabled {
+                rotationStartDate = .now
+            }
         }
     }
 
-    private var glowLevel: Double {
+    private var ambientGlowOpacity: Double {
         switch mood {
-        case .feasting: return 0.22
-        case .alert: return 0.16
-        case .expecting: return 0.10
-        case .dozing: return 0.06
-        case .sleeping: return 0.03
+        case .feasting: return 0.16
+        case .alert: return 0.12
+        case .expecting: return 0.08
+        case .dozing: return 0.05
+        case .sleeping: return 0.02
         }
     }
 
-    private var faceAlpha: Double {
+    private var shadowOpacity: Double {
+        switch mood {
+        case .feasting: return 0.24
+        case .alert: return 0.2
+        case .expecting: return 0.16
+        case .dozing: return 0.09
+        case .sleeping: return 0.04
+        }
+    }
+
+    private var paperAlpha: Double {
         switch mood {
         case .feasting: return 0.95
         case .alert: return 0.85
-        case .expecting: return 0.70
+        case .expecting: return 0.72
         case .dozing: return 0.45
         case .sleeping: return 0.25
         }
     }
 
-    private var pupilR: CGFloat {
+    private var hornGlowOpacity: Double {
         switch mood {
-        case .feasting: return 26
-        case .alert: return 22
-        case .expecting: return 18
-        case .dozing: return 14
-        case .sleeping: return 10
+        case .feasting: return 0.28
+        case .alert: return 0.18
+        case .expecting: return 0.10
+        case .dozing: return 0.04
+        case .sleeping: return 0.0
         }
     }
 
-    // How open the eye is — controls the curvature of upper/lower lids
-    private var openness: CGFloat {
+    private var eyeOpacity: Double {
         switch mood {
-        case .feasting: return 1.0
-        case .alert: return 0.88
-        case .expecting: return 0.72
-        case .dozing: return 0.35
-        case .sleeping: return 0.12
+        case .feasting: return 0.95
+        case .alert: return 0.8
+        case .expecting: return 0.55
+        case .dozing: return 0.22
+        case .sleeping: return 0.08
         }
     }
 
-    // All coordinates in 300×300 base space, scaled to actual size.
-    private func drawEye(_ context: inout GraphicsContext, _ size: CGSize) {
+    private func rotationDegrees(at date: Date) -> Double {
+        guard hasMotion else { return 0 }
+
+        let elapsed = max(0, date.timeIntervalSince(rotationStartDate))
+        return (elapsed / 20.0) * 360.0
+    }
+
+    private func drawOrigamiUnicorn(_ context: inout GraphicsContext, _ size: CGSize) {
         let s = min(size.width, size.height)
         let sc = s / 300.0
         let cx = s / 2
         let cy = s / 2
-        let o = openness
+        let strokeWidth = max(0.75, 1.35 * sc)
 
-        // Build almond eye path
-        var eyePath = Path()
-        eyePath.move(to: CGPoint(x: cx - 105.0 * sc, y: cy))
-        eyePath.addCurve(
-            to: CGPoint(x: cx + 105.0 * sc, y: cy),
-            control1: CGPoint(x: cx - 40.0 * sc, y: cy - 72.0 * o * sc),
-            control2: CGPoint(x: cx + 40.0 * sc, y: cy - 72.0 * o * sc))
-        eyePath.addCurve(
-            to: CGPoint(x: cx - 105.0 * sc, y: cy),
-            control1: CGPoint(x: cx + 40.0 * sc, y: cy + 72.0 * o * sc),
-            control2: CGPoint(x: cx - 40.0 * sc, y: cy + 72.0 * o * sc))
-        eyePath.closeSubpath()
+        let tail = polygon(
+            [(86, 132), (42, 118), (78, 146)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let hindQuarter = polygon(
+            [(86, 120), (124, 120), (138, 160), (98, 178), (70, 144)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let torso = polygon(
+            [(122, 122), (176, 110), (228, 126), (214, 160), (160, 174), (126, 154)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let belly = polygon(
+            [(132, 154), (162, 172), (196, 166), (176, 196), (142, 196), (118, 176)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let chest = polygon(
+            [(120, 142), (146, 144), (150, 190), (116, 186), (106, 166)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let mane = polygon(
+            [(122, 136), (134, 96), (154, 134), (140, 156)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let neck = polygon(
+            [(136, 138), (146, 64), (172, 64), (176, 132), (154, 154), (132, 148)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let head = polygon(
+            [(166, 64), (194, 56), (214, 74), (206, 102), (178, 104), (164, 88)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let muzzle = polygon(
+            [(194, 60), (230, 68), (212, 96), (188, 92)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let ear = polygon(
+            [(170, 62), (176, 34), (188, 60)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let horn = polygon(
+            [(182, 42), (192, 4), (200, 46)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let frontRearLeg = polygon(
+            [(120, 188), (136, 148), (150, 152), (140, 258), (118, 252)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let frontFrontLeg = polygon(
+            [(142, 190), (154, 148), (170, 150), (162, 260), (140, 254)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let hindRearLeg = polygon(
+            [(164, 170), (182, 150), (196, 158), (184, 250), (160, 244)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let hindFrontLeg = polygon(
+            [(190, 166), (218, 150), (234, 166), (216, 252), (190, 246)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
 
-        // Clipped layer: iris, pupil, highlights all inside the eye shape
-        context.drawLayer { ec in
-            ec.opacity = faceAlpha
-            ec.clip(to: eyePath)
+        context.drawLayer { uc in
+            uc.opacity = paperAlpha
+            uc.fill(tail, with: .color(paperDeep.opacity(0.92)))
+            uc.fill(hindRearLeg, with: .color(paperDeep.opacity(0.96)))
+            uc.fill(hindFrontLeg, with: .color(paperShade.opacity(0.95)))
+            uc.fill(hindQuarter, with: .color(paperDeep.opacity(0.94)))
+            uc.fill(torso, with: .color(paperMain))
+            uc.fill(belly, with: .color(paperShade.opacity(0.86)))
+            uc.fill(chest, with: .color(paperShade))
+            uc.fill(frontRearLeg, with: .color(paperHighlight.opacity(0.98)))
+            uc.fill(frontFrontLeg, with: .color(paperMain))
+            uc.fill(mane, with: .color(paperDeep.opacity(0.88)))
+            uc.fill(neck, with: .color(paperHighlight.opacity(0.96)))
+            uc.fill(head, with: .color(paperMain))
+            uc.fill(ear, with: .color(paperHighlight.opacity(0.92)))
+            uc.fill(muzzle, with: .color(paperHighlight))
+            uc.fill(horn, with: .color(paperHighlight))
 
-            // Sclera (dark warm tone)
-            ec.fill(
-                Path(ellipseIn: CGRect(x: cx - 130.0 * sc, y: cy - 130.0 * sc,
-                                       width: 260.0 * sc, height: 260.0 * sc)),
-                with: .color(Color(red: 0.12, green: 0.08, blue: 0.04)))
+            uc.stroke(torso, with: .color(Color.white.opacity(0.12)), lineWidth: strokeWidth)
+            uc.stroke(belly, with: .color(Color.white.opacity(0.08)), lineWidth: strokeWidth)
+            uc.stroke(chest, with: .color(Color.white.opacity(0.12)), lineWidth: strokeWidth)
+            uc.stroke(neck, with: .color(Color.white.opacity(0.18)), lineWidth: strokeWidth)
+            uc.stroke(head, with: .color(Color.white.opacity(0.16)), lineWidth: strokeWidth)
+            uc.stroke(ear, with: .color(Color.white.opacity(0.18)), lineWidth: strokeWidth)
+            uc.stroke(muzzle, with: .color(Color.white.opacity(0.22)), lineWidth: strokeWidth)
+            uc.stroke(horn, with: .color(Color.white.opacity(0.28)), lineWidth: strokeWidth)
 
-            // Iris circle
-            let iR = 52.0
-            ec.fill(
-                Path(ellipseIn: CGRect(x: cx - iR * sc, y: cy - iR * sc,
-                                       width: iR * 2.0 * sc, height: iR * 2.0 * sc)),
-                with: .color(amber.opacity(0.65)))
+            var spineFold = Path()
+            spineFold.move(to: point(134, 124, scale: sc, centerX: cx, centerY: cy))
+            spineFold.addLine(to: point(202, 136, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(spineFold, with: .color(paperDeep.opacity(0.6)), lineWidth: strokeWidth)
 
-            // Iris striations (radial lines — the organic detail)
-            for i in 0..<16 {
-                let angle = Double(i) * 22.5 * .pi / 180.0
-                var line = Path()
-                line.move(to: CGPoint(
-                    x: cx + 16.0 * sc * cos(angle),
-                    y: cy + 16.0 * sc * sin(angle)))
-                line.addLine(to: CGPoint(
-                    x: cx + 50.0 * sc * cos(angle),
-                    y: cy + 50.0 * sc * sin(angle)))
-                ec.stroke(line, with: .color(deepAmber.opacity(0.5)), lineWidth: 1.2 * sc)
-            }
+            var neckFold = Path()
+            neckFold.move(to: point(146, 66, scale: sc, centerX: cx, centerY: cy))
+            neckFold.addLine(to: point(154, 150, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(neckFold, with: .color(paperShade.opacity(0.7)), lineWidth: strokeWidth)
 
-            // Iris border ring
-            ec.stroke(
-                Path(ellipseIn: CGRect(x: cx - iR * sc, y: cy - iR * sc,
-                                       width: iR * 2.0 * sc, height: iR * 2.0 * sc)),
-                with: .color(deepAmber.opacity(0.8)), lineWidth: 2.0 * sc)
+            var faceFold = Path()
+            faceFold.move(to: point(174, 100, scale: sc, centerX: cx, centerY: cy))
+            faceFold.addLine(to: point(198, 62, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(faceFold, with: .color(paperDeep.opacity(0.7)), lineWidth: strokeWidth)
 
-            // Pupil (dilates with mood)
-            let pR = pupilR
-            ec.fill(
-                Path(ellipseIn: CGRect(x: cx - pR * sc, y: cy - pR * sc,
-                                       width: pR * 2.0 * sc, height: pR * 2.0 * sc)),
-                with: .color(.black))
+            var hipFold = Path()
+            hipFold.move(to: point(92, 122, scale: sc, centerX: cx, centerY: cy))
+            hipFold.addLine(to: point(126, 158, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(hipFold, with: .color(Color.white.opacity(0.1)), lineWidth: strokeWidth)
 
-            // Specular highlights (city lights reflected in the replicant's eye)
-            ec.fill(
-                Path(ellipseIn: CGRect(x: cx - 8.0 * sc, y: cy - 12.0 * sc,
-                                       width: 7.0 * sc, height: 7.0 * sc)),
-                with: .color(.white.opacity(0.5)))
-            ec.fill(
-                Path(ellipseIn: CGRect(x: cx + 5.0 * sc, y: cy + 4.0 * sc,
-                                       width: 4.0 * sc, height: 4.0 * sc)),
-                with: .color(.white.opacity(0.2)))
+            var eye = Path()
+            let eyeCenter = point(203, 79, scale: sc, centerX: cx, centerY: cy)
+            eye.addEllipse(
+                in: CGRect(
+                    x: eyeCenter.x - (3.0 * sc),
+                    y: eyeCenter.y - (3.0 * sc),
+                    width: 6.0 * sc,
+                    height: 6.0 * sc
+                )
+            )
+            uc.fill(eye, with: .color(amber.opacity(eyeOpacity)))
+
+            var hornHighlight = Path()
+            hornHighlight.move(to: point(187, 40, scale: sc, centerX: cx, centerY: cy))
+            hornHighlight.addLine(to: point(192, 8, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(hornHighlight, with: .color(amber.opacity(0.65)), lineWidth: max(0.55, strokeWidth * 0.7))
+
+            var backHighlight = Path()
+            backHighlight.move(to: point(138, 123, scale: sc, centerX: cx, centerY: cy))
+            backHighlight.addLine(to: point(192, 116, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(backHighlight, with: .color(Color.white.opacity(0.24)), lineWidth: max(0.55, strokeWidth * 0.7))
+
+            var muzzleHighlight = Path()
+            muzzleHighlight.move(to: point(202, 70, scale: sc, centerX: cx, centerY: cy))
+            muzzleHighlight.addLine(to: point(223, 74, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(muzzleHighlight, with: .color(Color.white.opacity(0.26)), lineWidth: max(0.55, strokeWidth * 0.7))
         }
+    }
 
-        // Eye outline (unclipped — always visible)
-        context.drawLayer { oc in
-            oc.opacity = faceAlpha
-            oc.stroke(eyePath, with: .color(amber.opacity(0.6)), lineWidth: 1.5 * sc)
+    private func point(_ x: CGFloat, _ y: CGFloat, scale: CGFloat, centerX: CGFloat, centerY: CGFloat) -> CGPoint {
+        CGPoint(
+            x: centerX + (x - 150.0) * scale,
+            y: centerY + (y - 150.0) * scale
+        )
+    }
+
+    private func polygon(_ points: [(CGFloat, CGFloat)], scale: CGFloat, centerX: CGFloat, centerY: CGFloat) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+
+        path.move(to: point(first.0, first.1, scale: scale, centerX: centerX, centerY: centerY))
+        for point in points.dropFirst() {
+            path.addLine(to: self.point(point.0, point.1, scale: scale, centerX: centerX, centerY: centerY))
         }
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -469,182 +664,256 @@ struct MatrixPetView: View {
     }
 }
 
-// MARK: - Void Pet View — モノリス (Monolith)
-// The 2001 monolith: cosmic catalyst for evolution, mathematically perfect.
-// Dark space viewport with starfield, the monolith (4:9 face of 1:4:9),
-// inner light line, and Star Gate color hints at the edges.
-// The monolith doesn't float — it is still, imposing, absolute. Only breathes.
+// MARK: - Monolith Pet View — 石碑 (Monolith)
+// Keep the 2001 symbol literal: no cosmic viewport, no halo, no ring.
+// Just the slab itself, a bottom shadow, and a faint inner seam when it wakes.
 
-struct VoidPetView: View {
+struct MonolithPetView: View {
     let mood: CompanionMood
     let accent: Color
     var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
 
     @State private var isBreathing = false
-    @State private var starTwinkle = false
 
-    private struct Star {
-        let x: CGFloat
-        let y: CGFloat
-        let size: CGFloat
-        let alpha: Double
-    }
-
-    // Pre-computed starfield (deterministic positions)
-    private static let stars: [Star] = {
-        let positions: [(CGFloat, CGFloat)] = [
-            (-40, -36), (-33, -16), (-42, 10), (-36, 30), (-28, -40),
-            (40, -33), (36, -10), (42, 16), (33, 36), (28, -46),
-            (-18, -44), (20, -42), (-44, -4), (44, 4),
-            (-23, 40), (26, 42), (0, -46), (0, 44)
-        ]
-        return positions.enumerated().map { (i, pos) in
-            Star(x: pos.0, y: pos.1,
-                 size: i % 3 == 0 ? 2.0 : 1.5,
-                 alpha: 0.3 + Double(i % 5) * 0.12)
-        }
-    }()
+    // Sun/moon geometry — moon is slightly SMALLER than sun
+    // so a bright annular ring is visible during totality.
+    private let sunRadius: CGFloat = 10
+    private let moonRadius: CGFloat = 9
 
     var body: some View {
-        ZStack {
-            // Space viewport (dark circle — the cosmic void)
-            Circle()
-                .fill(Color(red: 0.02, green: 0.02, blue: 0.05))
-                .frame(width: 94, height: 94)
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            let time = hasMotion ? timeline.date.timeIntervalSinceReferenceDate : 0
 
-            // Starfield
-            ForEach(0..<Self.stars.count, id: \.self) { i in
-                let star = Self.stars[i]
-                Circle()
-                    .fill(Color.white.opacity(star.alpha * starAlpha))
-                    .frame(width: star.size, height: star.size)
-                    .offset(x: star.x, y: star.y)
-                    .opacity(hasMotion && starTwinkle && i % 3 == 0 ? 0.3 : 1.0)
+            // Moon transits across the sun over 8 seconds, pauses at center
+            let rawCycle = time.truncatingRemainder(dividingBy: 10.0) / 10.0
+            // Ease in/out so the moon dwells at totality
+            let easedCycle = smootherstep(rawCycle)
+            let moonOffset = CGFloat(-16 + (easedCycle * 32))
+            let eclipseIntensity = 1.0 - min(1.0, abs(moonOffset) / 12.0)
+            let coronaPulse = (sin(time * 1.3) + 1.0) * 0.5
+
+            // Corona grows dramatically during totality
+            let coronaScale = 1.0 + (0.3 * eclipseIntensity)
+            let coronaRingOpacity = 0.20 + (0.65 * eclipseIntensity) + (0.10 * coronaPulse)
+            let coronaHaloOpacity = 0.08 + (0.28 * eclipseIntensity) + (0.06 * coronaPulse)
+            let sunCoreOpacity = 0.85 - (0.75 * eclipseIntensity)
+
+            ZStack {
+                // --- Eclipse above the slab ---
+                ZStack {
+                    // Outer halo — large diffuse warm glow
+                    Circle()
+                        .fill(coronaColor.opacity(coronaHaloOpacity * 0.5))
+                        .frame(width: 44, height: 44)
+                        .blur(radius: 14)
+                        .scaleEffect(coronaScale)
+
+                    // Corona ring — thick, visible during totality
+                    Circle()
+                        .stroke(
+                            coronaColor.opacity(coronaRingOpacity),
+                            lineWidth: 2.5 + (2.0 * eclipseIntensity)
+                        )
+                        .frame(width: sunRadius * 2 + 6, height: sunRadius * 2 + 6)
+                        .blur(radius: 0.6 + (0.8 * eclipseIntensity))
+                        .scaleEffect(coronaScale)
+
+                    // Outer corona streamer ring
+                    Circle()
+                        .stroke(
+                            coronaColor.opacity(coronaRingOpacity * 0.4),
+                            lineWidth: 1.5
+                        )
+                        .frame(width: sunRadius * 2 + 14, height: sunRadius * 2 + 14)
+                        .blur(radius: 2.5)
+                        .scaleEffect(coronaScale)
+
+                    // Sun core — bright warm disc
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.white.opacity(sunCoreOpacity),
+                                    Color.white.opacity(sunCoreOpacity * 0.7)
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: sunRadius
+                            )
+                        )
+                        .frame(width: sunRadius * 2, height: sunRadius * 2)
+
+                    // Sun limb — bright edge ring
+                    Circle()
+                        .stroke(Color.white.opacity(0.20 + (0.15 * eclipseIntensity)), lineWidth: 0.8)
+                        .frame(width: sunRadius * 2 + 1, height: sunRadius * 2 + 1)
+
+                    // Moon disc — slightly smaller, transiting
+                    Circle()
+                        .fill(Color(red: 0.03, green: 0.03, blue: 0.04))
+                        .frame(width: moonRadius * 2, height: moonRadius * 2)
+                        .offset(x: moonOffset)
+                }
+                .offset(y: -42)
+
+                // --- 45° upward projection above the slab ---
+                Path { path in
+                    let w = stoneWidth
+                    let top = stoneLift - stoneHeight / 2
+                    // Trapezoid: slab top edge → narrower edge 28pt above
+                    path.move(to: CGPoint(x: 54 - w / 2, y: top))
+                    path.addLine(to: CGPoint(x: 54 + w / 2, y: top))
+                    path.addLine(to: CGPoint(x: 54 + w / 2 - 6, y: top - 28))
+                    path.addLine(to: CGPoint(x: 54 - w / 2 + 6, y: top - 28))
+                    path.closeSubpath()
+                }
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(castShadowOpacity * 0.8),
+                            .clear
+                        ],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                )
+                .blur(radius: 5)
+
+                // --- Ground shadow ---
+                Ellipse()
+                    .fill(Color.black.opacity(baseShadowOpacity))
+                    .frame(width: 60, height: 12)
+                    .blur(radius: 12)
+                    .offset(y: stoneLift + 32)
+
+                // --- The slab ---
+                stoneCore
+                    .scaleEffect(x: 1.0, y: isBreathing ? (1.0 + 0.012 * motionScale) : 1.0)
+                    .offset(y: stoneLift)
+
+                // --- Reflection ---
+                stoneCore
+                    .scaleEffect(x: 1.0, y: -0.42)
+                    .opacity(reflectionOpacity)
+                    .blur(radius: 1.6)
+                    .mask(
+                        LinearGradient(
+                            colors: [.black.opacity(0.85), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(width: stoneWidth + 6, height: stoneHeight * 0.55)
+                    )
+                    .offset(y: stoneLift + (stoneHeight * 0.76))
             }
-
-            // Edge glow — Star Gate color hints (violet/blue emanation)
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [edgeColor.opacity(edgeGlowAlpha), .clear],
-                        startPoint: .leading, endPoint: .trailing))
-                .frame(width: 8, height: 58)
-                .offset(x: -16)
-                .blur(radius: 4)
-
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [.clear, edgeColor.opacity(edgeGlowAlpha)],
-                        startPoint: .leading, endPoint: .trailing))
-                .frame(width: 8, height: 58)
-                .offset(x: 16)
-                .blur(radius: 4)
-
-            // Monolith shadow
-            Rectangle()
-                .fill(Color.black.opacity(0.25))
-                .frame(width: 30, height: 65)
-                .blur(radius: 8)
-                .offset(y: 4)
-
-            // Monolith body (28×63 = 4:9 ratio, the front face of 1:4:9)
-            Rectangle()
-                .fill(Color(red: 0.04, green: 0.04, blue: 0.04))
-                .frame(width: 28, height: 63)
-                .overlay(
-                    Rectangle()
-                        .stroke(Color.white.opacity(0.06), lineWidth: 0.5))
-                .scaleEffect(isBreathing ? (1.0 + 0.02 * motionScale) : 1.0)
-
-            // Inner light line (the monolith's intelligence)
-            Rectangle()
-                .fill(centerLineColor.opacity(centerLineAlpha))
-                .frame(width: 1, height: 50)
-                .blur(radius: 2)
-
-            // Apex light (the Star Gate threshold — benevolent, not HAL-like)
-            Circle()
-                .fill(apexColor)
-                .frame(width: 5, height: 5)
-                .opacity(apexOpacity)
-                .offset(y: -18)
-                .shadow(color: apexColor.opacity(0.4), radius: 4)
         }
         .frame(width: 108, height: 108)
         .animation(hasMotion ? .easeInOut(duration: 4.0).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isBreathing)
         .onAppear {
             isBreathing = hasMotion
-            starTwinkle = hasMotion
         }
         .onChange(of: hasMotion) { _, enabled in
             isBreathing = enabled
-            starTwinkle = enabled
         }
     }
 
-    private var starAlpha: Double {
+    /// Smoother ease curve — dwells longer at totality (center)
+    private func smootherstep(_ t: Double) -> Double {
+        let x = min(1, max(0, t))
+        return x * x * x * (x * (x * 6 - 15) + 10)
+    }
+
+    private var baseShadowOpacity: Double {
         switch mood {
-        case .feasting: return 1.0
-        case .alert: return 0.8
-        case .expecting: return 0.6
-        case .dozing: return 0.3
-        case .sleeping: return 0.1
+        case .feasting: return 0.24
+        case .alert: return 0.2
+        case .expecting: return 0.16
+        case .dozing: return 0.11
+        case .sleeping: return 0.08
         }
     }
 
-    private var centerLineAlpha: Double {
+    private var castShadowOpacity: Double {
         switch mood {
-        case .feasting: return 0.5
-        case .alert: return 0.35
-        case .expecting: return 0.2
-        case .dozing: return 0.08
+        case .feasting: return 0.18
+        case .alert: return 0.15
+        case .expecting: return 0.12
+        case .dozing: return 0.09
+        case .sleeping: return 0.06
+        }
+    }
+
+    private var coronaColor: Color {
+        switch mood {
+        case .feasting: return Color(red: 0.88, green: 0.78, blue: 0.52)
+        case .alert: return Color(red: 0.82, green: 0.72, blue: 0.48)
+        case .expecting: return Color(red: 0.78, green: 0.72, blue: 0.56)
+        case .dozing, .sleeping: return Color(red: 0.72, green: 0.68, blue: 0.58)
+        }
+    }
+
+    private var seamGlowOpacity: Double {
+        switch mood {
+        case .feasting: return 0.10
+        case .alert: return 0.08
+        case .expecting: return 0.05
+        case .dozing: return 0.03
         case .sleeping: return 0.0
         }
     }
 
-    private var centerLineColor: Color {
+    private var seamColor: Color {
         switch mood {
-        case .feasting, .alert: return Color(red: 0.7, green: 0.8, blue: 1.0)
-        case .expecting, .dozing, .sleeping: return .white
+        case .feasting: return Color(red: 0.62, green: 0.68, blue: 0.80)
+        case .alert: return Color(red: 0.56, green: 0.62, blue: 0.74)
+        case .expecting, .dozing, .sleeping: return Color.white
         }
     }
 
-    private var edgeColor: Color {
+    private var reflectionOpacity: Double {
         switch mood {
-        case .feasting: return Color(red: 0.4, green: 0.3, blue: 0.9)
-        case .alert: return Color(red: 0.3, green: 0.4, blue: 0.8)
-        case .expecting, .dozing, .sleeping: return Color(red: 0.5, green: 0.5, blue: 0.7)
+        case .feasting: return 0.16
+        case .alert: return 0.14
+        case .expecting: return 0.12
+        case .dozing: return 0.1
+        case .sleeping: return 0.08
         }
     }
 
-    private var edgeGlowAlpha: Double {
+    private var stoneHeight: CGFloat {
         switch mood {
-        case .feasting: return 0.35
-        case .alert: return 0.25
-        case .expecting: return 0.15
-        case .dozing: return 0.0
-        case .sleeping: return 0.0
+        case .feasting: return 82
+        case .alert: return 80
+        case .expecting: return 78
+        case .dozing: return 76
+        case .sleeping: return 74
         }
     }
 
-    private var apexOpacity: Double {
-        switch mood {
-        case .feasting: return 1.0
-        case .alert: return 0.8
-        case .expecting: return 0.5
-        case .dozing: return 0.15
-        case .sleeping: return 0.0
-        }
+    private var stoneWidth: CGFloat {
+        38
     }
 
-    private var apexColor: Color {
-        switch mood {
-        case .feasting: return Color(red: 0.85, green: 0.9, blue: 1.0)
-        case .alert: return Color(red: 0.7, green: 0.8, blue: 0.95)
-        case .expecting: return Color(red: 0.6, green: 0.7, blue: 0.8)
-        case .dozing, .sleeping: return .white
+    private var stoneLift: CGFloat {
+        6
+    }
+
+    private var stoneCore: some View {
+        ZStack {
+            Rectangle()
+                .fill(Color.black)
+                .frame(width: stoneWidth, height: stoneHeight)
+
+            Rectangle()
+                .fill(seamColor.opacity(seamGlowOpacity))
+                .frame(width: 1.3, height: stoneHeight - 12)
+                .blur(radius: 1.4)
         }
+        .overlay(
+            Rectangle()
+                .stroke(Color.white.opacity(0.04), lineWidth: 0.6)
+                .frame(width: stoneWidth, height: stoneHeight)
+        )
     }
 }
