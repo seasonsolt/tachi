@@ -17,9 +17,9 @@ enum CompanionPersona: Equatable {
         case .matrixAgent:
             return Color(red: 0, green: 1.0, blue: 0.25)
         case .amberEye:
-            return Color(red: 0.91, green: 0.57, blue: 0.16)
+            return Color(red: 0.80, green: 0.82, blue: 0.86)
         case .voidMonolith:
-            return Color(red: 0.1, green: 0.1, blue: 0.1)
+            return Color(red: 0.24, green: 0.24, blue: 0.26)
         }
     }
 }
@@ -38,8 +38,8 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
         case .defaultOrb: return "Orb"
         case .laughingMan: return "笑い男 Laughing Man"
         case .matrixAgent: return "母体代码 Matrix Code"
-        case .amberEye: return "レプリカント Replicant"
-        case .voidMonolith: return "モノリス Monolith"
+        case .amberEye: return "折り紙ユニコーン Origami Unicorn"
+        case .voidMonolith: return "石碑 Monolith"
         }
     }
 
@@ -49,8 +49,8 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
         case .defaultOrb: return "PET ORB"
         case .laughingMan: return "PET LM"
         case .matrixAgent: return "PET MX"
-        case .amberEye: return "PET AM"
-        case .voidMonolith: return "PET VD"
+        case .amberEye: return "PET UN"
+        case .voidMonolith: return "PET MO"
         }
     }
 

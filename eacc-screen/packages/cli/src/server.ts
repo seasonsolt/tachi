@@ -5,15 +5,36 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, watchFile, unwatchF
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
-import type { TokenData, SourceData, WSMessage, WSClientMessage, EACCConfig, SessionInfo, ThemeName } from '@eacc/shared';
+import type {
+  TokenData,
+  SourceData,
+  WSMessage,
+  WSClientMessage,
+  EACCConfig,
+  SessionInfo,
+  ThemeName,
+  MarketBuyerRequest,
+  MarketSellerSummary,
+  MarketServerMode,
+  MarketState,
+} from '@eacc/shared';
 import { getMilestone } from '@eacc/shared';
 import { loadConfig, saveConfig } from './config.js';
 import { startClaudeCodeCollector } from './collectors/claude-code.js';
 import { startAnthropicCollector } from './collectors/anthropic-api.js';
 import { startOpenAICollector } from './collectors/openai-api.js';
 import { startSessionCollector } from './collectors/claude-sessions.js';
+import { SellerAgentBridge } from './market/agent.js';
+import { MarketHub } from './market/hub.js';
+import { MARKET_AGENT_PATH } from './market/protocol.js';
+import { readSellerVault, createSellerVault, decryptVault, writeSellerVault } from './market/vault.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+interface StartServerOptions {
+  marketMode?: MarketServerMode;
+  marketHubUrl?: string | null;
+}
 
 function emptySource(): SourceData {
   return {
@@ -49,22 +70,19 @@ function buildTokenData(sources: {
   };
 }
 
-// Theme file for cross-process sync with macOS app
 const THEME_DIR = join(homedir(), '.eacc');
 const THEME_FILE = join(THEME_DIR, 'theme.json');
 const LEGACY_THEME_FILE = join(homedir(), '.ritual-screen', 'theme.json');
 
 function readThemeFile(): ThemeName | null {
   try {
-    // Try new path first, fall back to legacy ~/.ritual-screen/
     const path = existsSync(THEME_FILE) ? THEME_FILE
       : existsSync(LEGACY_THEME_FILE) ? LEGACY_THEME_FILE
       : null;
     if (!path) return null;
-    const json = JSON.parse(readFileSync(path, 'utf-8'));
-    const raw = json.theme as string | undefined;
+    const json = JSON.parse(readFileSync(path, 'utf-8')) as { theme?: string };
+    const raw = json.theme;
     if (!raw) return null;
-    // Migrate removed themes
     if (raw === 'bladerunner' || raw === 'blood') return 'amber';
     if (raw === 'singularity') return 'void';
     return raw as ThemeName;
@@ -78,15 +96,53 @@ function writeThemeFile(theme: ThemeName): void {
     mkdirSync(THEME_DIR, { recursive: true });
     writeFileSync(THEME_FILE, JSON.stringify({ theme }) + '\n');
   } catch {
-    // Ignore write errors
+    // Ignore write errors.
   }
 }
 
-export function startServer(port: number): { close: () => void } {
+function resolveServerMode(config: EACCConfig, options?: StartServerOptions): MarketServerMode {
+  return options?.marketMode ?? config.market?.mode ?? 'standalone';
+}
+
+function buildSellerFallback(config: EACCConfig): MarketSellerSummary | null {
+  const seller = config.market?.seller;
+  if (!seller) return null;
+  return {
+    sellerId: seller.sellerId,
+    listingId: seller.listingId,
+    sellerAlias: seller.sellerAlias,
+    endpoint: seller.endpoint,
+    endpointHost: seller.endpointHost,
+    model: seller.model,
+    publicNote: seller.publicNote,
+    hubUrl: config.market?.hubUrl ?? null,
+    status: seller.enabled ? 'locked' : 'disabled',
+    enabled: seller.enabled,
+    hasLocalVault: !!readSellerVault(),
+    hasUnlockedSecret: false,
+    capabilityTokenPreview: seller.capabilityTokenPreview,
+    lastError: null,
+  };
+}
+
+function sanitizeConfigurePatch(config: EACCConfig, patch: Partial<EACCConfig>): EACCConfig {
+  const next: EACCConfig = { ...config };
+  if (typeof patch.anthropicAdminKey === 'string') next.anthropicAdminKey = patch.anthropicAdminKey;
+  if (typeof patch.openaiKey === 'string') next.openaiKey = patch.openaiKey;
+  if (typeof patch.pollIntervalMs === 'number') next.pollIntervalMs = patch.pollIntervalMs;
+  if (typeof patch.port === 'number') next.port = patch.port;
+  return next;
+}
+
+export function startServer(port: number, options?: StartServerOptions): { close: () => void } {
   let config = loadConfig();
   config.port = port;
+  config.market = {
+    mode: resolveServerMode(config, options),
+    hubUrl: options?.marketHubUrl ?? config.market?.hubUrl,
+    seller: config.market?.seller,
+  };
 
-  // Source state
   const sources = {
     claudeCode: emptySource(),
     anthropicApi: emptySource(),
@@ -95,37 +151,62 @@ export function startServer(port: number): { close: () => void } {
 
   let currentSessions: SessionInfo[] = [];
   let currentTheme: ThemeName = readThemeFile() || 'cyber';
-
   let previousTotalTokens = 0;
   let lastMilestoneThreshold = 0;
 
-  // WebSocket server
-  const wss = new WebSocketServer({ noServer: true });
+  const browserWss = new WebSocketServer({ noServer: true });
+  const marketAgentWss = new WebSocketServer({ noServer: true });
+
+  const marketHub = config.market.mode === 'hub'
+    ? new MarketHub({
+      onStateChange: () => broadcastMarketState(),
+      operatorControlsAvailable: !!process.env.EACC_MARKET_OPERATOR_SECRET,
+    })
+    : null;
+
+  const sellerAgentBridge = config.market.mode === 'seller'
+    ? new SellerAgentBridge({
+      getConfig: () => config,
+      onStateChange: () => broadcastMarketState(),
+    })
+    : null;
+
+  function buildMarketState(): MarketState {
+    if (marketHub) return marketHub.getState();
+    return {
+      serverMode: config.market?.mode ?? 'standalone',
+      hubUrl: config.market?.hubUrl ?? null,
+      seller: sellerAgentBridge?.getSummary() ?? buildSellerFallback(config),
+      listings: [],
+      blacklist: [],
+      operatorControlsAvailable: false,
+    };
+  }
 
   function broadcast(msg: WSMessage): void {
     const payload = JSON.stringify(msg);
-    for (const client of wss.clients) {
+    for (const client of browserWss.clients) {
       if (client.readyState === WebSocket.OPEN) {
         client.send(payload);
       }
     }
   }
 
+  function broadcastMarketState(): void {
+    broadcast({ type: 'market_state', market: buildMarketState() });
+  }
+
   function broadcastUpdate(): void {
     const data = buildTokenData(sources);
-
-    // Check for milestone
     const milestone = getMilestone(data.totalTokens);
     if (milestone && milestone.threshold > lastMilestoneThreshold && data.totalTokens > previousTotalTokens) {
       lastMilestoneThreshold = milestone.threshold;
       broadcast({ type: 'milestone', milestone });
     }
-
     previousTotalTokens = data.totalTokens;
     broadcast({ type: 'token_update', data });
   }
 
-  // Start collectors
   const stopClaude = startClaudeCodeCollector((data) => {
     sources.claudeCode = data;
     broadcastUpdate();
@@ -160,7 +241,10 @@ export function startServer(port: number): { close: () => void } {
     broadcast({ type: 'session_update', sessions });
   });
 
-  // Watch theme file for cross-process sync (macOS app writes this)
+  if (sellerAgentBridge) {
+    sellerAgentBridge.refresh();
+  }
+
   watchFile(THEME_FILE, { interval: 1000 }, () => {
     const theme = readThemeFile();
     if (theme && theme !== currentTheme) {
@@ -169,25 +253,18 @@ export function startServer(port: number): { close: () => void } {
     }
   });
 
-  // Hono app
   const app = new Hono();
 
-  // CORS middleware — allow e-acc.ai and any origin to connect
   app.use('*', async (c, next) => {
     await next();
     c.header('Access-Control-Allow-Origin', c.req.header('Origin') || '*');
     c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    c.header('Access-Control-Allow-Headers', 'Content-Type');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, x-market-operator-secret');
   });
 
-  app.options('*', (c) => {
-    return c.body(null, 204);
-  });
+  app.options('*', (c) => c.body(null, 204));
 
-  // API endpoints
-  app.get('/api/status', (c) => {
-    return c.json(buildTokenData(sources));
-  });
+  app.get('/api/status', (c) => c.json(buildTokenData(sources)));
 
   app.get('/api/config', (c) => {
     return c.json({
@@ -195,10 +272,121 @@ export function startServer(port: number): { close: () => void } {
       hasOpenAIKey: !!config.openaiKey,
       port: config.port,
       pollIntervalMs: config.pollIntervalMs,
+      marketMode: config.market?.mode ?? 'standalone',
+      marketHubUrl: config.market?.hubUrl ?? null,
+      hasMarketSeller: !!config.market?.seller,
     });
   });
 
-  // Serve static client files
+  app.get('/api/market/state', (c) => c.json(buildMarketState()));
+
+  app.post('/api/market/local-vault', async (c) => {
+    if (config.market?.mode !== 'seller') {
+      return c.json({ error: 'Local vault is only available in seller mode' }, 400);
+    }
+    try {
+      const body = await c.req.json() as {
+        sellerAlias?: string;
+        endpoint?: string;
+        model?: string;
+        publicNote?: string;
+        apiKey?: string;
+        passphrase?: string;
+        hubUrl?: string;
+      };
+      if (!body.sellerAlias || !body.endpoint || !body.model || !body.apiKey || !body.passphrase) {
+        return c.json({ error: 'Missing seller vault fields' }, 400);
+      }
+      const { vault, localConfig } = createSellerVault({
+        sellerAlias: body.sellerAlias,
+        endpoint: body.endpoint,
+        model: body.model,
+        publicNote: body.publicNote,
+        apiKey: body.apiKey,
+        passphrase: body.passphrase,
+        existing: config.market?.seller ?? null,
+      });
+      writeSellerVault(vault);
+      config = {
+        ...config,
+        market: {
+          mode: 'seller',
+          hubUrl: body.hubUrl?.trim() || config.market?.hubUrl,
+          seller: localConfig,
+        },
+      };
+      saveConfig(config);
+      sellerAgentBridge?.setUnlockedSecrets(null);
+      broadcastMarketState();
+      return c.json({ ok: true, seller: buildMarketState().seller });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Failed to save seller vault' }, 400);
+    }
+  });
+
+  app.post('/api/market/unlock', async (c) => {
+    if (!sellerAgentBridge || config.market?.mode !== 'seller') {
+      return c.json({ error: 'Unlock is only available in seller mode' }, 400);
+    }
+    try {
+      const body = await c.req.json() as { passphrase?: string };
+      if (!body.passphrase) {
+        return c.json({ error: 'Missing passphrase' }, 400);
+      }
+      const vault = readSellerVault();
+      if (!vault) {
+        return c.json({ error: 'No local market vault found' }, 404);
+      }
+      const secrets = decryptVault(vault, body.passphrase);
+      sellerAgentBridge.setUnlockedSecrets(secrets);
+      return c.json({ ok: true, seller: buildMarketState().seller });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Failed to unlock seller vault' }, 400);
+    }
+  });
+
+  app.post('/api/market/lock', (c) => {
+    if (!sellerAgentBridge || config.market?.mode !== 'seller') {
+      return c.json({ error: 'Lock is only available in seller mode' }, 400);
+    }
+    sellerAgentBridge.setUnlockedSecrets(null);
+    return c.json({ ok: true, seller: buildMarketState().seller });
+  });
+
+  app.post('/api/market/request', async (c) => {
+    if (!marketHub) {
+      return c.json({ error: 'Buyer requests are only available on the market hub' }, 400);
+    }
+    const request = await c.req.json() as MarketBuyerRequest;
+    if (!request.listingId || !request.prompt?.trim()) {
+      return c.json({ error: 'Missing listing or prompt' }, 400);
+    }
+    const response = await marketHub.requestBuyerInvocation(request);
+    broadcastMarketState();
+    return c.json(response);
+  });
+
+  app.post('/api/market/admin/disable', async (c) => {
+    if (!marketHub) {
+      return c.json({ error: 'Operator controls are only available on the market hub' }, 400);
+    }
+    const operatorSecret = process.env.EACC_MARKET_OPERATOR_SECRET;
+    const body = await c.req.json() as { listingId?: string; disabled?: boolean; operatorSecret?: string };
+    const provided = c.req.header('x-market-operator-secret') ?? body.operatorSecret;
+    if (!operatorSecret || provided !== operatorSecret) {
+      return c.json({ error: 'Operator secret mismatch' }, 403);
+    }
+    if (!body.listingId || typeof body.disabled !== 'boolean') {
+      return c.json({ error: 'Missing listingId or disabled flag' }, 400);
+    }
+    const updated = marketHub.setListingDisabled(body.listingId, body.disabled);
+    if (!updated) {
+      return c.json({ error: 'Listing not found' }, 404);
+    }
+    broadcastMarketState();
+    return c.json({ ok: true, market: buildMarketState() });
+  });
+
   const clientDistPath = join(__dirname, '..', '..', 'client', 'dist');
   const bundledDistPath = join(__dirname, '..', 'client');
   const staticRoot = existsSync(clientDistPath) ? clientDistPath : bundledDistPath;
@@ -229,35 +417,42 @@ export function startServer(port: number): { close: () => void } {
       return c.body(content, 200, { 'Content-Type': contentType });
     }
 
-    // SPA fallback
     const indexPath = join(staticRoot, 'index.html');
     if (existsSync(indexPath)) {
-      const content = readFileSync(indexPath, 'utf-8');
-      return c.html(content);
+      return c.html(readFileSync(indexPath, 'utf-8'));
     }
 
     return c.text('Not found', 404);
   });
 
-  // Start HTTP server
   const server = serve({ fetch: app.fetch, port }, () => {
-    // Server started
+    // Server started.
   });
 
-  // Handle WebSocket upgrade
   (server as import('node:http').Server).on('upgrade', (request, socket, head) => {
-    if (request.url === '/ws') {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
+    const pathname = new URL(request.url || '/', 'http://localhost').pathname;
+    if (pathname === '/ws') {
+      browserWss.handleUpgrade(request, socket, head, (ws) => {
+        browserWss.emit('connection', ws, request);
+      });
+    } else if (pathname === MARKET_AGENT_PATH && marketHub) {
+      marketAgentWss.handleUpgrade(request, socket, head, (ws) => {
+        marketAgentWss.emit('connection', ws, request);
       });
     } else {
       socket.destroy();
     }
   });
 
-  // Handle WebSocket connections
-  wss.on('connection', (ws) => {
-    // Send current state immediately
+  marketAgentWss.on('connection', (ws) => {
+    if (!marketHub) {
+      ws.close();
+      return;
+    }
+    marketHub.handleAgentConnection(ws);
+  });
+
+  browserWss.on('connection', (ws) => {
     const connectedSources: string[] = [];
     if (sources.claudeCode.connected) connectedSources.push('claudeCode');
     if (sources.anthropicApi.connected) connectedSources.push('anthropicApi');
@@ -267,12 +462,13 @@ export function startServer(port: number): { close: () => void } {
     ws.send(JSON.stringify({ type: 'token_update', data: buildTokenData(sources) } satisfies WSMessage));
     ws.send(JSON.stringify({ type: 'session_update', sessions: currentSessions } satisfies WSMessage));
     ws.send(JSON.stringify({ type: 'theme_change', theme: currentTheme } satisfies WSMessage));
+    ws.send(JSON.stringify({ type: 'market_state', market: buildMarketState() } satisfies WSMessage));
 
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(String(raw)) as WSClientMessage;
         if (msg.type === 'configure') {
-          config = { ...config, ...msg.config };
+          config = sanitizeConfigurePatch(config, msg.config);
           saveConfig(config);
           broadcastUpdate();
         } else if (msg.type === 'theme_change') {
@@ -282,9 +478,8 @@ export function startServer(port: number): { close: () => void } {
             broadcast({ type: 'theme_change', theme: msg.theme });
           }
         }
-        // ping is just a keepalive, no response needed
       } catch {
-        // Ignore malformed messages
+        // Ignore malformed browser websocket messages.
       }
     });
   });
@@ -295,8 +490,10 @@ export function startServer(port: number): { close: () => void } {
       stopAnthropic();
       stopOpenAI();
       stopSessions();
+      sellerAgentBridge?.close();
       unwatchFile(THEME_FILE);
-      wss.close();
+      browserWss.close();
+      marketAgentWss.close();
       (server as import('node:http').Server).close();
     },
   };

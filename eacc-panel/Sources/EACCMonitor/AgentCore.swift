@@ -29,6 +29,32 @@ struct AgentContext {
     let todayCost: Double
 }
 
+struct AgentHarnessPlan: Equatable {
+    let goal: String
+    let suggestedTools: [String]
+    let successCriteria: [String]
+    let notes: [String]
+
+    var promptBlock: String {
+        var lines = [
+            "Current harness brief:",
+            "- Goal: \(goal)",
+        ]
+
+        if !suggestedTools.isEmpty {
+            lines.append("- Suggested tool path: \(suggestedTools.joined(separator: " -> "))")
+        }
+        if !successCriteria.isEmpty {
+            lines.append("- Success criteria: \(successCriteria.joined(separator: "; "))")
+        }
+        if !notes.isEmpty {
+            lines.append("- Harness notes: \(notes.joined(separator: "; "))")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+}
+
 // MARK: - AgentCore
 
 final class AgentCore: @unchecked Sendable {
@@ -36,6 +62,9 @@ final class AgentCore: @unchecked Sendable {
     private var conversationHistory: [[String: Any]] = []
     private let tools: [AgentTool]
     private let queue = DispatchQueue(label: "agent.core")
+    private static let maxToolLoopIterations = 8
+    private static let historyCompactionThreshold = 24
+    private static let historyMessagesToKeep = 10
 
     /// API key (sk-ant-... or cr_... token)
     private(set) var apiKey: String?
@@ -193,24 +222,42 @@ final class AgentCore: @unchecked Sendable {
     func sendMessage(_ text: String, context: AgentContext? = nil) async -> AgentMessage {
         // Build user message
         let userEntry: [String: Any] = ["role": "user", "content": text]
-        queue.sync { conversationHistory.append(userEntry) }
+        let plan = Self.buildHarnessPlan(for: text, context: context)
+        let startedAt = Date()
+
+        queue.sync {
+            conversationHistory.append(userEntry)
+            conversationHistory = Self.compactConversationHistory(conversationHistory)
+        }
 
         // Build system prompt
-        let systemPrompt = buildSystemPrompt(context: context)
+        let systemPrompt = buildSystemPrompt(context: context, plan: plan)
 
         // Tool-use loop
         var allToolCalls: [ToolCallInfo] = []
+        var stepCount = 0
 
-        while true {
+        while stepCount < Self.maxToolLoopIterations {
+            stepCount += 1
             let messages: [[String: Any]] = queue.sync { conversationHistory }
 
             guard let responseContent = await callAPI(system: systemPrompt, messages: messages) else {
+                let errorText = "Failed to reach the API. Check your API key and connection."
                 let errorMsg = AgentMessage(
                     id: UUID(), role: .assistant,
-                    content: "Failed to reach the API. Check your API key and connection.",
+                    content: errorText,
                     timestamp: Date(), toolCalls: nil
                 )
                 saveHistory()
+                appendRunLog(
+                    input: text,
+                    plan: plan,
+                    toolCalls: allToolCalls,
+                    status: "api_error",
+                    finalText: errorText,
+                    startedAt: startedAt,
+                    stepCount: stepCount
+                )
                 return errorMsg
             }
 
@@ -240,6 +287,15 @@ final class AgentCore: @unchecked Sendable {
                     toolCalls: allToolCalls.isEmpty ? nil : allToolCalls
                 )
                 saveHistory()
+                appendRunLog(
+                    input: text,
+                    plan: plan,
+                    toolCalls: allToolCalls,
+                    status: "completed",
+                    finalText: finalText,
+                    startedAt: startedAt,
+                    stepCount: stepCount
+                )
                 return msg
             }
 
@@ -275,6 +331,26 @@ final class AgentCore: @unchecked Sendable {
             let toolResultEntry: [String: Any] = ["role": "user", "content": toolResults]
             queue.sync { conversationHistory.append(toolResultEntry) }
         }
+
+        let limitText = "I hit the current harness step limit before finishing. Please retry with a narrower request or continue from the latest state."
+        let msg = AgentMessage(
+            id: UUID(),
+            role: .assistant,
+            content: limitText,
+            timestamp: Date(),
+            toolCalls: allToolCalls.isEmpty ? nil : allToolCalls
+        )
+        saveHistory()
+        appendRunLog(
+            input: text,
+            plan: plan,
+            toolCalls: allToolCalls,
+            status: "step_limit",
+            finalText: limitText,
+            startedAt: startedAt,
+            stepCount: stepCount
+        )
+        return msg
     }
 
     // MARK: - Anthropic API Call
@@ -348,11 +424,18 @@ final class AgentCore: @unchecked Sendable {
 
     // MARK: - System Prompt
 
-    private func buildSystemPrompt(context: AgentContext?) -> String {
+    private func buildSystemPrompt(context: AgentContext?, plan: AgentHarnessPlan) -> String {
         var parts = [
             "You are the EACC agent, embedded in a macOS menu bar app that tracks AI token consumption as a sacred \"offering\" ritual.",
             "You help users set up data collectors (recipes) to track their AI API usage across providers.",
             "You can probe APIs, create/update collector recipes, query collected data, and inspect the system for AI tools.",
+            "",
+            "Execution harness:",
+            "- Separate planning, tool execution, and final response.",
+            "- Prefer read-only discovery before mutating recipes.",
+            "- Be explicit about what is verified versus inferred.",
+            "- If you create or update a recipe, say exactly what changed and what still needs verification.",
+            plan.promptBlock,
             "",
             "When the user asks you to set up tracking for a new API, use http_probe first to understand the API format, then create_recipe to configure the collector.",
             "Always be concise and direct. Respond in the same language as the user.",
@@ -393,6 +476,243 @@ final class AgentCore: @unchecked Sendable {
         }
 
         return parts.joined(separator: "\n")
+    }
+
+    // MARK: - Harness helpers
+
+    static func buildHarnessPlan(for text: String, context: AgentContext? = nil) -> AgentHarnessPlan {
+        let normalized = text.lowercased()
+        let containsURL = normalized.contains("http://") || normalized.contains("https://")
+        let isOnboarding = normalized.contains("first time")
+            || normalized.contains("just launched")
+            || normalized.contains("set up token tracking")
+            || normalized.contains("help me set up")
+            || text.contains("第一次")
+            || text.contains("初次")
+            || text.contains("帮我设置")
+        let isSetup = containsURL
+            || normalized.contains("track")
+            || normalized.contains("setup")
+            || normalized.contains("recipe")
+            || normalized.contains("collector")
+            || normalized.contains("api")
+            || text.contains("接入")
+            || text.contains("配置")
+            || text.contains("采集")
+        let isQuery = normalized.contains("usage")
+            || normalized.contains("today")
+            || normalized.contains("cost")
+            || normalized.contains("how many")
+            || normalized.contains("total")
+            || text.contains("今天")
+            || text.contains("总共")
+            || text.contains("花费")
+            || text.contains("多少")
+            || text.contains("用量")
+
+        var goal = "Help the user with their EACC tracking workflow."
+        var suggestedTools = ["list_recipes", "query_data", "get_system_info"]
+        var successCriteria = ["answer the user's request clearly"]
+        var notes = ["keep the reply concise and in the user's language"]
+
+        if isOnboarding {
+            goal = "Inspect the local machine, discover available AI tools, and bootstrap token tracking."
+            suggestedTools = ["get_system_info", "list_recipes", "http_probe", "create_recipe", "query_data"]
+            successCriteria = [
+                "installed tools or providers are identified",
+                "missing collectors are either created or clearly described",
+                "the user knows what is tracked now versus what still needs setup",
+            ]
+            notes.append("favor discovery before creation")
+        } else if isSetup {
+            goal = "Verify the target API shape and configure or update tracking safely."
+            suggestedTools = ["http_probe", "list_recipes", "create_recipe", "update_recipe", "query_data"]
+            successCriteria = [
+                "the endpoint or API response has been verified",
+                "a collector change is only made after probe results support it",
+                "the final reply states the recipe status and next verification step",
+            ]
+            notes.append("do not create or update a recipe until the probe result is understood")
+        } else if isQuery {
+            goal = "Answer the user's usage question from collected data and mention any data gaps."
+            suggestedTools = ["query_data", "list_recipes"]
+            successCriteria = [
+                "usage numbers are reported for the requested period",
+                "data gaps or disconnected sources are called out",
+            ]
+            notes.append("prefer existing collected data over speculative setup")
+        }
+
+        if let context {
+            if context.recipes.isEmpty {
+                notes.append("no active recipes are currently loaded")
+            } else {
+                notes.append("active recipes: \(context.recipes.joined(separator: ", "))")
+            }
+
+            let connected = context.sources.filter(\.value).map(\.key).sorted()
+            if !connected.isEmpty {
+                notes.append("connected sources right now: \(connected.joined(separator: ", "))")
+            }
+        }
+
+        return AgentHarnessPlan(
+            goal: goal,
+            suggestedTools: suggestedTools,
+            successCriteria: successCriteria,
+            notes: notes
+        )
+    }
+
+    static func compactConversationHistory(
+        _ history: [[String: Any]],
+        keepRecent: Int = AgentCore.historyMessagesToKeep,
+        threshold: Int = AgentCore.historyCompactionThreshold
+    ) -> [[String: Any]] {
+        guard history.count > threshold, history.count > keepRecent else { return history }
+
+        let summarySource = Array(history.dropLast(keepRecent))
+        let recent = Array(history.suffix(keepRecent))
+        let checkpoint: [String: Any] = [
+            "role": "assistant",
+            "content": historyCheckpointSummary(from: summarySource),
+        ]
+        return [checkpoint] + recent
+    }
+
+    static func historyCheckpointSummary(from history: [[String: Any]]) -> String {
+        let userGoals = history.compactMap { message -> String? in
+            guard (message["role"] as? String) == "user",
+                  let text = plainText(from: message["content"]),
+                  !text.isEmpty
+            else { return nil }
+            return shortened(text, limit: 120)
+        }
+
+        let assistantNotes = history.compactMap { message -> String? in
+            guard (message["role"] as? String) == "assistant",
+                  let text = plainText(from: message["content"]),
+                  !text.isEmpty
+            else { return nil }
+            return shortened(text, limit: 120)
+        }
+
+        let toolNames = Array(history.flatMap(extractToolNames(from:)).prefix(8))
+        var lines = ["Checkpoint summary for prior context:"]
+
+        if !userGoals.isEmpty {
+            lines.append("- Earlier user requests: \(userGoals.prefix(3).joined(separator: " | "))")
+        }
+        if !assistantNotes.isEmpty {
+            lines.append("- Prior assistant notes: \(assistantNotes.prefix(3).joined(separator: " | "))")
+        }
+        if !toolNames.isEmpty {
+            lines.append("- Tools already used: \(toolNames.joined(separator: ", "))")
+        }
+
+        lines.append("- Continue from the recent messages and avoid repeating completed work.")
+        return lines.joined(separator: "\n")
+    }
+
+    private static func plainText(from content: Any?) -> String? {
+        if let text = content as? String {
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        if let blocks = content as? [[String: Any]] {
+            let text = blocks.compactMap { block -> String? in
+                guard let type = block["type"] as? String else { return nil }
+                switch type {
+                case "text":
+                    return block["text"] as? String
+                case "tool_result":
+                    return block["content"] as? String
+                default:
+                    return nil
+                }
+            }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            return text.isEmpty ? nil : text
+        }
+
+        return nil
+    }
+
+    private static func extractToolNames(from message: [String: Any]) -> [String] {
+        guard let blocks = message["content"] as? [[String: Any]] else { return [] }
+        return blocks.compactMap { block in
+            guard (block["type"] as? String) == "tool_use" else { return nil }
+            return block["name"] as? String
+        }
+    }
+
+    private static func shortened(_ text: String, limit: Int) -> String {
+        guard text.count > limit else { return text }
+        return String(text.prefix(limit)) + "…"
+    }
+
+    private func appendRunLog(
+        input: String,
+        plan: AgentHarnessPlan,
+        toolCalls: [ToolCallInfo],
+        status: String,
+        finalText: String,
+        startedAt: Date,
+        stepCount: Int
+    ) {
+        try? FileManager.default.createDirectory(at: Self.agentDir, withIntermediateDirectories: true)
+
+        let iso = ISO8601DateFormatter()
+        let record: [String: Any] = [
+            "timestamp": iso.string(from: Date()),
+            "status": status,
+            "input": Self.shortened(input, limit: 300),
+            "goal": plan.goal,
+            "suggested_tools": plan.suggestedTools,
+            "success_criteria": plan.successCriteria,
+            "notes": plan.notes,
+            "step_count": stepCount,
+            "duration_ms": Int(Date().timeIntervalSince(startedAt) * 1000),
+            "tool_calls": toolCalls.map { tool in
+                [
+                    "name": tool.toolName,
+                    "input": Self.shortened(Self.jsonString(from: tool.input) ?? "{}", limit: 300),
+                    "output_preview": Self.shortened(tool.output, limit: 300),
+                ] as [String: Any]
+            },
+            "final_response": Self.shortened(finalText, limit: 400),
+        ]
+
+        guard JSONSerialization.isValidJSONObject(record),
+              let data = try? JSONSerialization.data(withJSONObject: record),
+              var line = String(data: data, encoding: .utf8)
+        else { return }
+
+        line.append("\n")
+        guard let lineData = line.data(using: .utf8) else { return }
+
+        if FileManager.default.fileExists(atPath: Self.runsPath.path) {
+            guard let handle = try? FileHandle(forWritingTo: Self.runsPath) else { return }
+            defer { try? handle.close() }
+            do {
+                try handle.seekToEnd()
+                try handle.write(contentsOf: lineData)
+            } catch {
+                return
+            }
+        } else {
+            try? lineData.write(to: Self.runsPath)
+        }
+    }
+
+    private static func jsonString(from object: Any) -> String? {
+        guard JSONSerialization.isValidJSONObject(object),
+              let data = try? JSONSerialization.data(withJSONObject: object),
+              let text = String(data: data, encoding: .utf8)
+        else { return nil }
+        return text
     }
 
     // MARK: - API Key persistence (~/.eacc/agent/config.json)
@@ -446,6 +766,10 @@ final class AgentCore: @unchecked Sendable {
 
     private static let historyPath: URL = {
         agentDir.appendingPathComponent("history.json")
+    }()
+
+    private static let runsPath: URL = {
+        agentDir.appendingPathComponent("runs.jsonl")
     }()
 
     private static let maxHistoryMessages = 50

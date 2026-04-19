@@ -1,10 +1,9 @@
-import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import { useStore } from '../stores/store';
 import { useTokenData } from '../hooks/useTokenData';
-import { THEMES, formatTokenCount, formatUSD } from '@eacc/shared';
+import { THEMES, formatTokenCount } from '@eacc/shared';
 import { LaughingMan } from './LaughingMan';
-import { BladeRunnerEye } from './BladeRunnerEye';
-import { NervHex } from './NervHex';
+import { OrigamiUnicorn } from './OrigamiUnicorn';
 import { VoidMonolith } from './VoidMonolith';
 
 // Matrix digital rain — canvas-based falling characters
@@ -174,19 +173,22 @@ function TokenHero() {
   const displayValue = tokenData
     ? formatTokenCount(tokenData.totalTokens)
     : '—';
-
-  const costDisplay = tokenData && tokenData.totalCostUSD > 0
-    ? formatUSD(tokenData.totalCostUSD)
-    : null;
-
-  const subtitle = (mode === 'cli' && !wsConnected)
-    ? 'Connection lost'
-    : !tokenData
-      ? 'Begin your offering.'
-      : null;
+  let subtitle: string | null = null;
+  if (mode === 'cli' && !wsConnected) {
+    subtitle = 'Connection lost';
+  } else if (!tokenData) {
+    subtitle = 'Begin your offering.';
+  }
 
   const isWide = typeof window !== 'undefined' && window.innerWidth >= 1280;
   const isMatrix = theme === 'matrix';
+  const isVoid = theme === 'void';
+  let heroBackground = `radial-gradient(ellipse, ${t.surfaceStrong} 0%, ${t.surfaceSoft} 34%, transparent 72%)`;
+  if (isMatrix) {
+    heroBackground = 'radial-gradient(ellipse, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.52) 46%, transparent 74%)';
+  } else if (isVoid) {
+    heroBackground = 'radial-gradient(ellipse, rgba(255,255,255,0.84) 0%, rgba(224,224,218,0.74) 28%, rgba(188,188,182,0.2) 56%, transparent 76%)';
+  }
 
   return (
     <div style={heroStyles.container}>
@@ -198,9 +200,7 @@ function TokenHero() {
           transform: 'translate(-50%, -50%)',
           width: isMatrix ? '128%' : '120%',
           height: isMatrix ? '220%' : '200%',
-          background: isMatrix
-            ? 'radial-gradient(ellipse, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.52) 46%, transparent 74%)'
-            : `radial-gradient(ellipse, ${t.surfaceStrong} 0%, ${t.surfaceSoft} 34%, transparent 72%)`,
+          background: heroBackground,
           filter: 'blur(4px)',
           zIndex: -2,
         }}
@@ -290,19 +290,20 @@ function GlowOverlay() {
 export function AltarScene() {
   const theme = useStore((s) => s.theme);
   const isMatrix = theme === 'matrix';
-
-  const isCyber = theme === 'cyber';
-  const isAmber = theme === 'amber';
-  const isVoid = theme === 'void';
+  let ornament: React.ReactNode = null;
+  if (theme === 'cyber') {
+    ornament = <LaughingMan />;
+  } else if (theme === 'amber') {
+    ornament = <OrigamiUnicorn />;
+  } else if (theme === 'void') {
+    ornament = <VoidMonolith />;
+  }
 
   return (
     <div style={{ ...altarStyles.container, height: isMatrix ? '100vh' : '70vh' }}>
       <GlowOverlay />
       {isMatrix ? <MatrixRain /> : <CSSParticles />}
-      {isCyber && <LaughingMan />}
-      {isAmber && <BladeRunnerEye />}
-      {isAmber && <div style={{ opacity: 0.04 }}><NervHex /></div>}
-      {isVoid && <VoidMonolith />}
+      {ornament}
       <TokenHero />
     </div>
   );

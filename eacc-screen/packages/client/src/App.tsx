@@ -12,17 +12,65 @@ import { Setup } from './setup/Setup';
 import { useAudioController } from './hooks/useAudio';
 import { useFocusTimerController } from './hooks/useFocusTimer';
 import { FocusTimer } from './focus/FocusTimer';
+import { MarketRite } from './market/MarketRite';
+import type { ThemeName } from '@eacc/shared';
+
+interface AltarControlProfile {
+  marketSigil: string;
+  marketLabel: string;
+  setupLabel: string;
+}
+
+const SETUP_CONTROL_SIGIL = '⚙';
+
+const ALTAR_CONTROL_PROFILES: Record<ThemeName, AltarControlProfile> = {
+  cyber: {
+    marketSigil: '⌬',
+    marketLabel: 'relay',
+    setupLabel: 'shell',
+  },
+  matrix: {
+    marketSigil: '∴',
+    marketLabel: 'thread',
+    setupLabel: 'node',
+  },
+  amber: {
+    marketSigil: '◈',
+    marketLabel: 'covenant',
+    setupLabel: 'unicorn',
+  },
+  void: {
+    marketSigil: '▮',
+    marketLabel: 'archive',
+    setupLabel: 'monolith',
+  },
+};
 
 export function App() {
   const theme = useStore((s) => s.theme);
   const tokenData = useStore((s) => s.tokenData);
   const setupOpen = useStore((s) => s.setupOpen);
   const toggleSetup = useStore((s) => s.toggleSetup);
+  const setSetupOpen = useStore((s) => s.setSetupOpen);
+  const marketOpen = useStore((s) => s.marketOpen);
+  const toggleMarket = useStore((s) => s.toggleMarket);
+  const setMarketOpen = useStore((s) => s.setMarketOpen);
+  const marketState = useStore((s) => s.marketState);
   const { send } = useWebSocket();
   useApiPolling();
   useAudioController();
   useFocusTimerController();
   const t = THEMES[theme];
+  const controlProfile = ALTAR_CONTROL_PROFILES[theme];
+  const hasMarketSignals = Boolean(
+    marketState && (
+      marketState.listings.length > 0
+      || marketState.seller
+      || marketState.serverMode !== 'standalone'
+      || marketState.operatorControlsAvailable
+      || marketState.blacklist.length > 0
+    )
+  );
 
   // Set color-scheme for light/dark themes
   useEffect(() => {
@@ -44,6 +92,11 @@ export function App() {
     }
   }, [tokenData, setupOpen, toggleSetup]);
 
+  const openMarketFromSetup = useCallback(() => {
+    setSetupOpen(false);
+    setMarketOpen(true);
+  }, [setMarketOpen, setSetupOpen]);
+
   const cssVars = {
     '--bg': t.bg,
     '--surface-strong': t.surfaceStrong,
@@ -59,7 +112,30 @@ export function App() {
     '--scripture-font': t.scriptureFont,
     '--data-font': t.dataFont,
     '--crt-opacity': t.isLightTheme ? '0.03' : '0.07',
+    '--vignette-strength': t.isLightTheme ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.46)',
+    '--ambient-top': t.isLightTheme ? 'rgba(236, 236, 230, 0.88)' : t.surfaceStrong,
+    '--ambient-mid': t.isLightTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.14)',
+    '--ambient-bottom': t.isLightTheme ? 'rgba(222, 222, 216, 0.82)' : t.surfaceSoft,
+    '--ambient-side': t.isLightTheme ? 'rgba(0, 0, 0, 0.1)' : 'rgba(0, 0, 0, 0.22)',
+    '--focus-core': t.isLightTheme ? 'rgba(255, 255, 255, 0.58)' : t.surfaceSoft,
+    '--focus-ring': t.isLightTheme ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.12)',
+    '--focus-side-left': t.isLightTheme ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.3)',
+    '--focus-side-right': t.isLightTheme ? 'rgba(0, 0, 0, 0.1)' : 'rgba(0, 0, 0, 0.28)',
   } as React.CSSProperties;
+
+  const controlBackground = t.isLightTheme
+    ? 'linear-gradient(180deg, rgba(255,255,255,0.9), rgba(226,226,220,0.78))'
+    : `linear-gradient(180deg, ${t.surfaceSoft}, rgba(0,0,0,0.02))`;
+  const controlBorder = t.isLightTheme ? 'rgba(0,0,0,0.18)' : t.surfaceBorder;
+  const controlBoxShadow = t.isLightTheme
+    ? '0 0 0 1px rgba(255,255,255,0.4) inset'
+    : 'none';
+  const sharedControlButtonStyle = {
+    borderColor: controlBorder,
+    background: controlBackground,
+    boxShadow: controlBoxShadow,
+  };
+  const setupButtonLeft = hasMarketSignals ? 'calc(50% + 30px)' : '50%';
 
   return (
     <div style={{ ...cssVars, ...styles.root }} onClick={handleFirstClick}>
@@ -84,15 +160,55 @@ export function App() {
         <FocusTimer />
         <Pulse />
         <Chant />
+        {(hasMarketSignals || marketOpen) && (
+          <button
+            className="market-btn"
+            onClick={(e) => { e.stopPropagation(); toggleMarket(); }}
+            style={{
+              ...styles.marketButton,
+              ...sharedControlButtonStyle,
+              opacity: t.isLightTheme ? 0.62 : styles.marketButton.opacity,
+            }}
+            title="Market Rite"
+            aria-label="Open Market Rite"
+          >
+            <span style={{ ...styles.controlGlyph, color: t.fireCore }}>{controlProfile.marketSigil}</span>
+            <span
+              style={{
+                ...styles.controlLabel,
+                color: t.isLightTheme ? t.fireCore : styles.controlLabel.color,
+                opacity: t.isLightTheme ? 0.82 : styles.controlLabel.opacity,
+              }}
+            >
+              {controlProfile.marketLabel}
+            </span>
+          </button>
+        )}
         <button
           className="setup-btn"
           onClick={(e) => { e.stopPropagation(); toggleSetup(); }}
-          style={styles.setupButton}
+          style={{
+            ...styles.setupButton,
+            ...sharedControlButtonStyle,
+            left: setupButtonLeft,
+            opacity: t.isLightTheme ? 0.56 : styles.setupButton.opacity,
+          }}
           title="Configure"
+          aria-label="Open Configure panel"
         >
-          ⚙
+          <span style={{ ...styles.controlGlyph, color: t.textSecondary }}>{SETUP_CONTROL_SIGIL}</span>
+          <span
+            style={{
+              ...styles.controlLabel,
+              color: t.isLightTheme ? t.textSecondary : styles.controlLabel.color,
+              opacity: t.isLightTheme ? 0.78 : styles.controlLabel.opacity,
+            }}
+          >
+            {controlProfile.setupLabel}
+          </span>
         </button>
-        {setupOpen && <Setup send={send} onClose={toggleSetup} />}
+        {marketOpen && <MarketRite onClose={toggleMarket} />}
+        {setupOpen && <Setup send={send} onClose={toggleSetup} onOpenMarket={openMarketFromSetup} hasMarketSignals={hasMarketSignals} />}
       </div>
     </div>
   );
@@ -165,7 +281,7 @@ const globalStyles = `
     background: radial-gradient(
       ellipse at center,
       transparent 44%,
-      rgba(0, 0, 0, 0.46) 100%
+      var(--vignette-strength, rgba(0, 0, 0, 0.46)) 100%
     );
   }
 
@@ -175,13 +291,30 @@ const globalStyles = `
     pointer-events: none;
     z-index: 3;
     background:
-      linear-gradient(180deg, var(--surface-strong) 0%, rgba(0, 0, 0, 0.14) 16%, rgba(0, 0, 0, 0.04) 55%, var(--surface-soft) 100%),
-      linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0%, transparent 18%, transparent 82%, rgba(0, 0, 0, 0.22) 100%);
+      linear-gradient(180deg, var(--ambient-top) 0%, var(--ambient-mid) 16%, rgba(0, 0, 0, 0.04) 55%, var(--ambient-bottom) 100%),
+      linear-gradient(90deg, var(--ambient-side) 0%, transparent 18%, transparent 82%, var(--ambient-side) 100%);
   }
 
   @keyframes haloBreathe {
     0%, 100% { opacity: 0.8; transform: scale(1); }
     50% { opacity: 1; transform: scale(1.04); }
+  }
+
+  @keyframes eclipseCorona {
+    0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+    50% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+  }
+
+  @keyframes eclipseRays {
+    0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+    33% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.08); }
+    66% { opacity: 0.6; transform: translate(-50%, -50%) scale(0.96); }
+  }
+
+  @keyframes eclipseDiamond {
+    0%, 100% { opacity: 0.4; transform: translateX(-50%) scale(0.8); }
+    40% { opacity: 1; transform: translateX(-50%) scale(1.2); }
+    70% { opacity: 0.6; transform: translateX(-50%) scale(1); }
   }
 
   .focus-halo {
@@ -190,9 +323,9 @@ const globalStyles = `
     pointer-events: none;
     z-index: 4;
     background:
-      radial-gradient(circle at 50% 44%, var(--surface-soft) 0%, rgba(0, 0, 0, 0.12) 20%, transparent 42%),
-      radial-gradient(circle at 15% 85%, rgba(0, 0, 0, 0.3) 0%, transparent 30%),
-      radial-gradient(circle at 85% 85%, rgba(0, 0, 0, 0.28) 0%, transparent 28%);
+      radial-gradient(circle at 50% 44%, var(--focus-core) 0%, var(--focus-ring) 20%, transparent 42%),
+      radial-gradient(circle at 15% 85%, var(--focus-side-left) 0%, transparent 30%),
+      radial-gradient(circle at 85% 85%, var(--focus-side-right) 0%, transparent 28%);
     animation: haloBreathe 8s ease-in-out infinite;
   }
 
@@ -236,9 +369,15 @@ const globalStyles = `
   .setup-btn:hover {
     opacity: 0.8 !important;
   }
+  .market-btn:hover {
+    opacity: 0.8 !important;
+  }
+  .market-btn:hover, .setup-btn:hover {
+    transform: translateX(-50%) translateY(-2px);
+  }
 
   /* Focus visible for keyboard accessibility */
-  button:focus-visible, input:focus-visible {
+  button:focus-visible, input:focus-visible, textarea:focus-visible {
     outline: 2px solid var(--fire-core);
     outline-offset: 2px;
   }
@@ -315,21 +454,56 @@ const styles: Record<string, React.CSSProperties> = {
   setupButton: {
     position: 'absolute',
     bottom: 12,
-    left: '50%',
     transform: 'translateX(-50%)',
-    background: 'none',
-    border: 'none',
-    color: 'var(--text-secondary)',
-    fontSize: 24,
+    appearance: 'none',
+    borderWidth: 1,
+    borderStyle: 'solid',
     cursor: 'pointer',
-    opacity: 0.7,
+    opacity: 0.4,
     zIndex: 10,
-    padding: 12,
-    minWidth: 44,
+    padding: '6px 10px',
+    minWidth: 56,
     minHeight: 44,
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'opacity 0.3s',
+    transition: 'opacity 0.3s, transform 0.3s, box-shadow 0.3s',
+    gap: 2,
+    borderRadius: 0,
+  },
+  marketButton: {
+    position: 'absolute',
+    bottom: 12,
+    left: 'calc(50% - 30px)',
+    transform: 'translateX(-50%)',
+    appearance: 'none',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    cursor: 'pointer',
+    opacity: 0.48,
+    zIndex: 10,
+    padding: '6px 10px',
+    minWidth: 56,
+    minHeight: 44,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'opacity 0.3s, transform 0.3s, box-shadow 0.3s',
+    gap: 2,
+    borderRadius: 0,
+  },
+  controlGlyph: {
+    fontSize: 15,
+    lineHeight: 1,
+  },
+  controlLabel: {
+    fontSize: 8,
+    letterSpacing: '0.22em',
+    textTransform: 'uppercase',
+    color: 'var(--text-secondary)',
+    lineHeight: 1,
+    opacity: 0.72,
   },
 };

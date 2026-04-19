@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TokenData, ThemeName, Milestone, SessionInfo } from '@eacc/shared';
+import type { TokenData, ThemeName, Milestone, SessionInfo, MarketState } from '@eacc/shared';
 
 export type AppMode = 'cli' | 'web';
 export type AudioSourceKind = 'default' | 'youtube' | 'local';
@@ -17,8 +17,11 @@ interface EACCStore {
   mode: AppMode;
   wsConnected: boolean;
   setupOpen: boolean;
+  marketOpen: boolean;
   milestone: Milestone | null;
   sessions: SessionInfo[];
+  marketState: MarketState | null;
+  buyerAlias: string;
   audioSource: AudioSource;
   audioPlaying: boolean;
   audioVolume: number;
@@ -33,9 +36,13 @@ interface EACCStore {
   setMode: (mode: AppMode) => void;
   toggleSetup: () => void;
   setSetupOpen: (open: boolean) => void;
+  toggleMarket: () => void;
+  setMarketOpen: (open: boolean) => void;
   setMilestone: (m: Milestone | null) => void;
   setWsConnected: (connected: boolean) => void;
   setSessions: (sessions: SessionInfo[]) => void;
+  setMarketState: (marketState: MarketState | null) => void;
+  setBuyerAlias: (buyerAlias: string) => void;
   setAudioSource: (source: AudioSource) => void;
   setAudioPlaying: (playing: boolean) => void;
   setAudioVolume: (volume: number) => void;
@@ -54,6 +61,7 @@ const DEFAULT_AUDIO_SOURCE: AudioSource = {
 };
 
 const LS_THEME = 'ritual-theme';
+const LS_BUYER_ALIAS = 'ritual-market-buyer-alias';
 
 function loadTheme(): ThemeName {
   const saved = localStorage.getItem(LS_THEME);
@@ -72,8 +80,11 @@ export const useStore = create<EACCStore>((set) => ({
   mode: 'cli',
   wsConnected: false,
   setupOpen: false,
+  marketOpen: false,
   milestone: null,
   sessions: [],
+  marketState: null,
+  buyerAlias: localStorage.getItem(LS_BUYER_ALIAS) || '',
   audioSource: DEFAULT_AUDIO_SOURCE,
   audioPlaying: false,
   audioVolume: 0.4,
@@ -91,9 +102,16 @@ export const useStore = create<EACCStore>((set) => ({
   setMode: (mode) => set({ mode }),
   toggleSetup: () => set((s) => ({ setupOpen: !s.setupOpen })),
   setSetupOpen: (open) => set({ setupOpen: open }),
+  toggleMarket: () => set((s) => ({ marketOpen: !s.marketOpen })),
+  setMarketOpen: (marketOpen) => set({ marketOpen }),
   setMilestone: (milestone) => set({ milestone }),
   setWsConnected: (connected) => set({ wsConnected: connected }),
   setSessions: (sessions) => set({ sessions }),
+  setMarketState: (marketState) => set({ marketState }),
+  setBuyerAlias: (buyerAlias) => {
+    localStorage.setItem(LS_BUYER_ALIAS, buyerAlias);
+    set({ buyerAlias });
+  },
   setAudioSource: (audioSource) => set({ audioSource }),
   setAudioPlaying: (audioPlaying) => set({ audioPlaying }),
   setAudioVolume: (audioVolume) => set({ audioVolume }),

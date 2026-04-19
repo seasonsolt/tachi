@@ -87,7 +87,8 @@ export type WSMessage =
   | { type: 'error'; source: string; message: string }
   | { type: 'connected'; sources: string[] }
   | { type: 'session_update'; sessions: SessionInfo[] }
-  | { type: 'theme_change'; theme: ThemeName };
+  | { type: 'theme_change'; theme: ThemeName }
+  | { type: 'market_state'; market: MarketState };
 
 export type WSClientMessage =
   | { type: 'configure'; config: Partial<EACCConfig> }
@@ -101,6 +102,133 @@ export interface EACCConfig {
   openaiKey?: string;
   pollIntervalMs: number;
   port: number;
+  market?: MarketConfig;
+}
+
+export type MarketServerMode = 'standalone' | 'hub' | 'seller';
+
+export type MarketListingStatus =
+  | 'locked'
+  | 'connecting'
+  | 'online'
+  | 'offline'
+  | 'disabled'
+  | 'error';
+
+export interface MarketConfig {
+  mode?: MarketServerMode;
+  hubUrl?: string;
+  seller?: MarketSellerLocalConfig;
+}
+
+export interface MarketSellerLocalConfig {
+  sellerId: string;
+  listingId: string;
+  sellerAlias: string;
+  endpoint: string;
+  endpointHost: string;
+  model: string;
+  publicNote?: string;
+  capabilityTokenPreview: string;
+  enabled: boolean;
+}
+
+export interface MarketVaultRecord {
+  version: 1;
+  sellerId: string;
+  listingId: string;
+  sellerAlias: string;
+  endpoint: string;
+  model: string;
+  publicNote?: string;
+  endpointHost: string;
+  salt: string;
+  iv: string;
+  authTag: string;
+  ciphertext: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface MarketSellerSecretBundle {
+  apiKey: string;
+  capabilityToken: string;
+}
+
+export interface MarketUsageLedger {
+  requestCount: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  lastRequestAt: number | null;
+  lastBuyerAlias: string | null;
+}
+
+export interface MarketListing {
+  listingId: string;
+  sellerId: string;
+  sellerAlias: string;
+  endpointHost: string;
+  model: string;
+  publicNote?: string;
+  capabilityTokenPreview: string;
+  status: MarketListingStatus;
+  disabled: boolean;
+  requestCount: number;
+  totalTokens: number;
+  lastSeenAt: number;
+  lastRequestAt: number | null;
+}
+
+export interface MarketSellerSummary {
+  sellerId: string;
+  listingId: string;
+  sellerAlias: string;
+  endpoint?: string;
+  endpointHost: string;
+  model: string;
+  publicNote?: string;
+  hubUrl: string | null;
+  status: MarketListingStatus;
+  enabled: boolean;
+  hasLocalVault: boolean;
+  hasUnlockedSecret: boolean;
+  capabilityTokenPreview: string;
+  lastError?: string | null;
+}
+
+export interface MarketBuyerRequest {
+  listingId: string;
+  prompt: string;
+  buyerAlias?: string;
+  maxTokens?: number;
+}
+
+export interface MarketUsageResult {
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface MarketBuyerResponse {
+  requestId: string;
+  listingId: string;
+  sellerAlias: string;
+  model: string;
+  outputText: string;
+  usage: MarketUsageResult;
+  latencyMs: number;
+  completedAt: number;
+  error?: string;
+}
+
+export interface MarketState {
+  serverMode: MarketServerMode;
+  hubUrl: string | null;
+  seller: MarketSellerSummary | null;
+  listings: MarketListing[];
+  blacklist: string[];
+  operatorControlsAvailable: boolean;
 }
 
 // === Milestones ===

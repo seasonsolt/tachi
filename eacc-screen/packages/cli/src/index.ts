@@ -1,11 +1,21 @@
 #!/usr/bin/env node
 
 import { DEFAULT_PORT } from '@eacc/shared';
+import type { MarketServerMode } from '@eacc/shared';
 import { startServer } from './server.js';
 
-function parseArgs(argv: string[]): { port: number; noOpen: boolean } {
+interface ParsedArgs {
+  port: number;
+  noOpen: boolean;
+  marketMode?: MarketServerMode;
+  marketHubUrl?: string | null;
+}
+
+function parseArgs(argv: string[]): ParsedArgs {
   let port = DEFAULT_PORT;
   let noOpen = false;
+  let marketMode: MarketServerMode | undefined;
+  let marketHubUrl: string | null = null;
 
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
@@ -17,18 +27,32 @@ function parseArgs(argv: string[]): { port: number; noOpen: boolean } {
       if (isNaN(port)) port = DEFAULT_PORT;
     } else if (arg === '--no-open') {
       noOpen = true;
+    } else if (arg === '--market-mode' && i + 1 < argv.length) {
+      const mode = argv[++i];
+      if (mode === 'hub' || mode === 'seller' || mode === 'standalone') {
+        marketMode = mode;
+      }
+    } else if (arg.startsWith('--market-mode=')) {
+      const mode = arg.split('=')[1];
+      if (mode === 'hub' || mode === 'seller' || mode === 'standalone') {
+        marketMode = mode;
+      }
+    } else if (arg === '--market-hub' && i + 1 < argv.length) {
+      marketHubUrl = argv[++i];
+    } else if (arg.startsWith('--market-hub=')) {
+      marketHubUrl = arg.split('=')[1] || null;
     }
   }
 
-  return { port, noOpen };
+  return { port, noOpen, marketMode, marketHubUrl };
 }
 
 async function main() {
-  const { port, noOpen } = parseArgs(process.argv);
+  const { port, noOpen, marketMode, marketHubUrl } = parseArgs(process.argv);
 
   console.log('\n  \x1b[33m\u{1F525} Igniting the altar...\x1b[0m\n');
 
-  const { close } = startServer(port);
+  const { close } = startServer(port, { marketMode, marketHubUrl });
 
   const url = `http://localhost:${port}`;
   console.log(`  \x1b[2mServing at\x1b[0m \x1b[36m${url}\x1b[0m\n`);
@@ -42,7 +66,6 @@ async function main() {
     }
   }
 
-  // Graceful shutdown
   const shutdown = () => {
     console.log('\n  \x1b[2mExtinguishing the flame...\x1b[0m\n');
     close();
