@@ -75,6 +75,7 @@ export function App() {
   const [scripture, setScripture] = useState(0);
   const [visible, setVisible] = useState(true);
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
+  const [connectedSources, setConnectedSources] = useState<string[]>([]);
   const [panelStatus, setPanelStatus] = useState<PanelStatus>('connecting');
   const [lastMilestone, setLastMilestone] = useState<string | null>(null);
 
@@ -103,6 +104,10 @@ export function App() {
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
+          if (message.type === 'connected') {
+            setConnectedSources(message.sources ?? []);
+            setPanelStatus('live');
+          }
           if (message.type === 'token_update') {
             setTokenData(message.data);
             setPanelStatus('live');
@@ -137,18 +142,22 @@ export function App() {
   const liveTelemetry = useMemo(() => {
     if (!tokenData) return fallbackTelemetry;
     return [
-      ['rate', tokenData.tokensPerSecond > 0 ? `${formatCompact(tokenData.tokensPerSecond)}/s` : 'listening'],
-      ['today', formatCompact(tokenData.todayTokens)],
+      ['total', formatCompact(tokenData.totalTokens)],
       ['month', formatCompact(tokenData.monthTokens)],
+      ['cost', formatCost(tokenData.totalCostUSD)],
       ['panel', panelStatus],
     ];
   }, [panelStatus, tokenData]);
 
   const claudeStatus = tokenData?.sources.claudeCode.connected ? 'live' : 'silent';
-  const sourceCount = connectedCount(tokenData);
+  const sourceCount = connectedSources.length || connectedCount(tokenData);
+  const totalOffering = formatCompact(tokenData?.totalTokens);
+  const totalCost = formatCost(tokenData?.totalCostUSD);
+  const dataIntensity = tokenData?.totalTokens ? Math.min(1, Math.log10(tokenData.totalTokens) / 11) : 0.28;
+  const sourceLabel = connectedSources.length ? connectedSources.join(' · ') : 'local altar';
 
   return (
-    <main className="site">
+    <main className="site" style={{ '--intensity': dataIntensity } as React.CSSProperties}>
       <style>{styles}</style>
 
       <nav className="nav" aria-label="Primary navigation">
@@ -177,6 +186,7 @@ export function App() {
           <p className="kicker">public altar · private offerings</p>
           <h1 id="hero-title">The altar is fed by tokens.</h1>
           <p className={`apparition ${visible ? 'visible' : ''}`}>{lastMilestone ?? scriptures[scripture]}</p>
+          <p className="liveLine">{panelStatus === 'live' ? `${totalOffering} tokens have passed through this local altar.` : 'waiting for eacc panel…'}</p>
         </div>
 
         <aside className="telemetry" aria-label="Token telemetry">
@@ -218,7 +228,7 @@ export function App() {
 
         <div className="console" aria-label="EACC panel preview">
           <div className="consoleTop">
-            <span>local altar</span>
+            <span>{sourceLabel}</span>
             <span className={`statusDot ${panelStatus}`}>{panelStatus}</span>
           </div>
           <div className="consoleMetric">
@@ -227,7 +237,7 @@ export function App() {
           </div>
           <div className="consoleGrid">
             <div><span>month</span><strong>{formatCompact(tokenData?.monthTokens)}</strong></div>
-            <div><span>cost</span><strong>{formatCost(tokenData?.totalCostUSD)}</strong></div>
+            <div><span>total cost</span><strong>{totalCost}</strong></div>
             <div><span>claude code</span><strong>{claudeStatus}</strong></div>
             <div><span>sources</span><strong>{sourceCount || '—'}</strong></div>
           </div>
@@ -272,9 +282,9 @@ a { color: inherit; text-decoration: none; }
 .site {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 50% 10%, rgba(139, 92, 246, 0.11), transparent 34rem),
-    radial-gradient(circle at 82% 46%, rgba(251, 113, 133, 0.08), transparent 28rem),
-    radial-gradient(circle at 16% 68%, rgba(103, 232, 249, 0.07), transparent 26rem),
+    radial-gradient(circle at 50% 10%, rgba(139, 92, 246, calc(0.07 + var(--intensity) * 0.14)), transparent 34rem),
+    radial-gradient(circle at 82% 46%, rgba(251, 113, 133, calc(0.04 + var(--intensity) * 0.1)), transparent 28rem),
+    radial-gradient(circle at 16% 68%, rgba(103, 232, 249, calc(0.04 + var(--intensity) * 0.1)), transparent 26rem),
     #050507;
   color: var(--fg);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -333,8 +343,8 @@ a { color: inherit; text-decoration: none; }
   border-radius: 50%;
   background: conic-gradient(from 180deg, transparent, rgba(103,232,249,.12), rgba(139,92,246,.2), rgba(251,113,133,.13), transparent 74%);
   filter: blur(18px);
-  opacity: .78;
-  animation: turn 22s linear infinite;
+  opacity: calc(.52 + var(--intensity) * .38);
+  animation: turn calc(32s - var(--intensity) * 14s) linear infinite;
 }
 .aura {
   position: absolute;
@@ -359,7 +369,7 @@ a { color: inherit; text-decoration: none; }
     radial-gradient(circle at 50% 50%, rgba(5,5,7,1) 0 24%, rgba(5,5,7,.72) 36%, transparent 68%),
     conic-gradient(from 90deg, rgba(244,239,231,.08), rgba(139,92,246,.34), rgba(103,232,249,.24), rgba(251,113,133,.28), rgba(244,239,231,.08));
   box-shadow: 0 0 120px rgba(139,92,246,.22), inset 0 0 80px rgba(0,0,0,.72);
-  animation: pulse 6s ease-in-out infinite;
+  animation: pulse calc(7s - var(--intensity) * 2.8s) ease-in-out infinite;
 }
 .scan {
   position: absolute;
@@ -429,6 +439,8 @@ h2 {
   transition: opacity .8s ease, filter .8s ease;
 }
 .apparition.visible { opacity: 1; filter: blur(0); }
+.liveLine { margin: -4px 0 0; color: var(--dim); font-family: var(--mono); font-size: 12px; letter-spacing: -.02em; }
+.liveLine { margin: -4px 0 0; color: var(--dim); font-family: var(--mono); font-size: 12px; letter-spacing: -.02em; }
 .telemetry {
   position: absolute;
   right: max(24px, calc((100vw - 1180px) / 2));
@@ -520,6 +532,10 @@ h2 {
   color: var(--dim);
   padding-bottom: 18px;
 }
+.statusDot { color: var(--dim); }
+.statusDot.live { color: var(--cyan); }
+.statusDot.connecting { color: var(--amber); }
+.statusDot.offline { color: var(--rose); }
 .statusDot { color: var(--dim); }
 .statusDot.live { color: var(--cyan); }
 .statusDot.connecting { color: var(--amber); }
