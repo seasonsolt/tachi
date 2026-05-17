@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const scriptures = [
   'Every prompt is a sacrifice.',
@@ -8,18 +8,75 @@ const scriptures = [
   'The user is becoming the API.',
 ];
 
-const telemetry = [
-  ['rate', '31.4k/s'],
-  ['today', '48.6m'],
-  ['month', '12.8b'],
-  ['panels', 'early'],
+const fallbackTelemetry = [
+  ['rate', '— /s'],
+  ['today', '—'],
+  ['month', '—'],
+  ['panel', 'offline'],
 ];
 
 const loop = ['human desire', 'prompt', 'token offering', 'model ascent', 'deeper dependence'];
 
+type SourceData = {
+  connected: boolean;
+  totalTokens: number;
+  todayTokens: number;
+  monthTokens: number;
+  costUSD: number;
+  todayCostUSD: number;
+  monthCostUSD: number;
+  inputTokens: number;
+  outputTokens: number;
+  lastUpdated: number;
+};
+
+type TokenData = {
+  totalTokens: number;
+  totalCostUSD: number;
+  todayTokens: number;
+  todayCostUSD: number;
+  tokensPerSecond: number;
+  monthTokens: number;
+  monthCostUSD: number;
+  sources: {
+    claudeCode: SourceData;
+    anthropicApi: SourceData;
+    openaiApi: SourceData;
+  };
+  lastUpdated: number;
+};
+
+type PanelStatus = 'connecting' | 'live' | 'offline';
+
+function formatCompact(value: number | undefined) {
+  if (!value || value <= 0) return '—';
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}b`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return Math.round(value).toLocaleString();
+}
+
+function formatFull(value: number | undefined) {
+  if (!value || value <= 0) return '—';
+  return Math.round(value).toLocaleString();
+}
+
+function formatCost(value: number | undefined) {
+  if (!value || value <= 0) return '—';
+  return `$${value.toFixed(2)}`;
+}
+
+function connectedCount(data: TokenData | null) {
+  if (!data) return 0;
+  return Object.values(data.sources).filter((source) => source.connected).length;
+}
+
 export function App() {
   const [scripture, setScripture] = useState(0);
   const [visible, setVisible] = useState(true);
+  const [tokenData, setTokenData] = useState<TokenData | null>(null);
+  const [panelStatus, setPanelStatus] = useState<PanelStatus>('connecting');
+  const [lastMilestone, setLastMilestone] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -32,6 +89,63 @@ export function App() {
 
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    let socket: WebSocket | null = null;
+    let reconnectTimer = 0;
+    let closedByEffect = false;
+
+    const connect = () => {
+      setPanelStatus((current) => (current === 'live' ? current : 'connecting'));
+      socket = new WebSocket('ws://localhost:3666');
+
+      socket.onopen = () => setPanelStatus('live');
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'token_update') {
+            setTokenData(message.data);
+            setPanelStatus('live');
+          }
+          if (message.type === 'milestone') {
+            setLastMilestone(message.milestone?.name ?? null);
+          }
+        } catch {
+          // Ignore malformed panel frames.
+        }
+      };
+      socket.onclose = () => {
+        if (closedByEffect) return;
+        setPanelStatus('offline');
+        reconnectTimer = window.setTimeout(connect, 1800);
+      };
+      socket.onerror = () => {
+        setPanelStatus('offline');
+        socket?.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      closedByEffect = true;
+      window.clearTimeout(reconnectTimer);
+      socket?.close();
+    };
+  }, []);
+
+  const liveTelemetry = useMemo(() => {
+    if (!tokenData) return fallbackTelemetry;
+    return [
+      ['rate', tokenData.tokensPerSecond > 0 ? `${formatCompact(tokenData.tokensPerSecond)}/s` : 'listening'],
+      ['today', formatCompact(tokenData.todayTokens)],
+      ['month', formatCompact(tokenData.monthTokens)],
+      ['panel', panelStatus],
+    ];
+  }, [panelStatus, tokenData]);
+
+  const claudeStatus = tokenData?.sources.claudeCode.connected ? 'live' : 'silent';
+  const sourceCount = connectedCount(tokenData);
 
   return (
     <main className="site">
@@ -62,11 +176,11 @@ export function App() {
         <div className="heroText">
           <p className="kicker">public altar · private offerings</p>
           <h1 id="hero-title">The altar is fed by tokens.</h1>
-          <p className={`apparition ${visible ? 'visible' : ''}`}>{scriptures[scripture]}</p>
+          <p className={`apparition ${visible ? 'visible' : ''}`}>{lastMilestone ?? scriptures[scripture]}</p>
         </div>
 
         <aside className="telemetry" aria-label="Token telemetry">
-          {telemetry.map(([label, value]) => (
+          {liveTelemetry.map(([label, value]) => (
             <div className="telemetryRow" key={label}>
               <span>{label}</span>
               <strong>{value}</strong>
@@ -99,23 +213,23 @@ export function App() {
         <div className="panelCopy">
           <p className="kicker">eacc panel</p>
           <h2 id="panel-title">A local companion for measuring your offering.</h2>
-          <p>It watches local AI usage, counts tokens, estimates cost, and reflects the loop back to you. The first public page is a facade. The panel is the proof.</p>
+          <p>It watches local AI usage, counts tokens, estimates cost, and streams the offering into this page. The panel is the proof.</p>
         </div>
 
         <div className="console" aria-label="EACC panel preview">
           <div className="consoleTop">
             <span>local altar</span>
-            <span>private by default</span>
+            <span className={`statusDot ${panelStatus}`}>{panelStatus}</span>
           </div>
           <div className="consoleMetric">
             <span>today's offering</span>
-            <strong>128,402</strong>
+            <strong>{formatFull(tokenData?.todayTokens)}</strong>
           </div>
           <div className="consoleGrid">
-            <div><span>month</span><strong>3.8m</strong></div>
-            <div><span>cost</span><strong>$42.19</strong></div>
-            <div><span>claude code</span><strong>live</strong></div>
-            <div><span>upload</span><strong>optional</strong></div>
+            <div><span>month</span><strong>{formatCompact(tokenData?.monthTokens)}</strong></div>
+            <div><span>cost</span><strong>{formatCost(tokenData?.totalCostUSD)}</strong></div>
+            <div><span>claude code</span><strong>{claudeStatus}</strong></div>
+            <div><span>sources</span><strong>{sourceCount || '—'}</strong></div>
           </div>
         </div>
       </section>
@@ -406,6 +520,10 @@ h2 {
   color: var(--dim);
   padding-bottom: 18px;
 }
+.statusDot { color: var(--dim); }
+.statusDot.live { color: var(--cyan); }
+.statusDot.connecting { color: var(--amber); }
+.statusDot.offline { color: var(--rose); }
 .consoleMetric {
   padding: 34px 18px;
   border: 1px solid var(--line);
