@@ -253,7 +253,8 @@ export function App() {
       <section id="signal" className="signalSection" aria-labelledby="signal-title">
         <p className="kicker">receive the signal</p>
         <h2 id="signal-title">Enter before the panel opens.</h2>
-        <a className="button primary" href="mailto:signal@e-acc.ai?subject=EACC%20early%20access">request early access</a>
+        <p className="contactLine">Transmission goes to contact@e-acc.ai</p>
+        <a className="button primary" href="mailto:contact@e-acc.ai?subject=EACC%20early%20access&body=I%20want%20to%20receive%20the%20signal%20and%20try%20EACC%20Panel.">request early access</a>
       </section>
     </main>
   );
@@ -572,6 +573,7 @@ h2 {
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
+.contactLine { margin: -10px 0 0; color: var(--dim); font-family: var(--mono); font-size: 12px; }
 .signalSection {
   width: min(900px, calc(100% - 32px));
   margin: 80px auto 60px;
