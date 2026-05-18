@@ -293,22 +293,24 @@ export function App() {
         <h2 id="signal-title">Enter before the panel opens.</h2>
         <p className="contactLine">Transmission goes directly to contact@e-acc.ai</p>
         <form className="contactForm" onSubmit={submitContact}>
-          <input
-            type="email"
-            name="email"
-            value={contactEmail}
-            onChange={(event) => setContactEmail(event.target.value)}
-            placeholder="your@email.com"
-            autoComplete="email"
-            required
-          />
-          <textarea
-            name="message"
-            value={contactMessage}
-            onChange={(event) => setContactMessage(event.target.value)}
-            placeholder="Optional note"
-            rows={3}
-          />
+          <div className="contactFields">
+            <input
+              type="email"
+              name="email"
+              value={contactEmail}
+              onChange={(event) => setContactEmail(event.target.value)}
+              placeholder="your@email.com"
+              autoComplete="email"
+              required
+            />
+            <textarea
+              name="message"
+              value={contactMessage}
+              onChange={(event) => setContactMessage(event.target.value)}
+              placeholder="Optional note"
+              rows={3}
+            />
+          </div>
           <button className="button primary" type="submit" disabled={contactStatus === 'sending'}>
             {contactStatus === 'sending' ? 'transmitting…' : contactStatus === 'sent' ? 'signal received' : 'request early access'}
           </button>
@@ -650,19 +652,26 @@ h2 {
   font-size: clamp(4.2rem, 10vw, 10.5rem);
 }
 .contactForm {
-  width: min(560px, 100%);
-  margin-top: 12px;
+  width: min(720px, 100%);
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+}
+.contactFields {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(220px, .85fr) minmax(280px, 1.15fr);
   gap: 12px;
-  justify-items: stretch;
+  align-items: stretch;
 }
 .contactForm input,
 .contactForm textarea {
   width: 100%;
+  min-width: 0;
   border: 1px solid var(--line-strong);
   border-radius: 24px;
-  background: rgba(244,239,231,.045);
+  background: rgba(244,239,231,.055);
   color: var(--fg);
   font: inherit;
   font-family: var(--mono);
@@ -671,19 +680,22 @@ h2 {
   outline: none;
   box-shadow: none;
 }
-.contactForm input { min-height: 54px; border-radius: 999px; }
+.contactForm input { min-height: 64px; border-radius: 22px; }
 .contactForm textarea { min-height: 112px; resize: vertical; line-height: 1.55; }
 .contactForm input:focus,
-.contactForm textarea:focus { border-color: rgba(244,239,231,.52); background: rgba(244,239,231,.07); }
+.contactForm textarea:focus { border-color: rgba(244,239,231,.52); background: rgba(244,239,231,.08); }
 .contactForm input::placeholder,
-.contactForm textarea::placeholder { color: rgba(244,239,231,.38); }
+.contactForm textarea::placeholder { color: rgba(244,239,231,.42); }
 .contactForm button {
-  width: 100%;
-  min-height: 56px;
+  width: fit-content;
+  min-width: 260px;
+  min-height: 64px;
   border: 0;
   font: inherit;
   cursor: pointer;
-  margin-top: 2px;
+  align-self: center;
+  padding-inline: 34px;
+  white-space: nowrap;
 }
 .contactForm button:disabled { opacity: .68; cursor: wait; }
 .formStatus { margin: 0; color: var(--muted); font-family: var(--mono); font-size: 12px; }
@@ -707,6 +719,8 @@ h2 {
   .heroText, .signalSection { text-align: left; justify-items: start; }
   .signalSection { min-height: auto; padding: 72px 0; }
   .signalSection h2 { font-size: clamp(3.2rem, 15vw, 5.4rem); }
+  .contactFields { grid-template-columns: 1fr; }
+  .contactForm button { width: 100%; min-width: 0; }
   .button, .heroActions { width: 100%; }
   .heroActions { flex-direction: column; }
   .consoleGrid { grid-template-columns: 1fr; }
