@@ -638,32 +638,33 @@ h2 {
 .contactLine { margin: -12px 0 0; color: var(--dim); font-family: var(--mono); font-size: 12px; }
 .signalSection {
   width: min(1080px, calc(100% - 32px));
-  min-height: 88vh;
-  margin: 40px auto 60px;
-  padding: 88px 0 92px;
+  min-height: 82vh;
+  margin: 20px auto 60px;
+  padding: 64px 0 84px;
   display: grid;
   justify-items: center;
   align-content: center;
-  gap: 24px;
+  gap: 20px;
   text-align: center;
 }
 .signalSection h2 {
-  max-width: 980px;
-  font-size: clamp(4.2rem, 10vw, 10.5rem);
+  max-width: 1020px;
+  font-size: clamp(4rem, 8vw, 8.8rem);
+  line-height: .88;
 }
 .contactForm {
-  width: min(720px, 100%);
-  margin-top: 16px;
+  width: min(760px, 100%);
+  margin-top: 8px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   align-items: stretch;
 }
 .contactFields {
   display: grid;
-  grid-template-columns: minmax(220px, .85fr) minmax(280px, 1.15fr);
+  grid-template-columns: minmax(220px, .82fr) minmax(300px, 1.18fr);
   gap: 12px;
-  align-items: stretch;
+  align-items: start;
 }
 .contactForm input,
 .contactForm textarea {
@@ -680,7 +681,7 @@ h2 {
   outline: none;
   box-shadow: none;
 }
-.contactForm input { min-height: 64px; border-radius: 22px; }
+.contactForm input { min-height: 56px; height: 56px; border-radius: 999px; }
 .contactForm textarea { min-height: 112px; resize: vertical; line-height: 1.55; }
 .contactForm input:focus,
 .contactForm textarea:focus { border-color: rgba(244,239,231,.52); background: rgba(244,239,231,.08); }
@@ -688,8 +689,8 @@ h2 {
 .contactForm textarea::placeholder { color: rgba(244,239,231,.42); }
 .contactForm button {
   width: fit-content;
-  min-width: 260px;
-  min-height: 64px;
+  min-width: 240px;
+  min-height: 58px;
   border: 0;
   font: inherit;
   cursor: pointer;
