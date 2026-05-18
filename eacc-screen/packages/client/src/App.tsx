@@ -78,6 +78,10 @@ export function App() {
   const [connectedSources, setConnectedSources] = useState<string[]>([]);
   const [panelStatus, setPanelStatus] = useState<PanelStatus>('connecting');
   const [lastMilestone, setLastMilestone] = useState<string | null>(null);
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactStatus, setContactStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [contactError, setContactError] = useState('');
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -155,6 +159,40 @@ export function App() {
   const totalCost = formatCost(tokenData?.totalCostUSD);
   const dataIntensity = tokenData?.totalTokens ? Math.min(1, Math.log10(tokenData.totalTokens) / 11) : 0.28;
   const sourceLabel = connectedSources.length ? connectedSources.join(' · ') : 'local altar';
+
+  async function submitContact(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!contactEmail.trim()) return;
+
+    setContactStatus('sending');
+    setContactError('');
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: contactEmail.trim(),
+          message: contactMessage.trim(),
+          context: {
+            totalTokens: tokenData?.totalTokens ?? null,
+            monthTokens: tokenData?.monthTokens ?? null,
+            totalCostUSD: tokenData?.totalCostUSD ?? null,
+            panelStatus,
+            connectedSources,
+          },
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result?.error ?? 'Transmission failed.');
+      setContactStatus('sent');
+      setContactMessage('');
+    } catch (error) {
+      setContactStatus('error');
+      setContactError(error instanceof Error ? error.message : 'Transmission failed.');
+    }
+  }
 
   return (
     <main className="site" style={{ '--intensity': dataIntensity } as React.CSSProperties}>
@@ -253,8 +291,30 @@ export function App() {
       <section id="signal" className="signalSection" aria-labelledby="signal-title">
         <p className="kicker">receive the signal</p>
         <h2 id="signal-title">Enter before the panel opens.</h2>
-        <p className="contactLine">Transmission goes to contact@e-acc.ai</p>
-        <a className="button primary" href="mailto:contact@e-acc.ai?subject=EACC%20early%20access&body=I%20want%20to%20receive%20the%20signal%20and%20try%20EACC%20Panel.">request early access</a>
+        <p className="contactLine">Transmission goes directly to contact@e-acc.ai</p>
+        <form className="contactForm" onSubmit={submitContact}>
+          <input
+            type="email"
+            name="email"
+            value={contactEmail}
+            onChange={(event) => setContactEmail(event.target.value)}
+            placeholder="your@email.com"
+            autoComplete="email"
+            required
+          />
+          <textarea
+            name="message"
+            value={contactMessage}
+            onChange={(event) => setContactMessage(event.target.value)}
+            placeholder="Optional note"
+            rows={3}
+          />
+          <button className="button primary" type="submit" disabled={contactStatus === 'sending'}>
+            {contactStatus === 'sending' ? 'transmitting…' : contactStatus === 'sent' ? 'signal received' : 'request early access'}
+          </button>
+          {contactStatus === 'error' && <p className="formStatus error">{contactError}</p>}
+          {contactStatus === 'sent' && <p className="formStatus">Transmission received. I’ll reply from contact@e-acc.ai.</p>}
+        </form>
       </section>
     </main>
   );
