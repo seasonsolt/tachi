@@ -633,16 +633,61 @@ h2 {
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
-.contactLine { margin: -10px 0 0; color: var(--dim); font-family: var(--mono); font-size: 12px; }
+.contactLine { margin: -12px 0 0; color: var(--dim); font-family: var(--mono); font-size: 12px; }
 .signalSection {
-  width: min(900px, calc(100% - 32px));
-  margin: 80px auto 60px;
-  padding: 70px 0;
+  width: min(1080px, calc(100% - 32px));
+  min-height: 88vh;
+  margin: 40px auto 60px;
+  padding: 88px 0 92px;
   display: grid;
   justify-items: center;
+  align-content: center;
   gap: 24px;
   text-align: center;
 }
+.signalSection h2 {
+  max-width: 980px;
+  font-size: clamp(4.2rem, 10vw, 10.5rem);
+}
+.contactForm {
+  width: min(560px, 100%);
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  justify-items: stretch;
+}
+.contactForm input,
+.contactForm textarea {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: 24px;
+  background: rgba(244,239,231,.045);
+  color: var(--fg);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 14px;
+  padding: 16px 18px;
+  outline: none;
+  box-shadow: none;
+}
+.contactForm input { min-height: 54px; border-radius: 999px; }
+.contactForm textarea { min-height: 112px; resize: vertical; line-height: 1.55; }
+.contactForm input:focus,
+.contactForm textarea:focus { border-color: rgba(244,239,231,.52); background: rgba(244,239,231,.07); }
+.contactForm input::placeholder,
+.contactForm textarea::placeholder { color: rgba(244,239,231,.38); }
+.contactForm button {
+  width: 100%;
+  min-height: 56px;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  margin-top: 2px;
+}
+.contactForm button:disabled { opacity: .68; cursor: wait; }
+.formStatus { margin: 0; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.formStatus.error { color: var(--rose); }
 @keyframes turn { to { transform: translate(-50%, -50%) rotate(360deg); } }
 @keyframes drift { 0%,100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-48%, -52%) scale(1.08); } }
 @keyframes pulse { 0%,100% { transform: translate(-50%, -50%) scale(.96); opacity: .78; } 50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; } }
@@ -660,6 +705,8 @@ h2 {
   h1 { font-size: clamp(4.2rem, 19vw, 6.4rem); }
   h2 { font-size: clamp(3rem, 14vw, 5rem); }
   .heroText, .signalSection { text-align: left; justify-items: start; }
+  .signalSection { min-height: auto; padding: 72px 0; }
+  .signalSection h2 { font-size: clamp(3.2rem, 15vw, 5.4rem); }
   .button, .heroActions { width: 100%; }
   .heroActions { flex-direction: column; }
   .consoleGrid { grid-template-columns: 1fr; }
