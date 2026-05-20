@@ -329,8 +329,9 @@ const styles = `
   --fg: #f4efe7;
   --muted: rgba(244, 239, 231, 0.62);
   --dim: rgba(244, 239, 231, 0.34);
-  --line: rgba(244, 239, 231, 0.13);
-  --line-strong: rgba(244, 239, 231, 0.24);
+  --line: rgba(244, 239, 231, 0.15);
+  --line-strong: rgba(244, 239, 231, 0.34);
+  --glow: rgba(139, 92, 246, 0.42);
   --violet: #8b5cf6;
   --cyan: #67e8f9;
   --rose: #fb7185;
@@ -345,10 +346,11 @@ a { color: inherit; text-decoration: none; }
 .site {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 50% 10%, rgba(139, 92, 246, calc(0.07 + var(--intensity) * 0.14)), transparent 34rem),
-    radial-gradient(circle at 82% 46%, rgba(251, 113, 133, calc(0.04 + var(--intensity) * 0.1)), transparent 28rem),
-    radial-gradient(circle at 16% 68%, rgba(103, 232, 249, calc(0.04 + var(--intensity) * 0.1)), transparent 26rem),
-    #050507;
+    radial-gradient(circle at 50% 7%, rgba(244,239,231,.055), transparent 18rem),
+    radial-gradient(circle at 50% 18%, rgba(139, 92, 246, calc(0.12 + var(--intensity) * 0.18)), transparent 36rem),
+    radial-gradient(circle at 78% 38%, rgba(251, 113, 133, calc(0.07 + var(--intensity) * 0.13)), transparent 30rem),
+    radial-gradient(circle at 18% 62%, rgba(103, 232, 249, calc(0.065 + var(--intensity) * 0.12)), transparent 30rem),
+    linear-gradient(180deg, #030304 0%, #07070a 42%, #020203 100%);
   color: var(--fg);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow-x: hidden;
@@ -362,7 +364,19 @@ a { color: inherit; text-decoration: none; }
     linear-gradient(rgba(244,239,231,.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(244,239,231,.035) 1px, transparent 1px);
   background-size: 64px 64px;
-  mask-image: radial-gradient(circle at 50% 42%, black, transparent 72%);
+  mask-image: radial-gradient(circle at 50% 36%, black, transparent 76%);
+  opacity: .95;
+}
+.site::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 42%, transparent 0 34%, rgba(0,0,0,.58) 84%),
+    linear-gradient(180deg, rgba(244,239,231,.03), transparent 18%, transparent 82%, rgba(244,239,231,.025));
+  mix-blend-mode: multiply;
 }
 .nav {
   position: fixed;
@@ -400,13 +414,13 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(82vw, 980px);
+  width: min(92vw, 1120px);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: conic-gradient(from 180deg, transparent, rgba(103,232,249,.12), rgba(139,92,246,.2), rgba(251,113,133,.13), transparent 74%);
-  filter: blur(18px);
-  opacity: calc(.52 + var(--intensity) * .38);
+  filter: blur(10px);
+  opacity: calc(.68 + var(--intensity) * .3);
   animation: turn calc(32s - var(--intensity) * 14s) linear infinite;
 }
 .aura {
@@ -417,30 +431,30 @@ a { color: inherit; text-decoration: none; }
   transform: translate(-50%, -50%);
   mix-blend-mode: screen;
 }
-.auraOne { width: min(62vw, 760px); aspect-ratio: 1.4; background: radial-gradient(ellipse, rgba(139,92,246,.28), transparent 62%); filter: blur(34px); animation: drift 11s ease-in-out infinite; }
-.auraTwo { width: min(52vw, 640px); aspect-ratio: 1; background: radial-gradient(circle, rgba(103,232,249,.18), transparent 56%); filter: blur(26px); animation: drift 13s ease-in-out infinite reverse; }
-.auraThree { width: min(44vw, 540px); aspect-ratio: 1.6; background: radial-gradient(ellipse, rgba(251,113,133,.18), transparent 60%); filter: blur(32px); animation: drift 17s ease-in-out infinite; }
+.auraOne { width: min(74vw, 920px); aspect-ratio: 1.45; background: radial-gradient(ellipse, rgba(139,92,246,.4), transparent 64%); filter: blur(30px); animation: drift 11s ease-in-out infinite; }
+.auraTwo { width: min(62vw, 760px); aspect-ratio: 1; background: radial-gradient(circle, rgba(103,232,249,.26), transparent 58%); filter: blur(24px); animation: drift 13s ease-in-out infinite reverse; }
+.auraThree { width: min(54vw, 660px); aspect-ratio: 1.7; background: radial-gradient(ellipse, rgba(251,113,133,.25), transparent 62%); filter: blur(28px); animation: drift 17s ease-in-out infinite; }
 .core {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(26vw, 320px);
+  width: min(30vw, 380px);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background:
     radial-gradient(circle at 50% 50%, rgba(5,5,7,1) 0 24%, rgba(5,5,7,.72) 36%, transparent 68%),
     conic-gradient(from 90deg, rgba(244,239,231,.08), rgba(139,92,246,.34), rgba(103,232,249,.24), rgba(251,113,133,.28), rgba(244,239,231,.08));
-  box-shadow: 0 0 120px rgba(139,92,246,.22), inset 0 0 80px rgba(0,0,0,.72);
+  box-shadow: 0 0 90px rgba(244,239,231,.08), 0 0 180px var(--glow), inset 0 0 96px rgba(0,0,0,.82);
   animation: pulse calc(7s - var(--intensity) * 2.8s) ease-in-out infinite;
 }
 .scan {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(70vw, 860px);
+  width: min(82vw, 1040px);
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(244,239,231,.28), transparent);
+  background: linear-gradient(90deg, transparent, rgba(103,232,249,.12), rgba(244,239,231,.42), rgba(251,113,133,.14), transparent);
   transform-origin: center;
   opacity: .42;
 }
@@ -450,11 +464,12 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   left: calc(50% + (var(--i) - 21) * 2.1vw);
   top: calc(50% + sin(var(--i)) * 10px);
-  width: 2px;
-  height: 2px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
-  background: rgba(244,239,231,.7);
-  opacity: .2;
+  background: rgba(244,239,231,.82);
+  box-shadow: 0 0 18px rgba(244,239,231,.38);
+  opacity: .26;
   animation: feed 5.2s linear infinite;
   animation-delay: calc(var(--i) * -130ms);
 }
@@ -463,7 +478,7 @@ a { color: inherit; text-decoration: none; }
   text-align: center;
   display: grid;
   justify-items: center;
-  gap: 18px;
+  gap: 22px;
 }
 .kicker {
   margin: 0;
@@ -478,9 +493,10 @@ h1 {
   margin: 0;
   max-width: 920px;
   font-family: var(--serif);
-  font-size: clamp(4.4rem, 12vw, 12rem);
-  line-height: .78;
-  letter-spacing: -.085em;
+  font-size: clamp(5rem, 13vw, 13.8rem);
+  line-height: .76;
+  letter-spacing: -.095em;
+  text-shadow: 0 0 28px rgba(244,239,231,.08), 0 0 110px rgba(139,92,246,.22);
   font-weight: 400;
 }
 h2 {
@@ -540,13 +556,14 @@ h2 {
   background: rgba(244,239,231,.035);
   transition: .18s ease;
 }
-.button:hover { border-color: rgba(244,239,231,.5); background: rgba(244,239,231,.08); }
-.button.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.button:hover { border-color: rgba(244,239,231,.58); background: rgba(244,239,231,.09); transform: translateY(-1px); }
+.button.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); box-shadow: 0 0 34px rgba(244,239,231,.12); }
+.button.primary:hover { box-shadow: 0 0 54px rgba(244,239,231,.2), 0 0 90px rgba(139,92,246,.16); }
 .section {
   position: relative;
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 130px 0;
+  padding: 150px 0;
 }
 .sectionIntro {
   max-width: 900px;
@@ -554,20 +571,23 @@ h2 {
   gap: 18px;
 }
 .loopLine {
-  margin-top: 70px;
+  margin-top: 80px;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(244,239,231,.03), transparent);
 }
 .loopItem {
   min-height: 180px;
-  padding: 22px 18px 0 0;
+  padding: 24px 18px 22px 0;
   border-right: 1px solid var(--line);
   display: grid;
   align-content: start;
   gap: 22px;
 }
 .loopItem:last-child { border-right: 0; }
+.loopItem:hover { background: linear-gradient(180deg, rgba(244,239,231,.045), rgba(139,92,246,.035)); }
 .loopItem span { color: var(--dim); font-family: var(--mono); font-size: 11px; }
 .loopItem strong { font-family: var(--serif); font-size: clamp(1.4rem, 2.4vw, 2.5rem); line-height: .98; font-weight: 400; letter-spacing: -.05em; }
 .panelSection {
@@ -579,12 +599,22 @@ h2 {
 .panelCopy { display: grid; gap: 22px; }
 .panelCopy p:not(.kicker), .privacySection p, .signalSection p { color: var(--muted); line-height: 1.7; max-width: 620px; }
 .console {
-  border: 1px solid var(--line);
-  border-radius: 28px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 32px;
   padding: 18px;
-  background: linear-gradient(180deg, rgba(244,239,231,.065), rgba(244,239,231,.025));
-  box-shadow: 0 24px 120px rgba(0,0,0,.35);
+  background: linear-gradient(180deg, rgba(244,239,231,.09), rgba(244,239,231,.028));
+  box-shadow: 0 24px 120px rgba(0,0,0,.46), 0 0 90px rgba(139,92,246,.12);
 }
+.console::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background: radial-gradient(circle at 72% 8%, rgba(103,232,249,.16), transparent 34%), radial-gradient(circle at 15% 90%, rgba(251,113,133,.12), transparent 38%);
+}
+.console > * { position: relative; }
 .consoleTop, .consoleGrid {
   font-family: var(--mono);
   font-size: 11px;
@@ -622,7 +652,8 @@ h2 {
 .consoleGrid div {
   min-height: 96px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 20px;
+  background: rgba(5,5,7,.32);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -632,15 +663,16 @@ h2 {
 .privacySection {
   display: grid;
   gap: 22px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+  background: linear-gradient(90deg, transparent, rgba(244,239,231,.035), transparent);
 }
 .contactLine { margin: -12px 0 0; color: var(--dim); font-family: var(--mono); font-size: 12px; }
 .signalSection {
   width: min(1080px, calc(100% - 32px));
-  min-height: 82vh;
+  min-height: 86vh;
   margin: 20px auto 60px;
-  padding: 64px 0 84px;
+  padding: 76px 0 96px;
   display: grid;
   justify-items: center;
   align-content: center;
@@ -649,8 +681,9 @@ h2 {
 }
 .signalSection h2 {
   max-width: 1020px;
-  font-size: clamp(4rem, 8vw, 8.8rem);
-  line-height: .88;
+  font-size: clamp(4.4rem, 8.8vw, 9.6rem);
+  line-height: .82;
+  text-shadow: 0 0 80px rgba(244,239,231,.08), 0 0 130px rgba(139,92,246,.18);
 }
 .contactForm {
   width: min(760px, 100%);
@@ -672,7 +705,8 @@ h2 {
   min-width: 0;
   border: 1px solid var(--line-strong);
   border-radius: 24px;
-  background: rgba(244,239,231,.055);
+  background: rgba(244,239,231,.065);
+  backdrop-filter: blur(16px);
   color: var(--fg);
   font: inherit;
   font-family: var(--mono);
