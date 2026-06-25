@@ -932,6 +932,7 @@ private struct LaughingManPetView: View {
     var motionScale: CGFloat = 1.0
 
     @State private var isFloating = false
+    @State private var isRingRotating = false
     @State private var rotationStartDate = Date()
 
     private let teal = Color(red: 0, green: 85.0 / 255.0, blue: 119.0 / 255.0)
@@ -957,6 +958,55 @@ private struct LaughingManPetView: View {
         return NSImage(data: data)
     }()
 
+    private static let ringTextImage: NSImage = {
+        let image = NSImage(size: NSSize(width: 400, height: 400))
+        let text = Array(
+            "I thought what I'd do was, I'd pretend I was one of those deaf-mutes "
+        )
+        let font = NSFont(name: "Impact", size: 22)
+            ?? NSFont.systemFont(ofSize: 22, weight: .heavy)
+        let color = NSColor(red: 0, green: 85.0 / 255.0, blue: 119.0 / 255.0, alpha: 1)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: color,
+        ]
+        let widths = text.map {
+            NSAttributedString(string: String($0), attributes: attributes).size().width
+        }
+        let totalWidth = widths.reduce(0, +)
+
+        image.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+
+        var cumulative: CGFloat = 0
+        for (index, character) in text.enumerated() {
+            let charCenter = cumulative + widths[index] / 2
+            let angle = Double(charCenter / totalWidth) * 360.0
+            let radians = angle * .pi / 180.0
+            let radius: CGFloat = 123
+            let x = 200 + radius * cos(radians)
+            let y = 200 + radius * sin(radians)
+            let string = NSString(string: String(character))
+            let size = string.size(withAttributes: attributes)
+
+            let transform = NSAffineTransform()
+            transform.translateX(by: x, yBy: y)
+            transform.rotate(byDegrees: angle + 90)
+            transform.concat()
+            string.draw(
+                at: NSPoint(x: -size.width / 2, y: -size.height),
+                withAttributes: attributes
+            )
+            transform.invert()
+            transform.concat()
+
+            cumulative += widths[index]
+        }
+
+        image.unlockFocus()
+        return image
+    }()
+
     private var faceOpacity: Double {
         switch mood {
         case .feasting: return 0.95
@@ -976,21 +1026,21 @@ private struct LaughingManPetView: View {
                     .aspectRatio(contentMode: .fit)
             }
 
-            // Layer 2: Rotating text ring (Canvas, drawn once, GPU-rotated)
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-                Canvas { context, size in
-                    drawRingText(&context, size)
-                }
+            // Layer 2: Rotating pre-rendered text ring
+            Image(nsImage: Self.ringTextImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
                 .rotationEffect(
                     .degrees(
-                        LaughingManMotion.rotationDegrees(
-                            at: timeline.date,
-                            startDate: rotationStartDate,
-                            hasMotion: hasMotion
-                        )
+                        hasMotion && isRingRotating ? -360 : 0
                     )
                 )
-            }
+                .animation(
+                    hasMotion
+                        ? .linear(duration: LaughingManMotion.revolutionDuration).repeatForever(autoreverses: false)
+                        : .easeInOut(duration: 0.2),
+                    value: isRingRotating
+                )
 
             // Layer 3: Static face (Canvas, redraws only on mood change)
             Canvas { context, size in
@@ -1001,6 +1051,7 @@ private struct LaughingManPetView: View {
         .offset(y: isFloating ? -3 * motionScale : 3 * motionScale)
         .onAppear {
             rotationStartDate = .now
+            isRingRotating = hasMotion
             withAnimation(
                 hasMotion
                     ? .easeInOut(duration: 2.2).repeatForever(autoreverses: true)
@@ -1013,6 +1064,7 @@ private struct LaughingManPetView: View {
             if enabled {
                 rotationStartDate = .now
             }
+            isRingRotating = enabled
             withAnimation(
                 enabled
                     ? .easeInOut(duration: 2.2).repeatForever(autoreverses: true)
@@ -1020,50 +1072,6 @@ private struct LaughingManPetView: View {
             ) {
                 isFloating = enabled
             }
-        }
-    }
-
-    // Text ring at r=123 — characters spaced proportionally by advance width.
-    private func drawRingText(_ context: inout GraphicsContext, _ size: CGSize) {
-        let s = min(size.width, size.height)
-        let sc = s / 400.0
-        let cx = s / 2
-        let cy = s / 2
-        let radius = 123 * sc
-        let fontSize = 22 * sc
-        let font = Font.custom("Impact", size: fontSize)
-        let text: [Character] = Array(
-            "I thought what I'd do was, I'd pretend I was one of those deaf-mutes "
-        )
-
-        // Measure each character's advance width for proportional spacing
-        let nsFont = NSFont(name: "Impact", size: fontSize)
-            ?? NSFont.systemFont(ofSize: fontSize, weight: .heavy)
-        var widths: [CGFloat] = []
-        for ch in text {
-            let w = NSAttributedString(
-                string: String(ch), attributes: [.font: nsFont]
-            ).size().width
-            widths.append(w)
-        }
-        let totalWidth = widths.reduce(0, +)
-
-        var cumulative: CGFloat = 0
-        for (i, ch) in text.enumerated() {
-            let charCenter = cumulative + widths[i] / 2
-            let angle = Double(charCenter / totalWidth) * 360.0
-            let rad = angle * .pi / 180.0
-            let gx = cx + radius * cos(rad)
-            let gy = cy + radius * sin(rad)
-
-            var resolved = context.resolve(Text(String(ch)).font(font))
-            resolved.shading = .color(teal)
-            context.drawLayer { c in
-                c.translateBy(x: gx, y: gy)
-                c.rotate(by: .degrees(angle + 90))
-                c.draw(resolved, at: .zero, anchor: .bottom)
-            }
-            cumulative += widths[i]
         }
     }
 

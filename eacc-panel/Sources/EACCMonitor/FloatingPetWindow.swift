@@ -116,6 +116,10 @@ struct DesktopPetView: View {
         )
     }
 
+    private var usesLaunchAwayCelebration: Bool {
+        vm.companionPersona == .voidMonolith
+    }
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             if isShowingPreview {
@@ -135,7 +139,7 @@ struct DesktopPetView: View {
             }
 
             ZStack {
-                if isCelebrating {
+                if isCelebrating && !usesLaunchAwayCelebration {
                     TaskCompletionBurstView(accent: vm.companionPetAccent, token: celebrationToken)
                         .offset(x: -8, y: -10)
                 }
@@ -148,9 +152,12 @@ struct DesktopPetView: View {
                     hasMotion: vm.companionHasMotion,
                     motionScale: 0.12
                 )
-                .scaleEffect(isCelebrating ? 1.12 : 1.0)
-                .rotationEffect(.degrees(isCelebrating ? 7 : 0))
-                .shadow(color: vm.companionPetAccent.opacity(isCelebrating ? 0.28 : 0.0), radius: 22, y: 4)
+                .scaleEffect(companionCelebrationScale)
+                .rotationEffect(.degrees(companionCelebrationRotation))
+                .offset(y: companionCelebrationOffsetY)
+                .opacity(companionCelebrationOpacity)
+                .blur(radius: companionCelebrationBlur)
+                .shadow(color: vm.companionPetAccent.opacity(companionCelebrationShadowOpacity), radius: 22, y: 4)
                 .frame(width: 124, height: 124)
                 .contentShape(Rectangle())
                 .onHover { hovering in
@@ -189,13 +196,13 @@ struct DesktopPetView: View {
         .onChange(of: vm.companionCelebrationSequence) { _, newValue in
             guard newValue > 0 else { return }
             celebrationToken = newValue
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.55)) {
+            withAnimation(usesLaunchAwayCelebration ? .easeInOut(duration: 0.72) : .spring(response: 0.22, dampingFraction: 0.55)) {
                 isCelebrating = true
             }
             Task {
                 try? await Task.sleep(for: .milliseconds(950))
                 await MainActor.run {
-                    withAnimation(.easeOut(duration: 0.24)) {
+                    withAnimation(usesLaunchAwayCelebration ? .easeOut(duration: 0.18) : .easeOut(duration: 0.24)) {
                         isCelebrating = false
                     }
                 }
@@ -208,6 +215,36 @@ struct DesktopPetView: View {
             CompanionPersonaActions(vm: vm)
         }
         .help("Hover to peek at the current task, drag to move, or tap to sniff session activity")
+    }
+
+    private var companionCelebrationScale: CGFloat {
+        guard isCelebrating else { return 1.0 }
+        return usesLaunchAwayCelebration ? 0.68 : 1.12
+    }
+
+    private var companionCelebrationRotation: Double {
+        guard isCelebrating else { return 0 }
+        return usesLaunchAwayCelebration ? -1.5 : 7
+    }
+
+    private var companionCelebrationOffsetY: CGFloat {
+        guard isCelebrating else { return 0 }
+        return usesLaunchAwayCelebration ? -92 : 0
+    }
+
+    private var companionCelebrationOpacity: Double {
+        guard isCelebrating else { return 1 }
+        return usesLaunchAwayCelebration ? 0 : 1
+    }
+
+    private var companionCelebrationBlur: CGFloat {
+        guard isCelebrating else { return 0 }
+        return usesLaunchAwayCelebration ? 1.6 : 0
+    }
+
+    private var companionCelebrationShadowOpacity: Double {
+        guard isCelebrating else { return 0 }
+        return usesLaunchAwayCelebration ? 0.0 : 0.28
     }
 
     private func showPreview() {

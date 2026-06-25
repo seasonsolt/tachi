@@ -30,9 +30,49 @@ enum EACCThemeName: String, CaseIterable, Codable {
         switch self {
         case .cyber: return .laughingMan
         case .matrix: return .matrixAgent
-        case .amber: return .amberEye
+        case .amber: return .laughingMan
         case .voidTheme: return .voidMonolith
         }
+    }
+}
+
+private struct VisibleSunMask: Shape {
+    var progress: CGFloat
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let phase = min(1, max(0, progress))
+        let widthRatio: CGFloat
+        let originX: CGFloat
+
+        if phase < 0.38 {
+            let ingress = smoothStep(phase / 0.38)
+            widthRatio = max(0, 1 - ingress)
+            originX = rect.minX
+        } else if phase < 0.58 {
+            widthRatio = 0
+            originX = rect.minX
+        } else {
+            let egress = smoothStep((phase - 0.58) / 0.42)
+            widthRatio = egress
+            originX = rect.maxX - rect.width * widthRatio
+        }
+
+        let visibleWidth = rect.width * widthRatio
+        guard visibleWidth > 0.5 else { return Path() }
+
+        var path = Path()
+        path.addRect(CGRect(x: originX, y: rect.minY, width: visibleWidth, height: rect.height))
+        return path
+    }
+
+    private func smoothStep(_ value: CGFloat) -> CGFloat {
+        let x = min(1, max(0, value))
+        return x * x * (3 - 2 * x)
     }
 }
 
@@ -111,41 +151,20 @@ struct OrigamiUnicornPetView: View {
 
     @State private var rotationStartDate = Date()
 
-    private let paperHighlight = Color(red: 0.93, green: 0.94, blue: 0.97)
-    private let paperMain = Color(red: 0.64, green: 0.68, blue: 0.74)
-    private let paperShade = Color(red: 0.35, green: 0.39, blue: 0.46)
-    private let paperDeep = Color(red: 0.10, green: 0.11, blue: 0.14)
+    private let paperHighlight = Color(red: 0.98, green: 0.99, blue: 1.0)
+    private let paperMain = Color(red: 0.68, green: 0.72, blue: 0.78)
+    private let paperShade = Color(red: 0.30, green: 0.35, blue: 0.43)
+    private let paperDeep = Color(red: 0.055, green: 0.065, blue: 0.085)
+    private let paperCoolReflection = Color(red: 0.56, green: 0.66, blue: 0.82)
     private let amber = Color(red: 0.91, green: 0.57, blue: 0.16)
 
     var body: some View {
         ZStack {
             ZStack {
                 Ellipse()
-                    .fill(Color.black.opacity(0.14))
-                    .frame(width: 72, height: 14)
-                    .blur(radius: 6)
-
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.16, green: 0.17, blue: 0.20),
-                                Color(red: 0.05, green: 0.05, blue: 0.07)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 66, height: 12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
-                    )
-
-                Capsule()
-                    .fill(Color.white.opacity(0.16))
-                    .frame(width: 38, height: 2)
-                    .offset(y: -2)
+                    .fill(Color.black.opacity(0.20))
+                    .frame(width: 82, height: 14)
+                    .blur(radius: 9)
             }
             .offset(y: 36)
 
@@ -161,6 +180,7 @@ struct OrigamiUnicornPetView: View {
                     )
                 )
                 .frame(width: 3, height: 18)
+                .opacity(0)
                 .offset(y: 25)
 
             Ellipse()
@@ -261,7 +281,7 @@ struct OrigamiUnicornPetView: View {
         guard hasMotion else { return 0 }
 
         let elapsed = max(0, date.timeIntervalSince(rotationStartDate))
-        return (elapsed / 20.0) * 360.0
+        return sin(elapsed / 3.2) * 3.0
     }
 
     private func drawOrigamiUnicorn(_ context: inout GraphicsContext, _ size: CGSize) {
@@ -269,94 +289,95 @@ struct OrigamiUnicornPetView: View {
         let sc = s / 300.0
         let cx = s / 2
         let cy = s / 2
-        let strokeWidth = max(0.75, 1.35 * sc)
+        let strokeWidth = max(0.85, 1.55 * sc)
+        let glintWidth = max(0.55, strokeWidth * 0.62)
 
         let tail = polygon(
-            [(86, 132), (42, 118), (78, 146)],
+            [(100, 150), (36, 132), (88, 178), (126, 166)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
         let hindQuarter = polygon(
-            [(86, 120), (124, 120), (138, 160), (98, 178), (70, 144)],
+            [(70, 140), (132, 112), (168, 146), (140, 196), (66, 184)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
-        let torso = polygon(
-            [(122, 122), (176, 110), (228, 126), (214, 160), (160, 174), (126, 154)],
+        let torsoTop = polygon(
+            [(126, 112), (192, 108), (226, 144), (184, 168), (132, 148)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
-        let belly = polygon(
-            [(132, 154), (162, 172), (196, 166), (176, 196), (142, 196), (118, 176)],
+        let torsoBelly = polygon(
+            [(132, 148), (184, 168), (154, 212), (82, 194), (66, 158)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
         let chest = polygon(
-            [(120, 142), (146, 144), (150, 190), (116, 186), (106, 166)],
+            [(194, 122), (232, 144), (210, 210), (154, 212), (184, 168)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
         let mane = polygon(
-            [(122, 136), (134, 96), (154, 134), (140, 156)],
+            [(188, 126), (208, 8), (226, 134), (206, 166)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
         let neck = polygon(
-            [(136, 138), (146, 64), (172, 64), (176, 132), (154, 154), (132, 148)],
+            [(198, 126), (214, 6), (244, 28), (232, 142), (206, 166)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
         let head = polygon(
-            [(166, 64), (194, 56), (214, 74), (206, 102), (178, 104), (164, 88)],
+            [(238, 26), (268, 46), (276, 76), (250, 96), (224, 66)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
         let muzzle = polygon(
-            [(194, 60), (230, 68), (212, 96), (188, 92)],
+            [(268, 54), (294, 70), (264, 82)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
         let ear = polygon(
-            [(170, 62), (176, 34), (188, 60)],
+            [(232, 32), (240, 0), (252, 40)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
         let horn = polygon(
-            [(182, 42), (192, 4), (200, 46)],
-            scale: sc,
-            centerX: cx,
-            centerY: cy
-        )
-        let frontRearLeg = polygon(
-            [(120, 188), (136, 148), (150, 152), (140, 258), (118, 252)],
-            scale: sc,
-            centerX: cx,
-            centerY: cy
-        )
-        let frontFrontLeg = polygon(
-            [(142, 190), (154, 148), (170, 150), (162, 260), (140, 254)],
+            [(246, 16), (270, -30), (260, 28)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
         let hindRearLeg = polygon(
-            [(164, 170), (182, 150), (196, 158), (184, 250), (160, 244)],
+            [(80, 184), (98, 188), (66, 286), (46, 282)],
             scale: sc,
             centerX: cx,
             centerY: cy
         )
         let hindFrontLeg = polygon(
-            [(190, 166), (218, 150), (234, 166), (216, 252), (190, 246)],
+            [(124, 194), (144, 196), (128, 288), (106, 286)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let frontRearLeg = polygon(
+            [(162, 210), (182, 198), (218, 288), (194, 292)],
+            scale: sc,
+            centerX: cx,
+            centerY: cy
+        )
+        let frontFrontLeg = polygon(
+            [(202, 204), (224, 186), (264, 286), (238, 292)],
             scale: sc,
             centerX: cx,
             centerY: cy
@@ -364,77 +385,109 @@ struct OrigamiUnicornPetView: View {
 
         context.drawLayer { uc in
             uc.opacity = paperAlpha
+            let facets = [
+                tail,
+                hindRearLeg,
+                hindFrontLeg,
+                frontRearLeg,
+                frontFrontLeg,
+                hindQuarter,
+                torsoTop,
+                torsoBelly,
+                chest,
+                mane,
+                neck,
+                head,
+                ear,
+                muzzle,
+                horn
+            ]
+
             uc.fill(tail, with: .color(paperDeep.opacity(0.92)))
             uc.fill(hindRearLeg, with: .color(paperDeep.opacity(0.96)))
-            uc.fill(hindFrontLeg, with: .color(paperShade.opacity(0.95)))
+            uc.fill(hindFrontLeg, with: .color(paperShade.opacity(0.98)))
+            uc.fill(frontRearLeg, with: .color(paperCoolReflection.opacity(0.70)))
+            uc.fill(frontFrontLeg, with: .color(paperHighlight.opacity(1.0)))
             uc.fill(hindQuarter, with: .color(paperDeep.opacity(0.94)))
-            uc.fill(torso, with: .color(paperMain))
-            uc.fill(belly, with: .color(paperShade.opacity(0.86)))
-            uc.fill(chest, with: .color(paperShade))
-            uc.fill(frontRearLeg, with: .color(paperHighlight.opacity(0.98)))
-            uc.fill(frontFrontLeg, with: .color(paperMain))
+            uc.fill(torsoTop, with: .color(paperHighlight.opacity(0.82)))
+            uc.fill(torsoBelly, with: .color(paperShade.opacity(0.96)))
+            uc.fill(chest, with: .color(paperCoolReflection.opacity(0.82)))
             uc.fill(mane, with: .color(paperDeep.opacity(0.88)))
-            uc.fill(neck, with: .color(paperHighlight.opacity(0.96)))
-            uc.fill(head, with: .color(paperMain))
+            uc.fill(neck, with: .color(paperHighlight.opacity(0.98)))
+            uc.fill(head, with: .color(paperMain.opacity(0.98)))
             uc.fill(ear, with: .color(paperHighlight.opacity(0.92)))
             uc.fill(muzzle, with: .color(paperHighlight))
             uc.fill(horn, with: .color(paperHighlight))
 
-            uc.stroke(torso, with: .color(Color.white.opacity(0.12)), lineWidth: strokeWidth)
-            uc.stroke(belly, with: .color(Color.white.opacity(0.08)), lineWidth: strokeWidth)
-            uc.stroke(chest, with: .color(Color.white.opacity(0.12)), lineWidth: strokeWidth)
-            uc.stroke(neck, with: .color(Color.white.opacity(0.18)), lineWidth: strokeWidth)
-            uc.stroke(head, with: .color(Color.white.opacity(0.16)), lineWidth: strokeWidth)
-            uc.stroke(ear, with: .color(Color.white.opacity(0.18)), lineWidth: strokeWidth)
-            uc.stroke(muzzle, with: .color(Color.white.opacity(0.22)), lineWidth: strokeWidth)
-            uc.stroke(horn, with: .color(Color.white.opacity(0.28)), lineWidth: strokeWidth)
+            for facet in facets {
+                uc.stroke(facet, with: .color(Color.black.opacity(0.58)), lineWidth: max(0.7, strokeWidth * 0.72))
+            }
+
+            uc.stroke(tail, with: .color(Color.white.opacity(0.18)), lineWidth: glintWidth)
+            uc.stroke(hindQuarter, with: .color(Color.white.opacity(0.22)), lineWidth: glintWidth)
+            uc.stroke(hindRearLeg, with: .color(Color.white.opacity(0.16)), lineWidth: glintWidth)
+            uc.stroke(hindFrontLeg, with: .color(Color.white.opacity(0.24)), lineWidth: glintWidth)
+            uc.stroke(frontRearLeg, with: .color(Color.white.opacity(0.30)), lineWidth: glintWidth)
+            uc.stroke(frontFrontLeg, with: .color(Color.white.opacity(0.46)), lineWidth: glintWidth)
+            uc.stroke(torsoTop, with: .color(Color.white.opacity(0.52)), lineWidth: strokeWidth)
+            uc.stroke(torsoBelly, with: .color(Color.white.opacity(0.34)), lineWidth: strokeWidth)
+            uc.stroke(chest, with: .color(Color.white.opacity(0.44)), lineWidth: strokeWidth)
+            uc.stroke(neck, with: .color(Color.white.opacity(0.62)), lineWidth: strokeWidth)
+            uc.stroke(head, with: .color(Color.white.opacity(0.50)), lineWidth: strokeWidth)
+            uc.stroke(ear, with: .color(Color.white.opacity(0.48)), lineWidth: strokeWidth)
+            uc.stroke(muzzle, with: .color(Color.white.opacity(0.62)), lineWidth: strokeWidth)
+            uc.stroke(horn, with: .color(Color.white.opacity(0.76)), lineWidth: strokeWidth)
 
             var spineFold = Path()
-            spineFold.move(to: point(134, 124, scale: sc, centerX: cx, centerY: cy))
-            spineFold.addLine(to: point(202, 136, scale: sc, centerX: cx, centerY: cy))
-            uc.stroke(spineFold, with: .color(paperDeep.opacity(0.6)), lineWidth: strokeWidth)
+            spineFold.move(to: point(74, 142, scale: sc, centerX: cx, centerY: cy))
+            spineFold.addLine(to: point(226, 144, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(spineFold, with: .color(Color.black.opacity(0.62)), lineWidth: max(0.65, strokeWidth * 0.82))
+            uc.stroke(spineFold, with: .color(Color.white.opacity(0.58)), lineWidth: max(0.55, strokeWidth * 0.45))
 
             var neckFold = Path()
-            neckFold.move(to: point(146, 66, scale: sc, centerX: cx, centerY: cy))
-            neckFold.addLine(to: point(154, 150, scale: sc, centerX: cx, centerY: cy))
-            uc.stroke(neckFold, with: .color(paperShade.opacity(0.7)), lineWidth: strokeWidth)
+            neckFold.move(to: point(218, 12, scale: sc, centerX: cx, centerY: cy))
+            neckFold.addLine(to: point(206, 166, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(neckFold, with: .color(Color.black.opacity(0.58)), lineWidth: max(0.65, strokeWidth * 0.82))
+            uc.stroke(neckFold, with: .color(Color.white.opacity(0.62)), lineWidth: max(0.55, strokeWidth * 0.45))
 
             var faceFold = Path()
-            faceFold.move(to: point(174, 100, scale: sc, centerX: cx, centerY: cy))
-            faceFold.addLine(to: point(198, 62, scale: sc, centerX: cx, centerY: cy))
-            uc.stroke(faceFold, with: .color(paperDeep.opacity(0.7)), lineWidth: strokeWidth)
+            faceFold.move(to: point(226, 66, scale: sc, centerX: cx, centerY: cy))
+            faceFold.addLine(to: point(270, 48, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(faceFold, with: .color(Color.black.opacity(0.56)), lineWidth: max(0.65, strokeWidth * 0.72))
+            uc.stroke(faceFold, with: .color(Color.white.opacity(0.54)), lineWidth: max(0.55, strokeWidth * 0.40))
 
             var hipFold = Path()
-            hipFold.move(to: point(92, 122, scale: sc, centerX: cx, centerY: cy))
-            hipFold.addLine(to: point(126, 158, scale: sc, centerX: cx, centerY: cy))
-            uc.stroke(hipFold, with: .color(Color.white.opacity(0.1)), lineWidth: strokeWidth)
+            hipFold.move(to: point(72, 162, scale: sc, centerX: cx, centerY: cy))
+            hipFold.addLine(to: point(154, 212, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(hipFold, with: .color(Color.black.opacity(0.54)), lineWidth: max(0.65, strokeWidth * 0.72))
+            uc.stroke(hipFold, with: .color(Color.white.opacity(0.44)), lineWidth: max(0.55, strokeWidth * 0.36))
 
             var eye = Path()
-            let eyeCenter = point(203, 79, scale: sc, centerX: cx, centerY: cy)
+            let eyeCenter = point(256, 72, scale: sc, centerX: cx, centerY: cy)
             eye.addEllipse(
                 in: CGRect(
-                    x: eyeCenter.x - (3.0 * sc),
-                    y: eyeCenter.y - (3.0 * sc),
-                    width: 6.0 * sc,
-                    height: 6.0 * sc
+                    x: eyeCenter.x - (2.4 * sc),
+                    y: eyeCenter.y - (2.4 * sc),
+                    width: 4.8 * sc,
+                    height: 4.8 * sc
                 )
             )
             uc.fill(eye, with: .color(amber.opacity(eyeOpacity)))
 
             var hornHighlight = Path()
-            hornHighlight.move(to: point(187, 40, scale: sc, centerX: cx, centerY: cy))
-            hornHighlight.addLine(to: point(192, 8, scale: sc, centerX: cx, centerY: cy))
-            uc.stroke(hornHighlight, with: .color(amber.opacity(0.65)), lineWidth: max(0.55, strokeWidth * 0.7))
+            hornHighlight.move(to: point(250, 16, scale: sc, centerX: cx, centerY: cy))
+            hornHighlight.addLine(to: point(268, -26, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(hornHighlight, with: .color(Color.white.opacity(0.9)), lineWidth: max(0.55, strokeWidth * 0.7))
 
             var backHighlight = Path()
-            backHighlight.move(to: point(138, 123, scale: sc, centerX: cx, centerY: cy))
-            backHighlight.addLine(to: point(192, 116, scale: sc, centerX: cx, centerY: cy))
-            uc.stroke(backHighlight, with: .color(Color.white.opacity(0.24)), lineWidth: max(0.55, strokeWidth * 0.7))
+            backHighlight.move(to: point(78, 142, scale: sc, centerX: cx, centerY: cy))
+            backHighlight.addLine(to: point(190, 112, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(backHighlight, with: .color(Color.white.opacity(0.82)), lineWidth: max(0.55, strokeWidth * 0.7))
 
             var muzzleHighlight = Path()
-            muzzleHighlight.move(to: point(202, 70, scale: sc, centerX: cx, centerY: cy))
-            muzzleHighlight.addLine(to: point(223, 74, scale: sc, centerX: cx, centerY: cy))
-            uc.stroke(muzzleHighlight, with: .color(Color.white.opacity(0.26)), lineWidth: max(0.55, strokeWidth * 0.7))
+            muzzleHighlight.move(to: point(268, 58, scale: sc, centerX: cx, centerY: cy))
+            muzzleHighlight.addLine(to: point(290, 70, scale: sc, centerX: cx, centerY: cy))
+            uc.stroke(muzzleHighlight, with: .color(Color.white.opacity(0.78)), lineWidth: max(0.55, strokeWidth * 0.7))
         }
     }
 
@@ -676,28 +729,25 @@ struct MonolithPetView: View {
 
     @State private var isBreathing = false
 
-    // Sun/moon geometry — moon is slightly SMALLER than sun
-    // so a bright annular ring is visible during totality.
+    // Eclipse geometry draws only surviving sunlight, so no visible moon disc crosses the scene.
     private let sunRadius: CGFloat = 10
-    private let moonRadius: CGFloat = 9
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
             let time = hasMotion ? timeline.date.timeIntervalSinceReferenceDate : 0
 
-            // Moon transits across the sun over 8 seconds, pauses at center
             let rawCycle = time.truncatingRemainder(dividingBy: 10.0) / 10.0
-            // Ease in/out so the moon dwells at totality
-            let easedCycle = smootherstep(rawCycle)
-            let moonOffset = CGFloat(-16 + (easedCycle * 32))
-            let eclipseIntensity = 1.0 - min(1.0, abs(moonOffset) / 12.0)
+            let visibleLight = visibleLight(for: rawCycle)
+            let eclipseIntensity = 1.0 - visibleLight
             let coronaPulse = (sin(time * 1.3) + 1.0) * 0.5
 
-            // Corona grows dramatically during totality
-            let coronaScale = 1.0 + (0.3 * eclipseIntensity)
-            let coronaRingOpacity = 0.20 + (0.65 * eclipseIntensity) + (0.10 * coronaPulse)
-            let coronaHaloOpacity = 0.08 + (0.28 * eclipseIntensity) + (0.06 * coronaPulse)
-            let sunCoreOpacity = 0.85 - (0.75 * eclipseIntensity)
+            // Corona vanishes at totality for this monolith treatment instead of forming a ring.
+            let coronaScale = 1.0 + (0.2 * eclipseIntensity)
+            let coronaRingOpacity = visibleLight * (0.22 + (0.18 * coronaPulse))
+            let coronaHaloOpacity = visibleLight * (0.10 + (0.10 * coronaPulse))
+            let sunCoreOpacity = visibleLight * (0.86 - (0.20 * eclipseIntensity))
+            let limbOpacity = visibleLight * (0.22 + (0.18 * eclipseIntensity))
+            let lightMask = VisibleSunMask(progress: CGFloat(rawCycle))
 
             ZStack {
                 // --- Eclipse above the slab ---
@@ -709,14 +759,14 @@ struct MonolithPetView: View {
                         .blur(radius: 14)
                         .scaleEffect(coronaScale)
 
-                    // Corona ring — thick, visible during totality
+                    // Corona fades with the remaining solar light and disappears in totality.
                     Circle()
                         .stroke(
                             coronaColor.opacity(coronaRingOpacity),
-                            lineWidth: 2.5 + (2.0 * eclipseIntensity)
+                            lineWidth: 2.0 + (1.0 * eclipseIntensity)
                         )
                         .frame(width: sunRadius * 2 + 6, height: sunRadius * 2 + 6)
-                        .blur(radius: 0.6 + (0.8 * eclipseIntensity))
+                        .blur(radius: 0.5 + (0.4 * eclipseIntensity))
                         .scaleEffect(coronaScale)
 
                     // Outer corona streamer ring
@@ -729,7 +779,7 @@ struct MonolithPetView: View {
                         .blur(radius: 2.5)
                         .scaleEffect(coronaScale)
 
-                    // Sun core — bright warm disc
+                    // Sun core — only the surviving photosphere is drawn.
                     Circle()
                         .fill(
                             RadialGradient(
@@ -743,19 +793,15 @@ struct MonolithPetView: View {
                             )
                         )
                         .frame(width: sunRadius * 2, height: sunRadius * 2)
+                        .mask(lightMask.frame(width: sunRadius * 2, height: sunRadius * 2))
 
                     // Sun limb — bright edge ring
                     Circle()
-                        .stroke(Color.white.opacity(0.20 + (0.15 * eclipseIntensity)), lineWidth: 0.8)
+                        .stroke(Color.white.opacity(limbOpacity), lineWidth: 0.8)
                         .frame(width: sunRadius * 2 + 1, height: sunRadius * 2 + 1)
-
-                    // Moon disc — slightly smaller, transiting
-                    Circle()
-                        .fill(Color(red: 0.03, green: 0.03, blue: 0.04))
-                        .frame(width: moonRadius * 2, height: moonRadius * 2)
-                        .offset(x: moonOffset)
+                        .mask(lightMask.frame(width: sunRadius * 2 + 1, height: sunRadius * 2 + 1))
                 }
-                .offset(y: -42)
+                .offset(y: -50)
 
                 // --- 45° upward projection above the slab ---
                 Path { path in
@@ -818,10 +864,22 @@ struct MonolithPetView: View {
         }
     }
 
-    /// Smoother ease curve — dwells longer at totality (center)
-    private func smootherstep(_ t: Double) -> Double {
-        let x = min(1, max(0, t))
-        return x * x * x * (x * (x * 6 - 15) + 10)
+    /// The eclipse sweeps in one direction: left remnant, totality, then right remnant.
+    private func visibleLight(for cycle: Double) -> Double {
+        let x = min(1, max(0, cycle))
+        if x < 0.38 {
+            return 1.0 - smoothStep(x / 0.38)
+        }
+        if x < 0.58 {
+            return 0
+        }
+
+        return smoothStep((x - 0.58) / 0.42)
+    }
+
+    private func smoothStep(_ value: Double) -> Double {
+        let x = min(1, max(0, value))
+        return x * x * (3 - 2 * x)
     }
 
     private var baseShadowOpacity: Double {
