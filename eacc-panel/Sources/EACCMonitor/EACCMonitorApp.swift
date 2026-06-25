@@ -11,8 +11,6 @@ struct EACCMonitorApp: App {
     private let themeWatcher = ThemeWatcher()
     private let bridge: EACCBridge
 
-    // Agent-native subsystems
-    private let agentCore = AgentCore()
     private let recipeRuntime = RecipeRuntime()
 
     init() {
@@ -35,8 +33,7 @@ struct EACCMonitorApp: App {
             vm.upsertSource(id: "claude-code", name: "Claude Code", data: data)
         }
 
-        // Connect Agent + RecipeRuntime to ViewModel + Bridge
-        vm.agent = agentCore
+        // Connect RecipeRuntime to ViewModel + Bridge
         vm.recipeRuntime = recipeRuntime
         bridge.recipeRuntime = recipeRuntime
 

@@ -12,6 +12,11 @@ enum Config {
     static let claudeRefreshToken = "rt_bd9cbfa51fdd42bf2b0ac51fb4fc3b9d167f852e4d5d6ffb99d2f760e480bd1e"
 }
 
+enum AppConfigKeys {
+    static let sub2APIBaseURL = "sub2apiBaseURL"
+    static let sub2APIRefreshToken = "sub2apiRefreshToken"
+}
+
 // MARK: - Models
 
 struct Account: Identifiable, Sendable {
@@ -269,10 +274,23 @@ final class APIClient: NSObject, URLSessionDelegate, @unchecked Sendable {
     // MARK: - Claude Channel (ai.benwk.io)
 
     private var claudeAccessToken: String?
-    private var claudeRefreshToken: String = Config.claudeRefreshToken
+    private var claudeApiBase: String = UserDefaults.standard.string(forKey: AppConfigKeys.sub2APIBaseURL) ?? Config.claudeApiBase
+    private var claudeRefreshToken: String = UserDefaults.standard.string(forKey: AppConfigKeys.sub2APIRefreshToken) ?? Config.claudeRefreshToken
+
+    func configureClaudeChannel(baseURL: String, refreshToken: String) {
+        let trimmedBase = baseURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let trimmedToken = refreshToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedBase.isEmpty, !trimmedToken.isEmpty else { return }
+
+        claudeApiBase = trimmedBase
+        claudeRefreshToken = trimmedToken
+        claudeAccessToken = nil
+        UserDefaults.standard.set(trimmedBase, forKey: AppConfigKeys.sub2APIBaseURL)
+        UserDefaults.standard.set(trimmedToken, forKey: AppConfigKeys.sub2APIRefreshToken)
+    }
 
     private func claudeRefresh() async -> Bool {
-        guard let url = URL(string: Config.claudeApiBase + "/auth/refresh") else { return false }
+        guard let url = URL(string: claudeApiBase + "/auth/refresh") else { return false }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -312,7 +330,7 @@ final class APIClient: NSObject, URLSessionDelegate, @unchecked Sendable {
     }
 
     private func fetchClaudeStatsOnce() async -> ClaudeStats? {
-        guard let url = URL(string: Config.claudeApiBase + "/usage/dashboard/stats?timezone=Asia%2FShanghai"),
+        guard let url = URL(string: claudeApiBase + "/usage/dashboard/stats?timezone=Asia%2FShanghai"),
               let token = claudeAccessToken
         else { return nil }
 

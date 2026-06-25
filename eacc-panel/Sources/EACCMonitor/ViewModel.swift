@@ -132,21 +132,36 @@ final class ViewModel {
     var selectedTheme: EACCThemeName = ViewModel.loadTheme()
     var companionCelebrationSequence = 0
     var companionCelebrationTitle = ""
+    var onboardingClaudePath: String = ViewModel.loadClaudeRecipePath()
+    var onboardingOpenAIKey: String = ""
+    var onboardingSub2APIBaseURL: String = UserDefaults.standard.string(forKey: AppConfigKeys.sub2APIBaseURL) ?? Config.claudeApiBase
+    var onboardingSub2APIRefreshToken: String = ""
+    var onboardingSaveMessage: String = ""
 
-    // Agent
-    var agentMessages: [AgentMessage] = []
-    var agentInput: String = ""
-    var agentIsThinking = false
-    var agentHasAPIKey = false
-    var agent: AgentCore? {
-        didSet { agentHasAPIKey = agent?.apiKey != nil && !(agent?.apiKey?.isEmpty ?? true) }
-    }
     var recipeRuntime: RecipeRuntime? {
         didSet { wireRecipeUpdates() }
     }
 
     // Recipe source data — updated by RecipeRuntime callbacks
     var recipeSources: [RecipeSourceInfo] = []
+
+    var onboardingClaudeConfigured: Bool {
+        RecipeStore.loadAll().contains { recipe in
+            recipe.id == "claude-code" && recipe.enabled && !(recipe.watchPath ?? "").isEmpty
+        }
+    }
+
+    var onboardingOpenAIConfigured: Bool {
+        RecipeStore.loadAll().contains { recipe in
+            recipe.id == "openai-api" && recipe.enabled && !(recipe.authKeyValue ?? "").isEmpty
+        }
+    }
+
+    var onboardingSub2APIConfigured: Bool {
+        let base = UserDefaults.standard.string(forKey: AppConfigKeys.sub2APIBaseURL)
+        let token = UserDefaults.standard.string(forKey: AppConfigKeys.sub2APIRefreshToken)
+        return !(base ?? "").isEmpty && !(token ?? "").isEmpty
+    }
 
     struct RecipeSourceInfo: Identifiable {
         let id: String
@@ -522,64 +537,59 @@ final class ViewModel {
     /// Bridge reference for cross-process theme sync
     var bridge: EACCBridge?
 
-    // MARK: - Agent
+    // MARK: - Onboarding
 
     @MainActor
-    func sendAgentMessage() {
-        let text = agentInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, let agent else { return }
-        agentInput = ""
-
-        let userMsg = AgentMessage(id: UUID(), role: .user, content: text, timestamp: Date(), toolCalls: nil)
-        agentMessages.append(userMsg)
-        agentIsThinking = true
-
-        Task {
-            let context = buildAgentContext()
-            let response = await agent.sendMessage(text, context: context)
-            await MainActor.run {
-                agentMessages.append(response)
-                agentIsThinking = false
-            }
+    func saveClaudeOnboarding() {
+        let path = onboardingClaudePath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty else {
+            onboardingSaveMessage = "Claude path is required."
+            return
         }
+
+        let recipe = CollectorRecipe(
+            id: "claude-code",
+            name: "Claude Code",
+            type: .fileWatch,
+            enabled: true,
+            watchPath: path,
+            parseScript: "claude-code-stats"
+        )
+        recipeRuntime?.addRecipe(recipe)
+        RecipeStore.save(recipe)
+        onboardingSaveMessage = "Claude Code collector configured."
     }
 
     @MainActor
-    func setAgentAPIKey(_ key: String) {
-        agent?.setAPIKey(key)
-        agentHasAPIKey = true
-        // Trigger onboarding after key is set
-        if agentMessages.isEmpty {
-            triggerOnboarding()
+    func saveOpenAIOnboarding() {
+        let key = onboardingOpenAIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else {
+            onboardingSaveMessage = "OpenAI key is required."
+            return
         }
+
+        var recipe = CollectorRecipe.openaiAPI
+        recipe.authKeyValue = key
+        recipe.enabled = true
+        recipeRuntime?.addRecipe(recipe)
+        RecipeStore.save(recipe)
+        onboardingOpenAIKey = ""
+        onboardingSaveMessage = "OpenAI usage collector configured."
     }
 
     @MainActor
-    func triggerOnboarding() {
-        guard let agent, agent.apiKey != nil else { return }
-        agentIsThinking = true
-        Task {
-            let context = buildAgentContext()
-            let response = await agent.sendMessage(
-                "I just launched the app for the first time. Please check what AI tools I have installed and help me set up token tracking.",
-                context: context
-            )
-            await MainActor.run {
-                agentMessages.append(response)
-                agentIsThinking = false
-            }
+    func saveSub2APIOnboarding() {
+        let baseURL = onboardingSub2APIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let refreshToken = onboardingSub2APIRefreshToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !baseURL.isEmpty, !refreshToken.isEmpty else {
+            onboardingSaveMessage = "sub2api base URL and refresh token are required."
+            return
         }
-    }
 
-    private func buildAgentContext() -> AgentContext {
-        let recipes = recipeRuntime?.getAllData().keys.map { $0 } ?? []
-        let sources = recipeRuntime?.getAllData().reduce(into: [String: Bool]()) { $0[$1.key] = $1.value.connected } ?? [:]
-        let allData: [EACCSourceData] = recipeRuntime.map { Array($0.getAllData().values) } ?? []
-        let totalTokens = allData.reduce(0) { $0 + $1.totalTokens }
-        let totalCost = allData.reduce(0.0) { $0 + $1.costUSD }
-        let todayTokens = allData.reduce(0) { $0 + $1.todayTokens }
-        let todayCost = allData.reduce(0.0) { $0 + $1.todayCostUSD }
-        return AgentContext(recipes: recipes, sources: sources, totalTokens: totalTokens, totalCost: totalCost, todayTokens: todayTokens, todayCost: todayCost)
+        APIClient.shared.configureClaudeChannel(baseURL: baseURL, refreshToken: refreshToken)
+        onboardingSub2APIRefreshToken = ""
+        onboardingSaveMessage = "sub2api Claude channel configured."
+        Task { await refresh() }
     }
 
     @MainActor
@@ -708,6 +718,10 @@ final class ViewModel {
 
     private static let companionPersonaModeKey = "companionPersonaMode"
     private static let themeKey = "ritualTheme"
+
+    private static func loadClaudeRecipePath() -> String {
+        RecipeStore.loadAll().first(where: { $0.id == "claude-code" })?.watchPath ?? "~/.claude/stats-cache.json"
+    }
 
     private static func loadCompanionPersonaMode() -> CompanionPersonaMode {
         let raw = UserDefaults.standard.string(forKey: companionPersonaModeKey)
