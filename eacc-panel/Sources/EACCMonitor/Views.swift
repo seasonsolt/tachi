@@ -291,7 +291,7 @@ struct ContentView: View {
         ScrollView {
             LazyVStack(spacing: 8) {
                 companionSection
-                agentChatSection
+                onboardingSection
                 if !vm.recipeSources.isEmpty {
                     recipeSourcesSection
                 }
@@ -311,134 +311,178 @@ struct ContentView: View {
             .padding(.bottom, 4)
     }
 
-    // MARK: - Agent Chat
+    // MARK: - Onboarding
 
-    private var agentChatSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+    private var onboardingSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Image(systemName: "brain.head.profile")
+                Image(systemName: "checklist")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(panelColors.accent)
-                Text("AGENT")
+                Text("SETUP")
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundStyle(panelColors.textSecondary)
                 Spacer()
-                if vm.agentIsThinking {
-                    ProgressView()
-                        .scaleEffect(0.5)
-                        .frame(width: 14, height: 14)
-                }
+                Text("\(onboardingCompletedCount)/3")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(onboardingCompletedCount == 3 ? matrixGreen : panelColors.textMuted)
             }
             .padding(.horizontal, 4)
 
-            if !vm.agentHasAPIKey {
-                agentAPIKeyPrompt
-            } else {
-                agentMessagesList
-                agentInputField
+            onboardingClaudeCard
+            onboardingOpenAICard
+            onboardingSub2APICard
+
+            if !vm.onboardingSaveMessage.isEmpty {
+                Text(vm.onboardingSaveMessage)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(panelColors.textSecondary)
+                    .padding(.horizontal, 4)
             }
         }
         .ritualSection(themeColors: panelColors, accent: panelColors.accent)
         .padding(.bottom, 4)
     }
 
-    private var agentAPIKeyPrompt: some View {
-        VStack(spacing: 8) {
-            Text("Enter your Anthropic API key to activate the agent.")
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(panelColors.textSecondary)
-                .multilineTextAlignment(.center)
+    private var onboardingCompletedCount: Int {
+        [
+            vm.onboardingClaudeConfigured,
+            vm.onboardingOpenAIConfigured,
+            vm.onboardingSub2APIConfigured
+        ].filter { $0 }.count
+    }
+
+    private var onboardingClaudeCard: some View {
+        OnboardingConfigCard(
+            title: "Claude",
+            subtitle: "Local Claude Code usage from stats-cache.json",
+            status: vm.onboardingClaudeConfigured ? "CONFIGURED" : "REQUIRED",
+            configured: vm.onboardingClaudeConfigured,
+            themeColors: panelColors
+        ) {
             HStack(spacing: 6) {
-                SecureField("sk-ant-...", text: $vm.agentInput)
+                TextField("~/.claude/stats-cache.json", text: $vm.onboardingClaudePath)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(panelColors.textPrimary)
                     .padding(6)
                     .ritualField(themeColors: panelColors, accent: panelColors.accent)
-                Button("SET") {
-                    let key = vm.agentInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !key.isEmpty {
-                        vm.agentInput = ""
-                        vm.setAgentAPIKey(key)
-                    }
+                onboardingSaveButton("SAVE") {
+                    vm.saveClaudeOnboarding()
                 }
-                .buttonStyle(.plain)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    panelColors.accent.opacity(0.22),
-                                    panelColors.accentEdge.opacity(0.18)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                )
-                .foregroundStyle(panelColors.accent)
             }
         }
-        .padding(10)
-        .ritualField(themeColors: panelColors, accent: panelColors.accent)
     }
 
-    private var agentMessagesList: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(vm.agentMessages.suffix(6)) { msg in
-                HStack(alignment: .top, spacing: 6) {
-                    if msg.role == .user {
-                        Spacer(minLength: 40)
-                        Text(msg.content)
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(panelColors.textPrimary)
-                            .padding(6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(vm.companionPetAccent.opacity(0.14))
-                            )
-                    } else {
-                        Text(msg.content)
-                            .font(.system(size: 11))
-                            .foregroundStyle(panelColors.textSecondary)
-                            .padding(6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(panelColors.cardBg.opacity(0.82))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .strokeBorder(panelColors.cardBorder.opacity(0.8), lineWidth: 1)
-                            )
-                        Spacer(minLength: 40)
+    private var onboardingOpenAICard: some View {
+        OnboardingConfigCard(
+            title: "OpenAI",
+            subtitle: "Organization usage API collector",
+            status: vm.onboardingOpenAIConfigured ? "CONFIGURED" : "API KEY",
+            configured: vm.onboardingOpenAIConfigured,
+            themeColors: panelColors
+        ) {
+            HStack(spacing: 6) {
+                SecureField(vm.onboardingOpenAIConfigured ? "saved" : "sk-...", text: $vm.onboardingOpenAIKey)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(panelColors.textPrimary)
+                    .padding(6)
+                    .ritualField(themeColors: panelColors, accent: panelColors.accent)
+                onboardingSaveButton("SAVE") {
+                    vm.saveOpenAIOnboarding()
+                }
+            }
+        }
+    }
+
+    private var onboardingSub2APICard: some View {
+        OnboardingConfigCard(
+            title: "sub2api",
+            subtitle: "Claude dashboard channel via refresh token",
+            status: vm.onboardingSub2APIConfigured ? "CONFIGURED" : "TOKEN",
+            configured: vm.onboardingSub2APIConfigured,
+            themeColors: panelColors
+        ) {
+            VStack(spacing: 6) {
+                TextField("https://ai.benwk.io/api/v1", text: $vm.onboardingSub2APIBaseURL)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(panelColors.textPrimary)
+                    .padding(6)
+                    .ritualField(themeColors: panelColors, accent: panelColors.accent)
+                HStack(spacing: 6) {
+                    SecureField(vm.onboardingSub2APIConfigured ? "saved refresh token" : "refresh token", text: $vm.onboardingSub2APIRefreshToken)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(panelColors.textPrimary)
+                        .padding(6)
+                        .ritualField(themeColors: panelColors, accent: panelColors.accent)
+                    onboardingSaveButton("SAVE") {
+                        vm.saveSub2APIOnboarding()
                     }
                 }
             }
         }
     }
 
-    private var agentInputField: some View {
-        HStack(spacing: 6) {
-            TextField("Ask the agent...", text: $vm.agentInput)
-                .textFieldStyle(.plain)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(panelColors.textPrimary)
-                .padding(6)
-                .ritualField(themeColors: panelColors, accent: panelColors.accent)
-                .onSubmit { vm.sendAgentMessage() }
-                .disabled(vm.agentIsThinking)
-            Button {
-                vm.sendAgentMessage()
-            } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 16))
-            }
+    private func onboardingSaveButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
             .buttonStyle(.plain)
-            .foregroundStyle(vm.agentInput.isEmpty || vm.agentIsThinking ? panelColors.textMuted : panelColors.accent)
-            .disabled(vm.agentInput.isEmpty || vm.agentIsThinking)
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                panelColors.accent.opacity(0.22),
+                                panelColors.accentEdge.opacity(0.18)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            )
+            .foregroundStyle(panelColors.accent)
+    }
+
+    private struct OnboardingConfigCard<Content: View>: View {
+        let title: String
+        let subtitle: String
+        let status: String
+        let configured: Bool
+        let themeColors: EACCThemeColors
+        @ViewBuilder let content: Content
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(themeColors.textPrimary)
+                        Text(subtitle)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(themeColors.textMuted)
+                    }
+                    Spacer()
+                    Text(status)
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(configured ? matrixGreen : themeColors.accent)
+                }
+                content
+            }
+            .padding(9)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(themeColors.cardBg.opacity(0.72))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder((configured ? matrixGreen : themeColors.accent).opacity(configured ? 0.22 : 0.18), lineWidth: 1)
+            )
         }
     }
 
