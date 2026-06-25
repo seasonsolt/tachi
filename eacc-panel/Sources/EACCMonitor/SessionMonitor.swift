@@ -25,6 +25,32 @@ struct CodingSession: Identifiable, Sendable {
     }
 }
 
+struct SessionScanBreakdown: Sendable {
+    let sessions: [CodingSession]
+    let claudeDuration: TimeInterval
+    let codexDuration: TimeInterval
+    let openCodeDuration: TimeInterval
+    let codexCacheHits: Int
+    let codexFileListCacheHits: Int
+    let openCodeCacheHits: Int
+
+    var totalDuration: TimeInterval {
+        claudeDuration + codexDuration + openCodeDuration
+    }
+
+    var claudeCount: Int {
+        sessions.filter { $0.tool == .claudeCode }.count
+    }
+
+    var codexCount: Int {
+        sessions.filter { $0.tool == .codex }.count
+    }
+
+    var openCodeCount: Int {
+        sessions.filter { $0.tool == .openCode }.count
+    }
+}
+
 enum CodingTool: String, Sendable {
     case claudeCode = "Claude Code"
     case codex = "Codex"
@@ -114,22 +140,79 @@ final class SessionMonitor {
         let updated: Date
     }
 
+    private struct CodexSessionCacheEntry {
+        let modified: Date
+        let size: UInt64
+        let session: CodingSession
+    }
+
+    private struct CodexFileListCache {
+        let createdAt: Date
+        let paths: [String]
+    }
+
+    private struct FileSnapshot: Equatable {
+        let modified: Date
+        let size: UInt64
+    }
+
+    private struct OpenCodeCacheKey: Equatable {
+        let db: FileSnapshot
+        let wal: FileSnapshot?
+    }
+
+    private struct OpenCodeSessionCache {
+        let createdAt: Date
+        let key: OpenCodeCacheKey
+        let sessions: [CodingSession]
+    }
+
     private let home = NSHomeDirectory()
     private var claudeDir: String { home + "/.claude/projects" }
     private var codexIndex: String { home + "/.codex/session_index.jsonl" }
     private var codexSessions: String { home + "/.codex/sessions" }
     private var openCodeDB: String { home + "/.local/share/opencode/opencode.db" }
+    private var codexSessionCache: [String: CodexSessionCacheEntry] = [:]
+    private var codexFileListCache: CodexFileListCache?
+    private var openCodeSessionCache: OpenCodeSessionCache?
+    private var lastCodexCacheHits = 0
+    private var lastCodexFileListCacheHits = 0
+    private var lastOpenCodeCacheHits = 0
+    private let scanLock = NSLock()
 
     func scanSessions() -> [CodingSession] {
-        var sessions: [CodingSession] = []
-        sessions.append(contentsOf: scanClaudeSessions())
-        sessions.append(contentsOf: scanCodexSessions())
-        sessions.append(contentsOf: scanOpenCodeSessions())
+        scanSessionBreakdown().sessions
+    }
+
+    func scanSessionBreakdown() -> SessionScanBreakdown {
+        scanLock.lock()
+        defer { scanLock.unlock() }
+
+        let (claudeSessions, claudeDuration) = timedScan { scanClaudeSessions() }
+        let (codexSessions, codexDuration) = timedScan { scanCodexSessions() }
+        let (openCodeSessions, openCodeDuration) = timedScan { scanOpenCodeSessions() }
+
+        var sessions = claudeSessions + codexSessions + openCodeSessions
         sessions.sort { lhs, rhs in
             if lhs.pulse != rhs.pulse { return lhs.pulse.rawValue > rhs.pulse.rawValue }
             return lhs.lastActivity > rhs.lastActivity
         }
-        return sessions
+
+        return SessionScanBreakdown(
+            sessions: sessions,
+            claudeDuration: claudeDuration,
+            codexDuration: codexDuration,
+            openCodeDuration: openCodeDuration,
+            codexCacheHits: lastCodexCacheHits,
+            codexFileListCacheHits: lastCodexFileListCacheHits,
+            openCodeCacheHits: lastOpenCodeCacheHits
+        )
+    }
+
+    private func timedScan(_ scan: () -> [CodingSession]) -> (sessions: [CodingSession], duration: TimeInterval) {
+        let start = Date()
+        let sessions = scan()
+        return (sessions, Date().timeIntervalSince(start))
     }
 
     // MARK: - Claude Code
@@ -217,10 +300,24 @@ final class SessionMonitor {
         let fm = FileManager.default
         let cutoff = Date().addingTimeInterval(-3600)
         let indexMetadata = loadCodexIndexMetadata(cutoff: cutoff)
+        lastCodexFileListCacheHits = 0
         let recentFiles = recentCodexSessionFiles(cutoff: cutoff, limit: 96)
+        let recentPaths = Set(recentFiles.map(\.path))
         var sessionsByID: [String: CodingSession] = [:]
+        var cacheHits = 0
 
-        for filePath in recentFiles {
+        codexSessionCache = codexSessionCache.filter { recentPaths.contains($0.key) }
+
+        for file in recentFiles {
+            let filePath = file.path
+            if let cached = codexSessionCache[filePath],
+               cached.modified == file.modified,
+               cached.size == file.size {
+                cacheHits += 1
+                upsert(session: cached.session, into: &sessionsByID)
+                continue
+            }
+
             let recentEntries = readRecentJsonlEntries(path: filePath, limit: 40, maxBytes: 262_144)
             let metaEntry = readFirstJsonlEntry(path: filePath, maxBytes: 524_288)
             let metaPayload = metaEntry?["payload"] as? [String: Any]
@@ -259,16 +356,27 @@ final class SessionMonitor {
                 pulse: trace.pulse
             )
 
-            if let existing = sessionsByID[sessionId] {
-                if session.lastActivity > existing.lastActivity {
-                    sessionsByID[sessionId] = session
-                }
-            } else {
-                sessionsByID[sessionId] = session
-            }
+            codexSessionCache[filePath] = CodexSessionCacheEntry(
+                modified: file.modified,
+                size: file.size,
+                session: session
+            )
+            upsert(session: session, into: &sessionsByID)
         }
 
+        lastCodexCacheHits = cacheHits
         return Array(sessionsByID.values)
+    }
+
+    private func upsert(session: CodingSession, into sessionsByID: inout [String: CodingSession]) {
+        if let existing = sessionsByID[session.id] {
+            if session.lastActivity > existing.lastActivity {
+                sessionsByID[session.id] = session
+            }
+            return
+        }
+
+        sessionsByID[session.id] = session
     }
 
     private func codexWorkspace(from recentEntries: [[String: Any]], metaPayload: [String: Any]?) -> String? {
@@ -284,9 +392,7 @@ final class SessionMonitor {
     }
 
     private func loadCodexIndexMetadata(cutoff: Date) -> [String: CodexIndexMetadata] {
-        guard let data = FileManager.default.contents(atPath: codexIndex),
-            let content = String(data: data, encoding: .utf8)
-        else { return [:] }
+        guard let content = readTailString(path: codexIndex, maxBytes: 524_288) else { return [:] }
 
         var metadata: [String: CodexIndexMetadata] = [:]
         for line in content.split(separator: "\n").reversed() {
@@ -304,24 +410,56 @@ final class SessionMonitor {
         return metadata
     }
 
-    private func recentCodexSessionFiles(cutoff: Date, limit: Int) -> [String] {
+    private func recentCodexSessionFiles(cutoff: Date, limit: Int) -> [(path: String, modified: Date, size: UInt64)] {
         guard let enumerator = FileManager.default.enumerator(atPath: codexSessions) else { return [] }
 
-        var files: [(path: String, modified: Date)] = []
+        let now = Date()
+        if let cached = codexFileListCache,
+           now.timeIntervalSince(cached.createdAt) < 30 {
+            lastCodexFileListCacheHits = 1
+            return cached.paths
+                .compactMap { codexSessionFileInfo(path: $0, cutoff: cutoff) }
+                .sorted { $0.modified > $1.modified }
+                .prefix(limit)
+                .map { $0 }
+        }
+
+        var files: [(path: String, modified: Date, size: UInt64)] = []
         while let relativePath = enumerator.nextObject() as? String {
             guard relativePath.hasSuffix(".jsonl") else { continue }
             let fullPath = codexSessions + "/" + relativePath
-            guard let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
-                let modified = attrs[.modificationDate] as? Date,
-                modified > cutoff
-            else { continue }
-            files.append((path: fullPath, modified: modified))
+            guard let file = codexSessionFileInfo(path: fullPath, cutoff: cutoff) else { continue }
+            files.append(file)
         }
 
-        return files
+        let recentFiles = files
             .sorted { $0.modified > $1.modified }
             .prefix(limit)
-            .map(\.path)
+            .map { $0 }
+        codexFileListCache = CodexFileListCache(
+            createdAt: now,
+            paths: recentFiles.map(\.path)
+        )
+        return recentFiles
+    }
+
+    private func codexSessionFileInfo(path: String, cutoff: Date) -> (path: String, modified: Date, size: UInt64)? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let modified = attrs[.modificationDate] as? Date,
+              let rawSize = attrs[.size],
+              modified > cutoff
+        else { return nil }
+
+        let size: UInt64
+        if let value = rawSize as? UInt64 {
+            size = value
+        } else if let value = rawSize as? NSNumber {
+            size = value.uint64Value
+        } else {
+            return nil
+        }
+
+        return (path: path, modified: modified, size: size)
     }
 
     private func codexTaskSummary(recentEntries: [[String: Any]], fallback: String?) -> String? {
@@ -406,7 +544,22 @@ final class SessionMonitor {
 
     private func scanOpenCodeSessions() -> [CodingSession] {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: openCodeDB) else { return [] }
+        guard fm.fileExists(atPath: openCodeDB),
+              let cacheKey = openCodeCacheKey()
+        else {
+            lastOpenCodeCacheHits = 0
+            openCodeSessionCache = nil
+            return []
+        }
+
+        let now = Date()
+        if let cached = openCodeSessionCache,
+           cached.key == cacheKey,
+           now.timeIntervalSince(cached.createdAt) < 30 {
+            lastOpenCodeCacheHits = 1
+            return cached.sessions
+        }
+        lastOpenCodeCacheHits = 0
 
         let cutoff = Date().addingTimeInterval(-3600)
         let query = [
@@ -418,6 +571,12 @@ final class SessionMonitor {
         ].joined(separator: " ")
 
         let rows = runSQLiteLines(database: openCodeDB, sql: query)
+        let sessionIds = rows.compactMap { row -> String? in
+            let columns = row.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            guard let sessionId = columns.first, !sessionId.isEmpty else { return nil }
+            return sessionId
+        }
+        let messagesBySession = readOpenCodeMessagesBySession(sessionIds: sessionIds)
         var sessions: [CodingSession] = []
 
         for row in rows {
@@ -430,7 +589,7 @@ final class SessionMonitor {
             let title = openCodeTaskTitle(title: columns[3], slug: slug)
             let createdAtMs = Double(columns[4]) ?? 0
             let updatedAtMs = Double(columns[5]) ?? 0
-            let recentMessages = readOpenCodeMessages(sessionId: sessionId)
+            let recentMessages = messagesBySession[sessionId] ?? []
             let latestMessage = recentMessages.first
             let latestUserMessage = recentMessages.first(where: { ($0["role"] as? String) == "user" })
 
@@ -461,7 +620,36 @@ final class SessionMonitor {
                 ))
         }
 
+        openCodeSessionCache = OpenCodeSessionCache(
+            createdAt: now,
+            key: cacheKey,
+            sessions: sessions
+        )
         return sessions
+    }
+
+    private func openCodeCacheKey() -> OpenCodeCacheKey? {
+        guard let db = fileSnapshot(path: openCodeDB) else { return nil }
+        let wal = fileSnapshot(path: openCodeDB + "-wal")
+        return OpenCodeCacheKey(db: db, wal: wal)
+    }
+
+    private func fileSnapshot(path: String) -> FileSnapshot? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let modified = attrs[.modificationDate] as? Date,
+              let rawSize = attrs[.size]
+        else { return nil }
+
+        let size: UInt64
+        if let value = rawSize as? UInt64 {
+            size = value
+        } else if let value = rawSize as? NSNumber {
+            size = value.uint64Value
+        } else {
+            return nil
+        }
+
+        return FileSnapshot(modified: modified, size: size)
     }
 
     private func openCodeTaskSummary(
@@ -608,16 +796,7 @@ final class SessionMonitor {
     private func readRecentJsonlEntries(
         path: String, limit: Int, maxBytes: UInt64 = 131_072
     ) -> [[String: Any]] {
-        guard let fh = FileHandle(forReadingAtPath: path) else { return [] }
-        defer { fh.closeFile() }
-
-        let fileSize = fh.seekToEndOfFile()
-        guard fileSize > 0 else { return [] }
-
-        let readSize = min(fileSize, maxBytes)
-        fh.seek(toFileOffset: fileSize - readSize)
-        let data = fh.readDataToEndOfFile()
-        guard let str = String(data: data, encoding: .utf8) else { return [] }
+        guard let str = readTailString(path: path, maxBytes: maxBytes) else { return [] }
 
         var results: [[String: Any]] = []
         for line in str.split(separator: "\n").reversed() {
@@ -630,6 +809,19 @@ final class SessionMonitor {
             if results.count == limit { break }
         }
         return results
+    }
+
+    private func readTailString(path: String, maxBytes: UInt64) -> String? {
+        guard let fh = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { fh.closeFile() }
+
+        let fileSize = fh.seekToEndOfFile()
+        guard fileSize > 0 else { return "" }
+
+        let readSize = min(fileSize, maxBytes)
+        fh.seek(toFileOffset: fileSize - readSize)
+        let data = fh.readDataToEndOfFile()
+        return String(data: data, encoding: .utf8)
     }
 
     private func readFirstJsonlEntry(path: String, maxBytes: Int = 32_768) -> [String: Any]? {
@@ -681,16 +873,32 @@ final class SessionMonitor {
             .map(String.init)
     }
 
-    private func readOpenCodeMessages(sessionId: String, limit: Int = 8) -> [[String: Any]] {
+    private func readOpenCodeMessagesBySession(sessionIds: [String], limit: Int = 8) -> [String: [[String: Any]]] {
+        let uniqueIds = Array(Set(sessionIds)).filter { !$0.isEmpty }
+        guard !uniqueIds.isEmpty else { return [:] }
+
+        let quotedIds = uniqueIds.map(quoteSQLite).joined(separator: ",")
         let sql = [
-            "select data",
+            "select session_id, data",
+            "from (",
+            "select session_id, data,",
+            "row_number() over (partition by session_id order by time_updated desc) as row_num",
             "from message",
-            "where session_id = \(quoteSQLite(sessionId))",
-            "order by time_updated desc",
-            "limit \(limit);"
+            "where session_id in (\(quotedIds))",
+            ")",
+            "where row_num <= \(limit)",
+            "order by session_id, row_num;"
         ].joined(separator: " ")
-        return runSQLiteLines(database: openCodeDB, sql: sql)
-            .compactMap(parseJSONString)
+
+        var messagesBySession: [String: [[String: Any]]] = [:]
+        for row in runSQLiteLines(database: openCodeDB, sql: sql) {
+            let columns = row.split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+            guard columns.count == 2,
+                  let message = parseJSONString(columns[1])
+            else { continue }
+            messagesBySession[columns[0], default: []].append(message)
+        }
+        return messagesBySession
     }
 
     private func quoteSQLite(_ value: String) -> String {

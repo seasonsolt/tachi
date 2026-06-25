@@ -32,6 +32,14 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
     case amberEye
     case voidMonolith
 
+    static var allCases: [CompanionPersonaMode] {
+        [
+            .laughingMan,
+            .matrixAgent,
+            .voidMonolith
+        ]
+    }
+
     var label: String {
         switch self {
         case .automatic: return "Auto (follows theme)"
@@ -239,7 +247,7 @@ final class ViewModel {
         sessions.filter { $0.status == .working || $0.status == .waitingForInput }
     }
 
-    var sessionRefreshInterval: TimeInterval { 5 }
+    var sessionRefreshInterval: TimeInterval { 15 }
 
     var workingSessionCount: Int {
         sessions.filter { $0.status == .working }.count
@@ -488,9 +496,8 @@ final class ViewModel {
     @MainActor
     func refresh() async {
         async let usageTask: () = refreshUsage()
-        async let sessionsTask: () = refreshSessions()
         async let claudeTask = APIClient.shared.fetchClaudeStats()
-        _ = await (usageTask, sessionsTask)
+        _ = await usageTask
         claudeStats = await claudeTask
         lastUpdated = Date()
         isLoading = false
@@ -704,18 +711,34 @@ final class ViewModel {
 
     private static func loadCompanionPersonaMode() -> CompanionPersonaMode {
         let raw = UserDefaults.standard.string(forKey: companionPersonaModeKey)
-        if let raw, let mode = CompanionPersonaMode(rawValue: raw) {
+        if let raw,
+           let mode = CompanionPersonaMode(rawValue: raw),
+           mode != .automatic,
+           mode != .defaultOrb,
+           mode != .amberEye {
             return mode
         }
         // Migrate removed persona modes
         if let raw {
             switch raw {
-            case "bladeRunnerEye", "nervHex": return .amberEye
+            case "automatic", "defaultOrb", "amberEye", "bladeRunnerEye", "nervHex":
+                return defaultCompanionPersonaMode(for: loadTheme())
             case "singularityVoid": return .voidMonolith
             default: break
             }
         }
-        return .automatic
+        return defaultCompanionPersonaMode(for: loadTheme())
+    }
+
+    private static func defaultCompanionPersonaMode(for theme: EACCThemeName) -> CompanionPersonaMode {
+        switch theme {
+        case .cyber, .amber:
+            return .laughingMan
+        case .matrix:
+            return .matrixAgent
+        case .voidTheme:
+            return .voidMonolith
+        }
     }
 
     private static func loadTheme() -> EACCThemeName {
