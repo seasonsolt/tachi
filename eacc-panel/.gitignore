@@ -1,4 +1,5 @@
 .build/
 EACCMonitor.app/
+Monolith.app/
 .swiftpm/
 .DS_Store

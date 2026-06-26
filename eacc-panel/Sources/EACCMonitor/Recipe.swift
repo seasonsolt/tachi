@@ -133,38 +133,24 @@ extension CollectorRecipe {
         parseScript: "claude-code-stats"
     )
 
-    static let anthropicAPI = CollectorRecipe(
-        id: "anthropic-api",
-        name: "Anthropic API",
-        type: .apiPoll,
+    static let codexSessions = CollectorRecipe(
+        id: "codex-sessions",
+        name: "Codex",
+        type: .fileWatch,
         enabled: true,
-        endpoint: "https://api.anthropic.com/v1/organizations/usage_report/messages",
-        method: "GET",
-        authType: .header,
-        authKeyName: "anthropicAdminKey",
         pollIntervalMs: 60000,
-        extractTotalTokens: "$.data[*].input_tokens + $.data[*].output_tokens"
+        watchPath: "~/.codex/sessions",
+        parseScript: "codex-sessions"
     )
 
-    static let openaiAPI = CollectorRecipe(
-        id: "openai-api",
-        name: "OpenAI",
-        type: .apiPoll,
-        enabled: true,
-        endpoint: "https://api.openai.com/v1/organization/usage/completions",
-        method: "GET",
-        authType: .bearer,
-        authKeyName: "openaiKey",
-        pollIntervalMs: 60000
-    )
-
-    static let builtins: [CollectorRecipe] = [.claudeCode, .anthropicAPI, .openaiAPI]
+    static let builtins: [CollectorRecipe] = [.claudeCode, .codexSessions]
 }
 
 // MARK: - Recipe persistence (~/.eacc/recipes/)
 
 struct RecipeStore {
     static let recipesDir = NSHomeDirectory() + "/.eacc/recipes"
+    private static let standardRecipeIds = Set(CollectorRecipe.builtins.map(\.id))
 
     static func ensureDir() {
         let fm = FileManager.default
@@ -206,14 +192,17 @@ struct RecipeStore {
         try? FileManager.default.removeItem(atPath: path)
     }
 
-    /// Install built-in recipes if the recipes directory is empty
+    /// Install standard local collectors and remove older/custom setup-driven recipes.
     static func installDefaults() {
         ensureDir()
         let existing = loadAll()
-        if existing.isEmpty {
-            for recipe in CollectorRecipe.builtins {
-                save(recipe)
-            }
+
+        for recipe in existing where !standardRecipeIds.contains(recipe.id) {
+            delete(id: recipe.id)
+        }
+
+        for recipe in CollectorRecipe.builtins {
+            save(recipe)
         }
     }
 }
