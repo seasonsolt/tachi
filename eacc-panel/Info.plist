@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>EACC Monitor</string>
+    <string>Monolith</string>
     <key>CFBundleDisplayName</key>
-    <string>EACC Monitor</string>
+    <string>Monolith</string>
     <key>CFBundleIdentifier</key>
     <string>com.seasonsolt.eacc-monitor</string>
     <key>CFBundleVersion</key>
@@ -22,10 +22,5 @@
     <string>AppIcon</string>
     <key>LSUIElement</key>
     <true/>
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <key>NSAllowsArbitraryLoads</key>
-        <true/>
-    </dict>
 </dict>
 </plist>

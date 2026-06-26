@@ -3,18 +3,12 @@ import Foundation
 // MARK: - Config
 
 enum Config {
-    static let apiBase = "http://seasonsolt.myds.me:8888/api/v1"
-    static let loginEmail = "thin@sub2api.local"
-    static let loginPassword = "season2026"
+    static let apiBase = ProcessInfo.processInfo.environment["MONOLITH_API_BASE"] ?? ""
+    static let loginEmail = ProcessInfo.processInfo.environment["MONOLITH_API_EMAIL"] ?? ""
+    static let loginPassword = ProcessInfo.processInfo.environment["MONOLITH_API_PASSWORD"] ?? ""
 
-    // Claude channel — ai.benwk.io (sub2api, refresh token auth)
-    static let claudeApiBase = "https://ai.benwk.io/api/v1"
-    static let claudeRefreshToken = "rt_bd9cbfa51fdd42bf2b0ac51fb4fc3b9d167f852e4d5d6ffb99d2f760e480bd1e"
-}
-
-enum AppConfigKeys {
-    static let sub2APIBaseURL = "sub2apiBaseURL"
-    static let sub2APIRefreshToken = "sub2apiRefreshToken"
+    static let claudeApiBase = ProcessInfo.processInfo.environment["MONOLITH_CLAUDE_API_BASE"] ?? ""
+    static let claudeRefreshToken = ProcessInfo.processInfo.environment["MONOLITH_CLAUDE_REFRESH_TOKEN"] ?? ""
 }
 
 // MARK: - Models
@@ -132,13 +126,13 @@ final class APIClient: NSObject, URLSessionDelegate, @unchecked Sendable {
     func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge) async
         -> (URLSession.AuthChallengeDisposition, URLCredential?)
     {
-        if let trust = challenge.protectionSpace.serverTrust {
-            return (.useCredential, URLCredential(trust: trust))
-        }
         return (.performDefaultHandling, nil)
     }
 
     private func login() async -> Bool {
+        guard !Config.apiBase.isEmpty, !Config.loginEmail.isEmpty, !Config.loginPassword.isEmpty else {
+            return false
+        }
         guard let url = URL(string: Config.apiBase + "/auth/login") else { return false }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -160,8 +154,12 @@ final class APIClient: NSObject, URLSessionDelegate, @unchecked Sendable {
         return true
     }
 
-    private func makeRequest(path: String) -> URLRequest {
-        var req = URLRequest(url: URL(string: Config.apiBase + "/admin" + path)!)
+    private func makeRequest(path: String) -> URLRequest? {
+        guard !Config.apiBase.isEmpty,
+              let url = URL(string: Config.apiBase + "/admin" + path)
+        else { return nil }
+
+        var req = URLRequest(url: url)
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         if let token = accessToken {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -172,7 +170,7 @@ final class APIClient: NSObject, URLSessionDelegate, @unchecked Sendable {
     }
 
     private func fetchJSON(path: String) async -> [String: Any]? {
-        let req = makeRequest(path: path)
+        guard let req = makeRequest(path: path) else { return nil }
         guard let (data, resp) = try? await session.data(for: req) else { return nil }
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
         if status == 401 { return nil }
@@ -274,23 +272,11 @@ final class APIClient: NSObject, URLSessionDelegate, @unchecked Sendable {
     // MARK: - Claude Channel (ai.benwk.io)
 
     private var claudeAccessToken: String?
-    private var claudeApiBase: String = UserDefaults.standard.string(forKey: AppConfigKeys.sub2APIBaseURL) ?? Config.claudeApiBase
-    private var claudeRefreshToken: String = UserDefaults.standard.string(forKey: AppConfigKeys.sub2APIRefreshToken) ?? Config.claudeRefreshToken
-
-    func configureClaudeChannel(baseURL: String, refreshToken: String) {
-        let trimmedBase = baseURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let trimmedToken = refreshToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedBase.isEmpty, !trimmedToken.isEmpty else { return }
-
-        claudeApiBase = trimmedBase
-        claudeRefreshToken = trimmedToken
-        claudeAccessToken = nil
-        UserDefaults.standard.set(trimmedBase, forKey: AppConfigKeys.sub2APIBaseURL)
-        UserDefaults.standard.set(trimmedToken, forKey: AppConfigKeys.sub2APIRefreshToken)
-    }
+    private var claudeRefreshToken: String = Config.claudeRefreshToken
 
     private func claudeRefresh() async -> Bool {
-        guard let url = URL(string: claudeApiBase + "/auth/refresh") else { return false }
+        guard !Config.claudeApiBase.isEmpty, !claudeRefreshToken.isEmpty else { return false }
+        guard let url = URL(string: Config.claudeApiBase + "/auth/refresh") else { return false }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -330,7 +316,8 @@ final class APIClient: NSObject, URLSessionDelegate, @unchecked Sendable {
     }
 
     private func fetchClaudeStatsOnce() async -> ClaudeStats? {
-        guard let url = URL(string: claudeApiBase + "/usage/dashboard/stats?timezone=Asia%2FShanghai"),
+        guard !Config.claudeApiBase.isEmpty else { return nil }
+        guard let url = URL(string: Config.claudeApiBase + "/usage/dashboard/stats?timezone=Asia%2FShanghai"),
               let token = claudeAccessToken
         else { return nil }
 
@@ -368,7 +355,9 @@ final class APIClient: NSObject, URLSessionDelegate, @unchecked Sendable {
     }
 
     func testAccount(id: Int) async -> TestState {
-        var req = makeRequest(path: "/accounts/\(id)/test")
+        guard var req = makeRequest(path: "/accounts/\(id)/test") else {
+            return .failure(error: "API endpoint is not configured")
+        }
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try? JSONSerialization.data(
