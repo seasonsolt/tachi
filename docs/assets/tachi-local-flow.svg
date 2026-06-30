@@ -1,0 +1,47 @@
+<svg width="900" height="344" viewBox="0 0 1100 420" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Tachi local workflow</title>
+  <desc id="desc">Claude Code and Codex local session data flowing into the Tachi menu bar companion.</desc>
+  <defs>
+    <linearGradient id="line" x1="260" y1="210" x2="842" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D6FF"/>
+      <stop offset="1" stop-color="#7A86FF"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="476" y1="132" x2="624" y2="286" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#63D0FF"/>
+      <stop offset="0.52" stop-color="#0B8EFF"/>
+      <stop offset="1" stop-color="#004AAE"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1100" height="420" rx="30" fill="#070B12"/>
+  <rect x="68" y="68" width="964" height="284" rx="26" fill="#0D1522" stroke="#263852"/>
+
+  <rect x="112" y="134" width="220" height="150" rx="20" fill="#121D2D" stroke="#2B405D"/>
+  <text x="150" y="190" fill="#EAF3FF" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="23" font-weight="700">Claude Code</text>
+  <text x="150" y="224" fill="#91A6C1" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="16">standard local traces</text>
+
+  <rect x="768" y="134" width="220" height="150" rx="20" fill="#121D2D" stroke="#2B405D"/>
+  <text x="838" y="190" fill="#EAF3FF" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="23" font-weight="700">Codex</text>
+  <text x="820" y="224" fill="#91A6C1" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="16">local session files</text>
+
+  <rect x="448" y="112" width="204" height="200" rx="26" fill="#080E18" stroke="#344A68"/>
+  <ellipse cx="550" cy="274" rx="74" ry="16" fill="#000000" opacity="0.35"/>
+  <path d="M490 204 C490 160 514 140 550 140 C586 140 610 160 610 204 L610 226 C610 256 586 272 550 272 C514 272 490 256 490 226 Z" fill="url(#blue)" stroke="#78D3FF" stroke-width="3"/>
+  <ellipse cx="550" cy="204" rx="54" ry="36" fill="#EDF5FF" stroke="#04101D" stroke-width="6"/>
+  <circle cx="550" cy="204" r="24" fill="#050A12" stroke="#445B74" stroke-width="4"/>
+  <circle cx="550" cy="204" r="12" fill="#0096FF"/>
+  <circle cx="560" cy="194" r="7" fill="#FFFFFF" opacity="0.9"/>
+  <rect x="522" y="252" width="56" height="18" rx="9" fill="#11223A" stroke="#2F6EB2"/>
+  <text x="520" y="334" fill="#EAF3FF" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="22" font-weight="700">Tachi</text>
+
+  <path d="M338 210 H438" stroke="url(#line)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M662 210 H762" stroke="url(#line)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M428 198 L448 210 L428 222" stroke="#22D6FF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M752 198 L772 210 L752 222" stroke="#7A86FF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="400" y="34" width="300" height="52" rx="18" fill="#0A111D" stroke="#263852"/>
+  <text x="452" y="67" fill="#AFC1D9" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="16">menu bar, no setup screen</text>
+
+  <rect x="398" y="362" width="304" height="34" rx="17" fill="#111C2B" stroke="#2B405D"/>
+  <text x="454" y="385" fill="#AFC1D9" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="15">Your coding state stays on your Mac.</text>
+</svg>

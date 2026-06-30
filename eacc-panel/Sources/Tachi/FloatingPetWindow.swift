@@ -10,8 +10,9 @@ final class FloatingPetWindowController {
     func show(vm: ViewModel) {
         let initialSize = DesktopPetView.panelSize(for: vm, showingPreview: false)
         if let panel {
-            updateContent(vm: vm, panel: panel)
-            panel.orderFrontRegardless()
+            if !panel.isVisible {
+                panel.orderFrontRegardless()
+            }
             return
         }
 

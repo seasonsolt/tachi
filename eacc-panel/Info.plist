@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Monolith</string>
+    <string>Tachi</string>
     <key>CFBundleDisplayName</key>
-    <string>Monolith</string>
+    <string>Tachi</string>
     <key>CFBundleIdentifier</key>
-    <string>com.seasonsolt.eacc-monitor</string>
-    <key>CFBundleVersion</key>
-    <string>1.0.0</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>com.seasonsolt.tachi</string>
+	<key>CFBundleVersion</key>
+	<string>1.1.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.1.0</string>
     <key>CFBundleExecutable</key>
-    <string>EACCMonitor</string>
+    <string>Tachi</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>NSPrincipalClass</key>

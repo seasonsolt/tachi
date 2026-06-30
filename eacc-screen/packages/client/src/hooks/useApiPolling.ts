@@ -223,7 +223,6 @@ function combineSourceData(anthropic: SourceData, openai: SourceData): TokenData
 
 export function useApiPolling() {
   const mode = useStore((s) => s.mode);
-  const { setTokenData, setMilestone } = useStore();
   const prevMilestoneRef = useRef<string | null>(null);
   const pollRef = useRef<() => void>(() => {});
 
@@ -246,13 +245,14 @@ export function useApiPolling() {
         if (cancelled) return;
 
         const data = combineSourceData(anthropic, openai);
+        const { setTokenData, setMilestone } = useStore.getState();
         setTokenData(data);
 
         const m = getMilestone(data.totalTokens);
         if (m && m.name !== prevMilestoneRef.current) {
           prevMilestoneRef.current = m.name;
           setMilestone(m);
-          setTimeout(() => setMilestone(null), 8000);
+          setTimeout(() => useStore.getState().setMilestone(null), 8000);
         }
       } catch {
         // silently retry on next interval
@@ -272,5 +272,5 @@ export function useApiPolling() {
       clearInterval(timer);
       window.removeEventListener('ritual-keys-updated', onKeysUpdated);
     };
-  }, [mode, setTokenData, setMilestone]);
+  }, [mode]);
 }

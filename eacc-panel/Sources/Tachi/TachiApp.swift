@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct EACCMonitorApp: App {
+struct TachiApp: App {
     private let vm = ViewModel()
 
     // WebSocket sidecar for eacc-screen
@@ -46,6 +46,10 @@ struct EACCMonitorApp: App {
         sessionsWatcher.start()
         themeWatcher.start()
         recipeRuntime.start()
+
+        Task { @MainActor [vm] in
+            FloatingPetWindowController.shared.show(vm: vm)
+        }
     }
 
     var body: some Scene {
@@ -59,9 +63,6 @@ struct EACCMonitorApp: App {
             }
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .fixedSize()
-                .task {
-                    FloatingPetWindowController.shared.show(vm: vm)
-                }
                 .task {
                     while !Task.isCancelled {
                         try? await Task.sleep(for: .seconds(1))

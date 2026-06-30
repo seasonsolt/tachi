@@ -220,6 +220,9 @@ private extension View {
 struct ContentView: View {
     @Bindable var vm: ViewModel
 
+    private let panelWidth: CGFloat = 400
+    private let panelHeight: CGFloat = 560
+
     private var panelColors: EACCThemeColors {
         vm.panelThemeColors
     }
@@ -236,7 +239,8 @@ struct ContentView: View {
             RitualDivider(themeColors: panelColors, accent: panelColors.accent)
             footer
         }
-        .frame(width: 400)
+        .frame(width: panelWidth, height: panelHeight)
+        .clipped()
         .background {
             RitualPanelBackdrop(
                 themeColors: panelColors,
@@ -247,33 +251,177 @@ struct ContentView: View {
     }
 
     private var header: some View {
-        HStack {
-            Text("e/acc")
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                .foregroundStyle(panelColors.accent)
-            Spacer()
-            if let date = vm.lastUpdated {
-                HStack(spacing: 4) {
-                    Text("CYCLE")
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+        HStack(spacing: 12) {
+            Circle()
+                .fill(panelColors.accent)
+                .frame(width: 13, height: 13)
+                .shadow(color: panelColors.accent.opacity(0.55), radius: 10)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(activeTaskTitle)
+                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                    .foregroundStyle(panelColors.textPrimary)
+                    .lineLimit(1)
+
+                HStack(spacing: 6) {
+                    Text(activeTaskSubtitle)
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
                         .foregroundStyle(panelColors.textMuted)
-                    Text(date, style: .time)
-                        .font(.system(size: 11, design: .monospaced).monospacedDigit())
-                        .foregroundStyle(panelColors.textSecondary)
+                        .lineLimit(1)
+
+                    if let date = vm.lastUpdated {
+                        Text("·")
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(panelColors.textMuted)
+                        Text(date, style: .time)
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced).monospacedDigit())
+                            .foregroundStyle(panelColors.textSecondary)
+                    }
                 }
             }
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+
+            CompanionPersonaMenu(vm: vm, accent: panelColors.accent, isProminent: true)
+
             Button {
                 Task { await vm.refresh() }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 11, weight: .bold))
+                    .frame(width: 28, height: 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(panelColors.cardBorder.opacity(0.32))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(panelColors.accent.opacity(0.16), lineWidth: 1)
+                    )
             }
             .buttonStyle(.plain)
             .foregroundStyle(panelColors.textSecondary)
             .help("Refresh")
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
+    }
+
+    private var activeTaskTitle: String {
+        let count = vm.activeSessions.count
+        if count == 1 { return "1 active task" }
+        if count > 1 { return "\(count) active tasks" }
+        return "all agents quiet"
+    }
+
+    private var activeTaskSubtitle: String {
+        let codex = vm.codexSessionCount
+        let warm = vm.warmSessionCount
+        if codex > 0 && warm > 0 {
+            return "\(codex) codex · \(warm) warm"
+        }
+        if warm > 0 {
+            return "\(warm) warm threads"
+        }
+        return "session pulse \(Int(vm.sessionRefreshInterval))s"
+    }
+
+    private var syncStatusText: String {
+        let total = vm.recipeSources.count
+        let connected = vm.recipeSources.filter { $0.data.connected }.count
+        let pulse = "pulse \(Int(vm.sessionRefreshInterval))s"
+
+        guard total > 0 else {
+            return "local agents synced · \(pulse)"
+        }
+
+        if connected == total {
+            return "all collectors synced · \(pulse)"
+        }
+
+        return "\(connected)/\(total) collectors live · \(pulse)"
+    }
+
+    private var footer: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.shield")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(panelColors.accent)
+                Text(syncStatusText)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(panelColors.textSecondary)
+                    .lineLimit(1)
+            }
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+
+            Menu {
+                ForEach([15.0, 30.0, 60.0, 120.0], id: \.self) { interval in
+                    Button {
+                        vm.refreshInterval = interval
+                    } label: {
+                        HStack {
+                            Text("\(Int(interval))s")
+                            if vm.refreshInterval == interval {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "timer")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("\(Int(vm.refreshInterval))s")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced).monospacedDigit())
+                }
+                .padding(.horizontal, 8)
+                .frame(height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(panelColors.cardBorder.opacity(0.26))
+                )
+                .foregroundStyle(panelColors.textSecondary)
+            }
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+
+            Button {
+                if let url = URL(string: "https://e-acc.ai") {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                footerIcon("arrow.up.forward.app", tint: panelColors.accent)
+            }
+            .buttonStyle(.plain)
+            .help("Open altar")
+
+            Button {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                footerIcon("power", tint: redAccent)
+            }
+            .buttonStyle(.plain)
+            .help("Disconnect")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
+        .background(panelColors.bg.opacity(0.96))
+    }
+
+    private func footerIcon(_ systemName: String, tint: Color) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 11, weight: .bold))
+            .frame(width: 26, height: 26)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(tint.opacity(0.10))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(tint.opacity(0.18), lineWidth: 1)
+            )
+            .foregroundStyle(tint.opacity(0.86))
     }
 
     private var loadingView: some View {
@@ -284,29 +432,59 @@ struct ContentView: View {
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(panelColors.textSecondary)
         }
-        .frame(height: 120)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var scrollContent: some View {
         ScrollView {
             LazyVStack(spacing: 8) {
                 companionSection
+                if let snapshot = vm.codexRateLimits {
+                    codexUsageSection(snapshot)
+                }
+                if !vm.menuSessions.isEmpty {
+                    sessionsSection
+                }
                 if !vm.recipeSources.isEmpty {
                     recipeSourcesSection
-                }
-                if !vm.sessions.isEmpty {
-                    sessionsSection
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
         }
-        .frame(minHeight: 420, maxHeight: 620)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .layoutPriority(1)
     }
 
     private var companionSection: some View {
         CompanionCard(vm: vm)
             .padding(.bottom, 4)
+    }
+
+    // MARK: - Codex Usage
+
+    private func codexUsageSection(_ snapshot: CodexRateLimitSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "gauge.with.dots.needle.bottom.50percent")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(panelColors.accent)
+                Text("CODEX USAGE")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(panelColors.textSecondary)
+                Spacer()
+                Text("OFFICIAL")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(panelColors.accent.opacity(0.12)))
+                    .foregroundStyle(panelColors.accent)
+            }
+            .padding(.horizontal, 4)
+
+            CodexQuotaCard(snapshot: snapshot, themeColors: panelColors)
+        }
+        .ritualSection(themeColors: panelColors, accent: panelColors.accent)
     }
 
     // MARK: - Recipe Sources
@@ -340,11 +518,18 @@ struct ContentView: View {
                 Image(systemName: "waveform.path")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(panelColors.accent)
-                Text("PET-SENSED THREADS")
+                Text("AI CODING SESSIONS")
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundStyle(panelColors.textSecondary)
                 Spacer()
-                if vm.workingSessionCount > 0 {
+                if vm.codexSessionCount > 0 {
+                    Text("\(vm.codexSessionCount) CODEX")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(panelColors.accent.opacity(0.12)))
+                        .foregroundStyle(panelColors.accent)
+                } else if vm.workingSessionCount > 0 {
                     Text("\(vm.workingSessionCount) FEEDING")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .padding(.horizontal, 6)
@@ -362,7 +547,7 @@ struct ContentView: View {
             }
             .padding(.horizontal, 4)
 
-            ForEach(vm.sessions) { session in
+            ForEach(vm.menuSessions) { session in
                 SessionRow(session: session, themeColors: panelColors)
             }
         }
@@ -398,63 +583,6 @@ struct ContentView: View {
         .ritualSection(themeColors: panelColors, accent: panelColors.accent)
     }
 
-    private var footer: some View {
-        VStack(spacing: 6) {
-            HStack {
-                Menu {
-                    ForEach([15.0, 30.0, 60.0, 120.0], id: \.self) { interval in
-                        Button {
-                            vm.refreshInterval = interval
-                        } label: {
-                            HStack {
-                                Text("\(Int(interval))s")
-                                if vm.refreshInterval == interval {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "timer")
-                            .font(.system(size: 10))
-                        Text("\(Int(vm.refreshInterval))s")
-                            .font(.system(size: 11, design: .monospaced).monospacedDigit())
-                    }
-                    .foregroundStyle(panelColors.textSecondary)
-                }
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-
-                ThemePickerMenu(vm: vm)
-
-                Spacer()
-                Button("OPEN ALTAR") {
-                    if let url = URL(string: "https://e-acc.ai") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(panelColors.accent.opacity(0.7))
-                Button("DISCONNECT") {
-                    NSApplication.shared.terminate(nil)
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(redAccent.opacity(0.6))
-            }
-            Text("Session pulse: \(Int(vm.sessionRefreshInterval))s")
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(panelColors.textMuted)
-            Text("ACCELERATE OR DIE")
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(panelColors.textMuted)
-                .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-    }
 }
 
 // MARK: - Companion Card
@@ -548,6 +676,7 @@ struct CompanionCard: View {
 struct CompanionPersonaMenu: View {
     let vm: ViewModel
     var accent: Color? = nil
+    var isProminent = false
 
     private var menuAccent: Color {
         accent ?? vm.themeColors.accent
@@ -557,19 +686,38 @@ struct CompanionPersonaMenu: View {
         Menu {
             CompanionPersonaActions(vm: vm)
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "person.crop.circle.badge.questionmark")
-                    .font(.system(size: 9, weight: .semibold))
+            HStack(spacing: isProminent ? 8 : 4) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: isProminent ? 13 : 9, weight: .semibold))
                 Text(vm.companionPersonaMode.badge)
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .font(.system(size: isProminent ? 12 : 9, weight: .bold, design: .monospaced))
+                if isProminent {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(menuAccent.opacity(0.72))
+                }
             }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4)
-            .background(Capsule().fill(menuAccent.opacity(0.12)))
+            .padding(.horizontal, isProminent ? 11 : 7)
+            .padding(.vertical, isProminent ? 8 : 4)
+            .background {
+                if isProminent {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(menuAccent.opacity(0.16))
+                } else {
+                    Capsule()
+                        .fill(menuAccent.opacity(0.12))
+                }
+            }
+            .overlay {
+                if isProminent {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .strokeBorder(menuAccent.opacity(0.18), lineWidth: 1)
+                }
+            }
             .foregroundStyle(menuAccent)
         }
         .menuStyle(.borderlessButton)
-        .help("Switch floating pet icon")
+        .help("Switch companion")
     }
 }
 
@@ -592,47 +740,6 @@ struct CompanionPersonaActions: View {
     }
 }
 
-// MARK: - Theme Picker Menu
-
-struct ThemePickerMenu: View {
-    let vm: ViewModel
-
-    private var panelColors: EACCThemeColors {
-        vm.panelThemeColors
-    }
-
-    var body: some View {
-        Menu {
-            ForEach(EACCThemeName.allCases, id: \.self) { theme in
-                Button {
-                    vm.setTheme(theme)
-                } label: {
-                    HStack {
-                        Text("\(theme.label) — \(theme.subtitle)")
-                        if vm.selectedTheme == theme {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(panelColors.accent)
-                    .frame(width: 6, height: 6)
-                Text(vm.selectedTheme.label)
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-            }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4)
-            .background(Capsule().fill(panelColors.accent.opacity(0.12)))
-            .foregroundStyle(panelColors.accent)
-        }
-        .menuStyle(.borderlessButton)
-        .help("Switch theme")
-    }
-}
-
 struct CompanionPetView: View {
     let persona: CompanionPersona
     let mood: CompanionMood
@@ -645,8 +752,8 @@ struct CompanionPetView: View {
         switch persona {
         case .defaultOrb:
             DefaultCompanionPetView(mood: mood, accent: accent, themeColors: themeColors, hasMotion: hasMotion, motionScale: motionScale)
-        case .laughingMan:
-            LaughingManPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
+        case .cyberSignal:
+            CyberSignalPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
         case .matrixAgent:
             MatrixPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
         case .amberEye:
@@ -786,13 +893,13 @@ private struct DefaultCompanionPetView: View {
     }
 }
 
-// MARK: - Laughing Man Pet View (SVG ring + Canvas face)
-// Ring: NSImage from inline SVG — native <textPath> for pixel-perfect text.
+// MARK: - Cyber Signal Pet View (SVG ring + Canvas face)
+// Ring: NSImage from inline SVG text path for pixel-perfect text.
 // Face: Canvas paths with mood-based opacity.
 // Both layers share the same coordinate space centered on SVG origin (0,0).
 // Ring rotates via GPU-accelerated SwiftUI animation (no per-frame redraw).
 
-private struct LaughingManPetView: View {
+private struct CyberSignalPetView: View {
     let mood: CompanionMood
     let accent: Color
     var hasMotion: Bool = true
@@ -816,7 +923,7 @@ private struct LaughingManPetView: View {
         <circle r="160"/>\
         <circle r="150" fill="#fff"/>\
         <text font-size="28" font-stretch="condensed" font-family="Impact">\
-        <textPath xlink:href="#f">I thought what I&apos;d do was, I&apos;d pretend I was one of those deaf-mutes</textPath>\
+        <textPath xlink:href="#f">TACHI LOCAL SESSION SIGNAL WATCH THE WORK KEEP THE FLOW</textPath>\
         </text>\
         </g>\
         </svg>
@@ -828,7 +935,7 @@ private struct LaughingManPetView: View {
     private static let ringTextImage: NSImage = {
         let image = NSImage(size: NSSize(width: 400, height: 400))
         let text = Array(
-            "I thought what I'd do was, I'd pretend I was one of those deaf-mutes "
+            "TACHI LOCAL SESSION SIGNAL WATCH THE WORK KEEP THE FLOW "
         )
         let font = NSFont(name: "Impact", size: 22)
             ?? NSFont.systemFont(ofSize: 22, weight: .heavy)
@@ -904,7 +1011,7 @@ private struct LaughingManPetView: View {
                 )
                 .animation(
                     hasMotion
-                        ? .linear(duration: LaughingManMotion.revolutionDuration).repeatForever(autoreverses: false)
+                        ? .linear(duration: CyberSignalMotion.revolutionDuration).repeatForever(autoreverses: false)
                         : .easeInOut(duration: 0.2),
                     value: isRingRotating
                 )
@@ -1639,6 +1746,129 @@ struct UtilBar: View {
     }
 }
 
+// MARK: - Codex Quota Card
+
+struct CodexQuotaCard: View {
+    let snapshot: CodexRateLimitSnapshot
+    let themeColors: EACCThemeColors
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "cube.transparent")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(themeColors.accent)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Codex account")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(themeColors.textPrimary)
+                    Text(snapshot.limitName ?? snapshot.limitId ?? "OpenAI Codex")
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundStyle(themeColors.textMuted)
+                        .lineLimit(1)
+                }
+                Spacer()
+                if let count = snapshot.resetCreditCount {
+                    Text("\(count) resets")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced).monospacedDigit())
+                        .foregroundStyle(themeColors.accent)
+                }
+            }
+
+            VStack(spacing: 6) {
+                ForEach(snapshot.windows, id: \.kind.rawValue) { window in
+                    quotaWindowRow(window)
+                }
+            }
+
+            if !snapshot.availableResetCredits.isEmpty {
+                VStack(spacing: 4) {
+                    ForEach(Array(snapshot.availableResetCredits.prefix(4).enumerated()), id: \.offset) { index, credit in
+                        resetCreditRow(index: index, credit: credit)
+                    }
+                    if snapshot.availableResetCredits.count > 4 {
+                        Text("+\(snapshot.availableResetCredits.count - 4) more reset valid dates")
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundStyle(themeColors.textMuted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.top, snapshot.windows.isEmpty ? 0 : 2)
+            } else if (snapshot.resetCreditCount ?? 0) > 0 {
+                Text("Reset valid dates unavailable")
+                    .font(.system(size: 8, design: .monospaced))
+                    .foregroundStyle(themeColors.textMuted)
+            }
+        }
+        .padding(10)
+        .ritualDataCard(themeColors: themeColors, emphasis: themeColors.accent, radius: 10)
+    }
+
+    private func quotaWindowRow(_ window: CodexRateLimitWindow) -> some View {
+        HStack(spacing: 8) {
+            Text(window.validityLabel)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(themeColors.accent)
+                .frame(width: 24, alignment: .leading)
+            UtilBar(value: Int(window.usedPercent.rounded()), accent: themeColors.accent)
+                .frame(height: 5)
+            Text("\(formatPercent(window.remainingPercent))% left")
+                .font(.system(size: 9, weight: .semibold, design: .monospaced).monospacedDigit())
+                .foregroundStyle(themeColors.textSecondary)
+                .frame(width: 58, alignment: .trailing)
+            Text(formatResetDate(window.resetsAt))
+                .font(.system(size: 9, design: .monospaced).monospacedDigit())
+                .foregroundStyle(themeColors.textMuted)
+                .frame(width: 50, alignment: .trailing)
+        }
+    }
+
+    private func resetCreditRow(index: Int, credit: CodexResetCredit) -> some View {
+        HStack(spacing: 8) {
+            Text("Reset \(index + 1)")
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(themeColors.textSecondary)
+                .frame(width: 58, alignment: .leading)
+            Text("valid until")
+                .font(.system(size: 8, design: .monospaced))
+                .foregroundStyle(themeColors.textMuted)
+            Spacer()
+            Text(formatResetValidDate(credit.expiresAt))
+                .font(.system(size: 9, weight: .semibold, design: .monospaced).monospacedDigit())
+                .foregroundStyle(themeColors.accent)
+        }
+    }
+
+    private func formatPercent(_ value: Double) -> String {
+        if value.rounded() == value {
+            return "\(Int(value))"
+        }
+        return String(format: "%.1f", value)
+    }
+
+    private func formatResetDate(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        formatter.locale = Locale.autoupdatingCurrent
+        if calendar.isDateInToday(date) {
+            formatter.dateFormat = "HH:mm"
+        } else if calendar.component(.year, from: date) == calendar.component(.year, from: Date()) {
+            formatter.dateFormat = "M/d"
+        } else {
+            formatter.dateFormat = "yyyy/M/d"
+        }
+        return formatter.string(from: date)
+    }
+
+    private func formatResetValidDate(_ date: Date?) -> String {
+        guard let date else { return "unknown" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale.autoupdatingCurrent
+        formatter.dateFormat = "EEE M/d HH:mm"
+        return formatter.string(from: date)
+    }
+}
+
 // MARK: - Session Row
 
 struct SessionRow: View {
@@ -1647,68 +1877,89 @@ struct SessionRow: View {
     @State private var isPulsing = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 11) {
             statusIndicator
-            VStack(alignment: .leading, spacing: 2) {
+
+            VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
-                    Image(systemName: session.tool.icon)
-                        .font(.system(size: 10))
-                        .foregroundStyle(themeColors.textSecondary)
                     Text(session.projectName)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(themeColors.textPrimary)
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(statusColor.opacity(0.16))
+                        )
+                        .foregroundStyle(statusColor)
+                        .frame(maxWidth: 105, alignment: .leading)
+
+                    Text(session.signal.compactLabel)
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(themeColors.textMuted)
                         .lineLimit(1)
                 }
-                Text(detailLine)
-                    .font(.system(size: 9))
-                    .foregroundStyle(signalColor)
+
+                Text(session.displayTitle)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(themeColors.textPrimary)
                     .lineLimit(1)
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(ritualStatusLabel(session.status))
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(statusColor)
-                Text(timeAgo(session.lastActivity))
-                    .font(.system(size: 9).monospacedDigit())
-                    .foregroundStyle(themeColors.textMuted)
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(agentStatusLine)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(signalColor)
+                    .lineLimit(1)
+                    .frame(width: 96, alignment: .leading)
+
+                activityMeter
+                    .frame(width: 92, height: 5)
             }
+
+            Button {
+                Task { @MainActor in
+                    SessionLauncher.open(session)
+                }
+            } label: {
+                Image(systemName: "arrow.up.forward")
+                    .font(.system(size: 13, weight: .bold))
+                    .frame(width: 32, height: 32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(statusColor.opacity(0.12))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(statusColor.opacity(0.28), lineWidth: 1)
+                    )
+                    .foregroundStyle(statusColor)
+            }
+            .buttonStyle(.plain)
+            .help("Open \(session.tool.rawValue)")
         }
-        .padding(10)
-        .ritualDataCard(themeColors: themeColors, emphasis: statusColor, radius: 10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .ritualDataCard(themeColors: themeColors, emphasis: statusColor, radius: 12)
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(statusBorderColor, lineWidth: 1)
         )
     }
 
-    private func ritualStatusLabel(_ status: SessionStatus) -> String {
-        switch status {
-        case .working: return "FEEDING"
-        case .waitingForInput: return "WATCHING"
-        case .idle: return "DOZING"
-        case .completed: return "CURLED UP"
-        }
-    }
-
-    private var detailLine: String {
-        let base = session.signal.label
-        if !session.slug.isEmpty && session.slug != session.projectName {
-            return "\(session.slug) · \(base)"
-        }
-        return base
-    }
-
     @ViewBuilder
     private var statusIndicator: some View {
-        Circle()
+        RoundedRectangle(cornerRadius: 2, style: .continuous)
             .fill(statusColor)
-            .frame(width: 8, height: 8)
+            .frame(width: 5, height: 58)
+            .shadow(color: statusColor.opacity(session.pulse == .hot ? 0.42 : 0.18), radius: 8)
             .overlay(
-                Circle()
-                    .stroke(statusColor, lineWidth: 1.5)
-                    .frame(width: 14, height: 14)
-                    .scaleEffect(isPulsing ? 1.6 : 1.0)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .stroke(statusColor.opacity(0.65), lineWidth: 1)
+                    .frame(width: 9, height: 62)
+                    .scaleEffect(x: isPulsing ? 1.8 : 1.0, y: 1.0)
                     .opacity(isPulsing ? 0 : 1)
                     .opacity(session.pulse == .hot || session.pulse == .warm ? 1 : 0)
             )
@@ -1735,6 +1986,38 @@ struct SessionRow: View {
                     isPulsing = false
                 }
             }
+    }
+
+    private var agentStatusLine: String {
+        "\(session.tool.rawValue) · \(session.signal.compactLabel)"
+    }
+
+    private var activityMeter: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(themeColors.cardBorder.opacity(0.48))
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [statusColor.opacity(0.65), statusColor],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: max(7, geo.size.width * CGFloat(pulseLevel)))
+            }
+        }
+    }
+
+    private var pulseLevel: Double {
+        switch session.pulse {
+        case .hot: return 0.92
+        case .warm: return 0.66
+        case .listening: return 0.44
+        case .drowsy: return 0.24
+        case .sleeping: return 0.10
+        }
     }
 
     private var statusColor: Color {

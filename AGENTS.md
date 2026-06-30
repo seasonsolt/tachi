@@ -31,7 +31,7 @@
 - `eacc-screen/packages/shared` — shared TS types, constants, milestones, theme definitions.
 - `eacc-screen/packages/worker` — Cloudflare Worker proxy.
 - `eacc-panel/Package.swift` — SwiftPM package for the menu bar app.
-- `eacc-panel/Sources/EACCMonitor` — all Swift source files.
+- `eacc-panel/Sources/Tachi` — all Swift source files.
 
 ## Install And Run
 - Screen workspace install: `cd eacc-screen && pnpm install`
@@ -41,7 +41,7 @@
 - Worker dev: `cd eacc-screen && pnpm -F @eacc/worker dev`
 - Panel app build script: `cd eacc-panel && ./build.sh`
 - Panel raw Swift build: `cd eacc-panel && swift build -c release`
-- Launch built panel app: `cd eacc-panel && open EACCMonitor.app`
+- Launch built panel app: `cd eacc-panel && open Tachi.app`
 
 ## Build Commands
 - Build all TS packages: `cd eacc-screen && pnpm build`
@@ -155,7 +155,7 @@
 - Preserve theme-driven colors through `vm.themeColors.*` or related semantic theme objects; avoid ad hoc hardcoded UI colors except existing semantic accents.
 
 ## Cross-Project Consistency
-- Wire protocol types must stay aligned between `eacc-screen/packages/shared/src/types.ts` and `eacc-panel/Sources/EACCMonitor/EACCTypes.swift`.
+- Wire protocol types must stay aligned between `eacc-screen/packages/shared/src/types.ts` and `eacc-panel/Sources/Tachi/EACCTypes.swift`.
 - Theme changes must respect both web and panel theme systems.
 - Recipe/config persistence paths under `~/.eacc/` are part of the contract; do not rename casually.
 - Session-related concepts and labels should stay consistent across TypeScript and Swift, especially when adding support for new tools such as OpenCode.
@@ -164,6 +164,6 @@
 - Before editing, identify whether the change belongs to `eacc-screen`, `eacc-panel`, or both.
 - For UI changes in the screen app, check `DESIGN.md` first.
 - For protocol or pricing changes, search both TypeScript and Swift implementations.
-- For session-tracking changes, inspect `eacc-screen/packages/cli/src/collectors/claude-sessions.ts` and `eacc-panel/Sources/EACCMonitor/SessionMonitor.swift` first; OpenCode support should be added intentionally rather than only in one surface.
+- For session-tracking changes, inspect `eacc-screen/packages/cli/src/collectors/claude-sessions.ts` and `eacc-panel/Sources/Tachi/SessionMonitor.swift` first; OpenCode support should be added intentionally rather than only in one surface.
 - Prefer the smallest viable patch.
 - If no lint command exists, report that explicitly instead of inventing one.

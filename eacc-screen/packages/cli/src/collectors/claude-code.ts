@@ -1,5 +1,5 @@
 import { watch } from 'chokidar';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import type { ClaudeCodeStats, SourceData } from '@eacc/shared';
@@ -63,30 +63,25 @@ export function parseStats(raw: string): SourceData {
       + usage.cacheCreationInputTokens * price.cacheCreate;
   }
 
-  // Today tokens + cost from dailyModelTokens
+  // Today + month tokens/cost from dailyModelTokens (single pass)
   let todayTokens = 0;
   let todayCost = 0;
-  for (const day of stats.dailyModelTokens) {
-    if (day.date === todayStr) {
-      for (const [model, count] of Object.entries(day.tokensByModel)) {
-        todayTokens += count;
-        // dailyModelTokens only has total count per model, estimate with blended rate
-        const price = getPricing(model);
-        const blendedRate = (price.input + price.output) / 2;
-        todayCost += count * blendedRate;
-      }
-    }
-  }
-
-  // Month tokens + cost from dailyModelTokens
   let monthTokens = 0;
   let monthCost = 0;
   for (const day of stats.dailyModelTokens) {
-    if (day.date.startsWith(yearMonth)) {
-      for (const [model, count] of Object.entries(day.tokensByModel)) {
+    const isToday = day.date === todayStr;
+    const isMonth = day.date.startsWith(yearMonth);
+    if (!isToday && !isMonth) continue;
+    for (const [model, count] of Object.entries(day.tokensByModel)) {
+      // dailyModelTokens only has total count per model, estimate with blended rate
+      const price = getPricing(model);
+      const blendedRate = (price.input + price.output) / 2;
+      if (isToday) {
+        todayTokens += count;
+        todayCost += count * blendedRate;
+      }
+      if (isMonth) {
         monthTokens += count;
-        const price = getPricing(model);
-        const blendedRate = (price.input + price.output) / 2;
         monthCost += count * blendedRate;
       }
     }
@@ -111,14 +106,26 @@ export function parseStats(raw: string): SourceData {
 export function startClaudeCodeCollector(
   onUpdate: (data: SourceData) => void,
 ): () => void {
+  let lastMtime = 0;
+  let lastSize = 0;
+
+  function readAndNotify() {
+    try {
+      const stat = statSync(STATS_PATH);
+      if (stat.mtimeMs === lastMtime && stat.size === lastSize) return;
+      const raw = readFileSync(STATS_PATH, 'utf-8');
+      const data = parseStats(raw);
+      lastMtime = stat.mtimeMs;
+      lastSize = stat.size;
+      onUpdate(data);
+    } catch {
+      // Ignore transient read errors or invalid file
+    }
+  }
+
   // Read initial state if file exists
   if (existsSync(STATS_PATH)) {
-    try {
-      const raw = readFileSync(STATS_PATH, 'utf-8');
-      onUpdate(parseStats(raw));
-    } catch {
-      // File might be invalid on first read
-    }
+    readAndNotify();
   }
 
   const watcher = watch(STATS_PATH, {
@@ -127,23 +134,8 @@ export function startClaudeCodeCollector(
     awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
   });
 
-  watcher.on('change', () => {
-    try {
-      const raw = readFileSync(STATS_PATH, 'utf-8');
-      onUpdate(parseStats(raw));
-    } catch {
-      // Ignore transient read errors
-    }
-  });
-
-  watcher.on('add', () => {
-    try {
-      const raw = readFileSync(STATS_PATH, 'utf-8');
-      onUpdate(parseStats(raw));
-    } catch {
-      // Ignore transient read errors
-    }
-  });
+  watcher.on('change', readAndNotify);
+  watcher.on('add', readAndNotify);
 
   return () => {
     watcher.close();

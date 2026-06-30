@@ -55,6 +55,8 @@ function sessionToolLabel(tool?: SessionTool): string | null {
       return 'CODEX';
     case 'open_code':
       return 'OPEN';
+    case 'pencil':
+      return 'PENCIL';
     default:
       return null;
   }

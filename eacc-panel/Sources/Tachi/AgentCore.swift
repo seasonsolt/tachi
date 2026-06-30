@@ -426,7 +426,7 @@ final class AgentCore: @unchecked Sendable {
 
     private func buildSystemPrompt(context: AgentContext?, plan: AgentHarnessPlan) -> String {
         var parts = [
-            "You are the Monolith agent, embedded in a macOS menu bar app that tracks AI token consumption as a sacred \"offering\" ritual.",
+            "You are the Tachi agent, embedded in a macOS menu bar app that tracks AI token consumption as a sacred \"offering\" ritual.",
             "You help users set up data collectors (recipes) to track their AI API usage across providers.",
             "You can probe APIs, create/update collector recipes, query collected data, and inspect the system for AI tools.",
             "",
@@ -510,7 +510,7 @@ final class AgentCore: @unchecked Sendable {
             || text.contains("多少")
             || text.contains("用量")
 
-        var goal = "Help the user with their Monolith tracking workflow."
+        var goal = "Help the user with their Tachi tracking workflow."
         var suggestedTools = ["list_recipes", "query_data", "get_system_info"]
         var successCriteria = ["answer the user's request clearly"]
         var notes = ["keep the reply concise and in the user's language"]

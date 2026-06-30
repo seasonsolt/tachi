@@ -1,21 +1,21 @@
 import XCTest
-@testable import EACCMonitor
+@testable import Tachi
 
-final class LaughingManMotionTests: XCTestCase {
+final class CyberSignalMotionTests: XCTestCase {
     func testRotationDegreesKeepMovingCounterclockwise() {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
 
-        let atStart = LaughingManMotion.rotationDegrees(
+        let atStart = CyberSignalMotion.rotationDegrees(
             at: start,
             startDate: start,
             hasMotion: true
         )
-        let quarterTurn = LaughingManMotion.rotationDegrees(
+        let quarterTurn = CyberSignalMotion.rotationDegrees(
             at: start.addingTimeInterval(2.5),
             startDate: start,
             hasMotion: true
         )
-        let halfTurn = LaughingManMotion.rotationDegrees(
+        let halfTurn = CyberSignalMotion.rotationDegrees(
             at: start.addingTimeInterval(5),
             startDate: start,
             hasMotion: true
@@ -32,7 +32,7 @@ final class LaughingManMotionTests: XCTestCase {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
         let later = start.addingTimeInterval(7.5)
 
-        let angle = LaughingManMotion.rotationDegrees(
+        let angle = CyberSignalMotion.rotationDegrees(
             at: later,
             startDate: start,
             hasMotion: false
