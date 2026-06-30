@@ -3,14 +3,14 @@ import SwiftUI
 // MARK: - Theme Names matching eacc-screen/packages/shared/src/constants.ts
 
 enum EACCThemeName: String, CaseIterable, Codable {
-    case cyber       // 攻殻機動隊 — Ghost in the Shell
+    case cyber       // Cyber signal
     case matrix      // 母体代码 — Matrix Code
     case amber       // 琥珀 — Amber
     case voidTheme = "void" // 虚無 — The Void
 
     var label: String {
         switch self {
-        case .cyber: return "攻殻機動隊"
+        case .cyber: return "Cyber"
         case .matrix: return "母体代码"
         case .amber: return "琥珀"
         case .voidTheme: return "虚無"
@@ -19,7 +19,7 @@ enum EACCThemeName: String, CaseIterable, Codable {
 
     var subtitle: String {
         switch self {
-        case .cyber: return "Ghost in the Shell"
+        case .cyber: return "Local Signal"
         case .matrix: return "Matrix Code"
         case .amber: return "Amber"
         case .voidTheme: return "The Void"
@@ -28,9 +28,9 @@ enum EACCThemeName: String, CaseIterable, Codable {
 
     var defaultPersona: CompanionPersona {
         switch self {
-        case .cyber: return .laughingMan
+        case .cyber: return .cyberSignal
         case .matrix: return .matrixAgent
-        case .amber: return .laughingMan
+        case .amber: return .cyberSignal
         case .voidTheme: return .voidMonolith
         }
     }
@@ -138,9 +138,7 @@ struct EACCThemeColors {
     }
 }
 
-// MARK: - Blade Runner Pet View — 折り紙ユニコーン (Origami Unicorn)
-// The origami unicorn is the stronger Blade Runner symbol:
-// memory, implanted meaning, and the uneasy line between human and artifact.
+// MARK: - Folded Signal Pet View
 // Keep it cold and faceted, with only a little amber city light on the folds.
 
 struct OrigamiUnicornPetView: View {

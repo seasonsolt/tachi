@@ -35,6 +35,10 @@ enum SessionLauncher {
                 "/Applications/OpenCode.app",
                 "/Applications/OpenCode Desktop.app"
             ]
+        case .pencil:
+            return [
+                "/Applications/Pencil.app"
+            ]
         case .claudeCode:
             return [
                 "/Applications/iTerm.app",

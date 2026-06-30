@@ -3,7 +3,7 @@ import SwiftUI
 
 enum CompanionPersona: Equatable {
     case defaultOrb
-    case laughingMan
+    case cyberSignal
     case matrixAgent
     case amberEye
     case voidMonolith
@@ -12,7 +12,7 @@ enum CompanionPersona: Equatable {
         switch self {
         case .defaultOrb:
             return nil
-        case .laughingMan:
+        case .cyberSignal:
             return Color(red: 0.0, green: 0.84, blue: 1.0)
         case .matrixAgent:
             return Color(red: 0, green: 1.0, blue: 0.25)
@@ -27,14 +27,14 @@ enum CompanionPersona: Equatable {
 enum CompanionPersonaMode: String, CaseIterable, Equatable {
     case automatic
     case defaultOrb
-    case laughingMan
+    case cyberSignal
     case matrixAgent
     case amberEye
     case voidMonolith
 
     static var allCases: [CompanionPersonaMode] {
         [
-            .laughingMan,
+            .cyberSignal,
             .matrixAgent,
             .voidMonolith
         ]
@@ -44,9 +44,9 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
         switch self {
         case .automatic: return "Auto (follows theme)"
         case .defaultOrb: return "Orb"
-        case .laughingMan: return "笑い男 Laughing Man"
+        case .cyberSignal: return "Cyber Signal"
         case .matrixAgent: return "母体代码 Matrix Code"
-        case .amberEye: return "折り紙ユニコーン Origami Unicorn"
+        case .amberEye: return "Folded Signal"
         case .voidMonolith: return "石碑 Monolith"
         }
     }
@@ -55,10 +55,10 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
         switch self {
         case .automatic: return "PET AUTO"
         case .defaultOrb: return "PET ORB"
-        case .laughingMan: return "PET LM"
-        case .matrixAgent: return "PET MX"
+        case .cyberSignal: return "PET CYBER"
+        case .matrixAgent: return "PET MATRIX"
         case .amberEye: return "PET UN"
-        case .voidMonolith: return "PET MO"
+        case .voidMonolith: return "PET MONOLITH"
         }
     }
 
@@ -66,10 +66,23 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
         switch self {
         case .automatic: return nil
         case .defaultOrb: return .defaultOrb
-        case .laughingMan: return .laughingMan
+        case .cyberSignal: return .cyberSignal
         case .matrixAgent: return .matrixAgent
         case .amberEye: return .amberEye
         case .voidMonolith: return .voidMonolith
+        }
+    }
+
+    var linkedTheme: EACCThemeName {
+        switch self {
+        case .matrixAgent:
+            return .matrix
+        case .amberEye:
+            return .amber
+        case .voidMonolith:
+            return .voidTheme
+        case .automatic, .defaultOrb, .cyberSignal:
+            return .cyber
         }
     }
 }
@@ -123,6 +136,7 @@ enum CompanionMood: Equatable {
 final class ViewModel {
     var items: [AccountWithUsage] = []
     var sessions: [CodingSession] = []
+    var codexRateLimits: CodexRateLimitSnapshot?
     var claudeStats: ClaudeStats?
     var isLoading = true
     var lastUpdated: Date?
@@ -175,7 +189,7 @@ final class ViewModel {
         switch companionPersona {
         case .defaultOrb:
             return themeColors
-        case .laughingMan:
+        case .cyberSignal:
             return EACCThemeColors(
                 bg: Color(red: 0.03, green: 0.06, blue: 0.09),
                 cardBg: Color(red: 0.05, green: 0.09, blue: 0.12),
@@ -249,6 +263,10 @@ final class ViewModel {
         sessions.filter { $0.status == .waitingForInput }.count
     }
 
+    var codexSessionCount: Int {
+        sessions.filter { $0.tool == .codex }.count
+    }
+
     var warmSessionCount: Int {
         sessions.filter { $0.pulse == .hot || $0.pulse == .warm }.count
     }
@@ -262,6 +280,16 @@ final class ViewModel {
 
     var companionTaskPreviewSessions: [CodingSession] {
         activeSessions.sorted { lhs, rhs in
+            if lhs.status != rhs.status {
+                return sessionPriority(lhs.status) < sessionPriority(rhs.status)
+            }
+            if lhs.pulse != rhs.pulse { return lhs.pulse.rawValue > rhs.pulse.rawValue }
+            return lhs.lastActivity > rhs.lastActivity
+        }
+    }
+
+    var menuSessions: [CodingSession] {
+        sessions.sorted { lhs, rhs in
             if lhs.status != rhs.status {
                 return sessionPriority(lhs.status) < sessionPriority(rhs.status)
             }
@@ -355,6 +383,10 @@ final class ViewModel {
             return nil
         }
 
+        if looksLikeAttachmentPrelude(text) {
+            return nil
+        }
+
         text = text.replacingOccurrences(
             of: #"^\s*[=\-:#>\[\]\(\)]+\s*"#,
             with: "",
@@ -400,7 +432,16 @@ final class ViewModel {
         if normalized == "codex" || normalized == "claude code" || normalized == "opencode" {
             return false
         }
+        if looksLikeAttachmentPrelude(text) {
+            return false
+        }
         return !looksLikeOnlyAPath(text)
+    }
+
+    private func looksLikeAttachmentPrelude(_ text: String) -> Bool {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized.hasPrefix("# files mentioned by the user")
+            || normalized.hasPrefix("files mentioned by the user")
     }
 
     private func looksLikeOnlyAPath(_ text: String) -> Bool {
@@ -493,7 +534,7 @@ final class ViewModel {
 
     @MainActor
     func refreshSessionPulse() async {
-        await refreshSessions()
+        await refreshSessionsAndCodexQuota()
     }
 
     @MainActor
@@ -505,6 +546,7 @@ final class ViewModel {
     func setCompanionPersonaMode(_ mode: CompanionPersonaMode) {
         companionPersonaMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: Self.companionPersonaModeKey)
+        setTheme(mode.linkedTheme)
     }
 
     /// Bridge reference for cross-process theme sync
@@ -526,6 +568,11 @@ final class ViewModel {
         else { return }
         selectedTheme = theme
         UserDefaults.standard.set(theme.rawValue, forKey: Self.themeKey)
+        let linkedMode = Self.defaultCompanionPersonaMode(for: theme)
+        if companionPersonaMode != linkedMode {
+            companionPersonaMode = linkedMode
+            UserDefaults.standard.set(linkedMode.rawValue, forKey: Self.companionPersonaModeKey)
+        }
     }
 
     @MainActor
@@ -560,12 +607,22 @@ final class ViewModel {
     }
 
     @MainActor
-    private func refreshSessions() async {
+    private func refreshSessionsAndCodexQuota() async {
         let previousSessions = sessions
-        let updatedSessions = await Task.detached {
+        async let updatedSessionsTask = Task.detached {
             SessionMonitor.shared.scanSessions()
         }.value
+        async let rateLimitsTask = Task.detached {
+            CodexAppServerRateLimitClient.shared.fetchCached()
+        }.value
+        async let resetCreditsTask = CodexResetCreditsClient.shared.fetch()
+
+        let updatedSessions = await updatedSessionsTask
+        let updatedRateLimits = await rateLimitsTask
+        let resetCredits = await resetCreditsTask
         sessions = updatedSessions
+        codexRateLimits = updatedRateLimits?.withResetCredits(resetCredits)
+            ?? resetCredits.map(CodexRateLimitSnapshot.fromResetCredits)
         handleCompletedTasks(previous: previousSessions, current: updatedSessions)
     }
 
@@ -649,6 +706,8 @@ final class ViewModel {
         // Migrate removed persona modes
         if let raw {
             switch raw {
+            case "laughingMan":
+                return .cyberSignal
             case "automatic", "defaultOrb", "amberEye", "bladeRunnerEye", "nervHex":
                 return defaultCompanionPersonaMode(for: loadTheme())
             case "singularityVoid": return .voidMonolith
@@ -661,7 +720,7 @@ final class ViewModel {
     private static func defaultCompanionPersonaMode(for theme: EACCThemeName) -> CompanionPersonaMode {
         switch theme {
         case .cyber, .amber:
-            return .laughingMan
+            return .cyberSignal
         case .matrix:
             return .matrixAgent
         case .voidTheme:

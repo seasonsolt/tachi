@@ -3,12 +3,17 @@ import Foundation
 // MARK: - Config
 
 enum Config {
-    static let apiBase = ProcessInfo.processInfo.environment["MONOLITH_API_BASE"] ?? ""
-    static let loginEmail = ProcessInfo.processInfo.environment["MONOLITH_API_EMAIL"] ?? ""
-    static let loginPassword = ProcessInfo.processInfo.environment["MONOLITH_API_PASSWORD"] ?? ""
+    private static func env(_ key: String, legacy legacyKey: String) -> String {
+        let values = ProcessInfo.processInfo.environment
+        return values[key] ?? values[legacyKey] ?? ""
+    }
 
-    static let claudeApiBase = ProcessInfo.processInfo.environment["MONOLITH_CLAUDE_API_BASE"] ?? ""
-    static let claudeRefreshToken = ProcessInfo.processInfo.environment["MONOLITH_CLAUDE_REFRESH_TOKEN"] ?? ""
+    static let apiBase = env("TACHI_API_BASE", legacy: "MONOLITH_API_BASE")
+    static let loginEmail = env("TACHI_API_EMAIL", legacy: "MONOLITH_API_EMAIL")
+    static let loginPassword = env("TACHI_API_PASSWORD", legacy: "MONOLITH_API_PASSWORD")
+
+    static let claudeApiBase = env("TACHI_CLAUDE_API_BASE", legacy: "MONOLITH_CLAUDE_API_BASE")
+    static let claudeRefreshToken = env("TACHI_CLAUDE_REFRESH_TOKEN", legacy: "MONOLITH_CLAUDE_REFRESH_TOKEN")
 }
 
 // MARK: - Models

@@ -35,11 +35,6 @@ function MatrixRain() {
 
     let lastTime = 0;
     const draw = (time: number) => {
-      if (document.hidden) {
-        animRef.current = requestAnimationFrame(draw);
-        return;
-      }
-
       // Target ~20fps for the classic Matrix look
       if (time - lastTime < 50) {
         animRef.current = requestAnimationFrame(draw);
@@ -70,18 +65,18 @@ function MatrixRain() {
         const glowBias = (Math.sin((time * 0.016) + (i * 1.7)) + 1) * 0.5;
         const bloom = 4 + (glowBias * 8);
 
-        // Every visible glyph breathes, with occasional brighter heads.
         if (glowBias > 0.7) {
           ctx.fillStyle = '#00ff41';
           ctx.globalAlpha = Math.min(1, pulse * 0.95) * centerFade;
+          ctx.shadowColor = '#00ff41';
+          ctx.shadowBlur = bloom * centerFade;
+          ctx.fillText(char, x, y);
+          ctx.shadowBlur = 0;
         } else {
           ctx.fillStyle = '#80ff80';
           ctx.globalAlpha = Math.min(1, pulse * 1.08) * centerFade;
+          ctx.fillText(char, x, y);
         }
-        ctx.shadowColor = '#00ff41';
-        ctx.shadowBlur = bloom * centerFade;
-        ctx.fillText(char, x, y);
-        ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
 
         // Reset drop to top when it reaches bottom
@@ -95,11 +90,26 @@ function MatrixRain() {
       animRef.current = requestAnimationFrame(draw);
     };
 
-    animRef.current = requestAnimationFrame(draw);
+    const startRain = () => {
+      if (animRef.current) return;
+      animRef.current = requestAnimationFrame(draw);
+    };
+    const stopRain = () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      animRef.current = 0;
+    };
+    const onVisibility = () => {
+      if (document.hidden) stopRain();
+      else startRain();
+    };
+
+    if (!document.hidden) startRain();
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
-      cancelAnimationFrame(animRef.current);
+      stopRain();
       window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
 

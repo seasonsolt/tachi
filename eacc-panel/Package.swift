@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "EACCMonitor",
+    name: "Tachi",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "EACCMonitor",
-            path: "Sources/EACCMonitor"
+            name: "Tachi",
+            path: "Sources/Tachi"
         ),
         .testTarget(
-            name: "EACCMonitorTests",
-            dependencies: ["EACCMonitor"],
-            path: "Tests/EACCMonitorTests"
+            name: "TachiTests",
+            dependencies: ["Tachi"],
+            path: "Tests/TachiTests"
         )
     ]
 )

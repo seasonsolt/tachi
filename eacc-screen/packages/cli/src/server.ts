@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { WebSocketServer, WebSocket } from 'ws';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, watchFile, unwatchFile } from 'node:fs';
-import { join, dirname, extname } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { join, dirname, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import type {
@@ -196,15 +197,21 @@ export function startServer(port: number, options?: StartServerOptions): { close
     broadcast({ type: 'market_state', market: buildMarketState() });
   }
 
+  let flushPending = false;
   function broadcastUpdate(): void {
-    const data = buildTokenData(sources);
-    const milestone = getMilestone(data.totalTokens);
-    if (milestone && milestone.threshold > lastMilestoneThreshold && data.totalTokens > previousTotalTokens) {
-      lastMilestoneThreshold = milestone.threshold;
-      broadcast({ type: 'milestone', milestone });
-    }
-    previousTotalTokens = data.totalTokens;
-    broadcast({ type: 'token_update', data });
+    if (flushPending) return;
+    flushPending = true;
+    queueMicrotask(() => {
+      flushPending = false;
+      const data = buildTokenData(sources);
+      const milestone = getMilestone(data.totalTokens);
+      if (milestone && milestone.threshold > lastMilestoneThreshold && data.totalTokens > previousTotalTokens) {
+        lastMilestoneThreshold = milestone.threshold;
+        broadcast({ type: 'milestone', milestone });
+      }
+      previousTotalTokens = data.totalTokens;
+      broadcast({ type: 'token_update', data });
+    });
   }
 
   const stopClaude = startClaudeCodeCollector((data) => {
@@ -406,23 +413,33 @@ export function startServer(port: number, options?: StartServerOptions): { close
     '.wav': 'audio/wav',
   };
 
-  app.get('/*', (c) => {
+  app.get('/*', async (c) => {
     const urlPath = c.req.path === '/' ? '/index.html' : c.req.path;
     const filePath = join(staticRoot, urlPath);
 
-    if (existsSync(filePath)) {
-      const ext = extname(filePath);
-      const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-      const content = readFileSync(filePath);
-      return c.body(content, 200, { 'Content-Type': contentType });
+    if (filePath.startsWith(staticRoot + sep)) {
+      try {
+        const ext = extname(filePath);
+        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+        const content = await readFile(filePath);
+        const headers: Record<string, string> = { 'Content-Type': contentType };
+        if (urlPath.startsWith('/assets/')) {
+          headers['Cache-Control'] = 'public, max-age=31536000, immutable';
+        } else {
+          headers['Cache-Control'] = 'no-cache';
+        }
+        return c.body(content, 200, headers);
+      } catch {
+        // fall through to index.html for SPA routes
+      }
     }
 
-    const indexPath = join(staticRoot, 'index.html');
-    if (existsSync(indexPath)) {
-      return c.html(readFileSync(indexPath, 'utf-8'));
+    try {
+      const indexContent = await readFile(join(staticRoot, 'index.html'), 'utf-8');
+      return c.html(indexContent);
+    } catch {
+      return c.text('Not found', 404);
     }
-
-    return c.text('Not found', 404);
   });
 
   const server = serve({ fetch: app.fetch, port }, () => {

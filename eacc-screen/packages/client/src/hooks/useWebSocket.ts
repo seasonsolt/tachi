@@ -40,15 +40,6 @@ export function useWebSocket() {
   const prevMilestoneRef = useRef<string | null>(null);
 
   const mode = useStore((s) => s.mode);
-  const {
-    setTokenData,
-    setWsConnected,
-    setMilestone,
-    setMode,
-    setSessions,
-    setTheme,
-    setMarketState,
-  } = useStore();
 
   const getUrl = useCallback(() => {
     const customServer = resolveServerUrl();
@@ -75,12 +66,13 @@ export function useWebSocket() {
 
     ws.onopen = () => {
       retriesRef.current = 0;
-      setWsConnected(true);
+      useStore.getState().setWsConnected(true);
     };
 
     ws.onmessage = (event) => {
       try {
         const msg: WSMessage = JSON.parse(event.data);
+        const { setTokenData, setMilestone, setSessions, setTheme, setMarketState } = useStore.getState();
         switch (msg.type) {
           case 'token_update': {
             setTokenData(msg.data);
@@ -88,14 +80,14 @@ export function useWebSocket() {
             if (m && m.name !== prevMilestoneRef.current) {
               prevMilestoneRef.current = m.name;
               setMilestone(m);
-              setTimeout(() => setMilestone(null), 8000);
+              setTimeout(() => useStore.getState().setMilestone(null), 8000);
             }
             break;
           }
           case 'milestone':
             setMilestone(msg.milestone);
             prevMilestoneRef.current = msg.milestone.name;
-            setTimeout(() => setMilestone(null), 8000);
+            setTimeout(() => useStore.getState().setMilestone(null), 8000);
             break;
           case 'session_update':
             setSessions(msg.sessions);
@@ -116,12 +108,13 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
-      setWsConnected(false);
+      const store = useStore.getState();
+      store.setWsConnected(false);
       wsRef.current = null;
       retriesRef.current++;
 
       if (retriesRef.current >= MAX_RETRIES_BEFORE_WEB_MODE) {
-        setMode('web');
+        store.setMode('web');
         return;
       }
 
@@ -135,7 +128,7 @@ export function useWebSocket() {
     ws.onerror = () => {
       ws.close();
     };
-  }, [getUrl, setTokenData, setWsConnected, setMilestone, setMode, setSessions, setTheme, setMarketState]);
+  }, [getUrl]);
 
   useEffect(() => {
     if (mode === 'web') return;

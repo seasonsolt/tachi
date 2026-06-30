@@ -50,6 +50,21 @@ struct EACCSessionInfo: Codable {
     let taskSummary: String?
 }
 
+extension EACCSessionInfo {
+    init(session: CodingSession) {
+        self.init(
+            pid: 0,
+            sessionId: session.id,
+            cwd: session.projectPath,
+            startedAt: Int(session.lastActivity.timeIntervalSince1970 * 1000),
+            alive: session.status != .completed,
+            tool: session.tool.wireName,
+            taskTitle: session.taskTitle,
+            taskSummary: session.taskSummary
+        )
+    }
+}
+
 struct EACCMilestone: Codable {
     let threshold: Int
     let name: String

@@ -71,7 +71,7 @@ export const SCRIPTURES: string[] = [
 ];
 
 // === Themes ===
-// Keep these values in sync with eacc-panel/Sources/EACCMonitor/ThemeSystem.swift.
+// Keep these values in sync with eacc-panel/Sources/Tachi/ThemeSystem.swift.
 // eacc-panel is the source of truth for shared theme identity and palette.
 
 export const THEMES: Record<ThemeName, Theme> = {

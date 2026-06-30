@@ -79,11 +79,19 @@ function readOpenCodeSessions(): SessionInfo[] {
   const processes = readOpenCodeProcesses();
   if (processes.length === 0) return [];
 
+  const cwds = Array.from(new Set(processes.map((p) => p.cwd)));
+  const recordsByCwd = readLatestOpenCodeSessionsForDirectories(cwds);
+  if (recordsByCwd.size === 0) return [];
+
+  const sessionIds = Array.from(new Set(Array.from(recordsByCwd.values()).map((r) => r.sessionId)));
+  const messagesBySession = readOpenCodeMessagesBySession(sessionIds);
+
   const sessionsById = new Map<string, SessionInfo>();
   for (const process of processes) {
-    const record = readLatestOpenCodeSessionForDirectory(process.cwd);
+    const record = recordsByCwd.get(process.cwd);
     if (!record) continue;
 
+    const messages = messagesBySession.get(record.sessionId) ?? [];
     const session: SessionInfo = {
       pid: process.pid,
       sessionId: record.sessionId,
@@ -92,7 +100,7 @@ function readOpenCodeSessions(): SessionInfo[] {
       alive: true,
       tool: 'open_code',
       taskTitle: record.taskTitle,
-      taskSummary: record.taskSummary,
+      taskSummary: openCodeTaskSummary(messages, record.taskTitle),
     };
 
     const existing = sessionsById.get(record.sessionId);
@@ -139,67 +147,85 @@ function quoteSQLite(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function readLatestOpenCodeSessionForDirectory(cwd: string): OpenCodeSessionRecord | null {
+function readLatestOpenCodeSessionsForDirectories(cwds: string[]): Map<string, OpenCodeSessionRecord> {
+  if (cwds.length === 0) return new Map();
+  const quoted = cwds.map(quoteSQLite).join(',');
+  const sql = [
+    'select id, slug, directory, title, time_created',
+    'from (',
+    '  select id, slug, directory, title, time_created,',
+    '         row_number() over (partition by directory order by time_updated desc) as rn',
+    '  from session',
+    `  where directory in (${quoted}) and time_archived is null`,
+    ')',
+    'where rn = 1;',
+  ].join(' ');
   try {
-    const sql = [
-      'select id, slug, directory, title, time_created',
-      'from session',
-      `where directory = ${quoteSQLite(cwd)} and time_archived is null`,
-      'order by time_updated desc',
-      'limit 1;',
-    ].join(' ');
     const output = execFileSync('sqlite3', ['-separator', '\t', OPENCODE_DB, sql], {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
-    if (!output) return null;
+    if (!output) return new Map();
 
-    const [sessionId, slug, directory, title, createdAt] = output.split('\t');
-    const startedAt = Number.parseInt(createdAt, 10);
-    if (!sessionId || !directory || !Number.isFinite(startedAt)) return null;
-
-    const messages = readOpenCodeMessages(sessionId);
-    const taskTitle = openCodeTaskTitle(title, slug);
-
-    return {
-      sessionId,
-      cwd: directory,
-      startedAt,
-      taskTitle,
-      taskSummary: openCodeTaskSummary(messages, taskTitle),
-    };
+    const recordsByCwd = new Map<string, OpenCodeSessionRecord>();
+    for (const line of output.split(/\r?\n/)) {
+      const [sessionId, slug, directory, title, createdAt] = line.split('\t');
+      const startedAt = Number.parseInt(createdAt, 10);
+      if (!sessionId || !directory || !Number.isFinite(startedAt)) continue;
+      recordsByCwd.set(directory, {
+        sessionId,
+        cwd: directory,
+        startedAt,
+        taskTitle: openCodeTaskTitle(title, slug),
+        taskSummary: undefined,
+      });
+    }
+    return recordsByCwd;
   } catch {
-    return null;
+    return new Map();
   }
 }
 
-function readOpenCodeMessages(sessionId: string): OpenCodeMessage[] {
+function readOpenCodeMessagesBySession(sessionIds: string[], limit = 8): Map<string, OpenCodeMessage[]> {
+  const unique = Array.from(new Set(sessionIds)).filter((id) => id.length > 0);
+  if (unique.length === 0) return new Map();
+  const quoted = unique.map(quoteSQLite).join(',');
+  const sql = [
+    'select session_id, data',
+    'from (',
+    '  select session_id, data,',
+    '         row_number() over (partition by session_id order by time_updated desc) as rn',
+    '  from message',
+    `  where session_id in (${quoted})`,
+    ')',
+    `where rn <= ${limit}`,
+    'order by session_id, rn;',
+  ].join(' ');
   try {
-    const sql = [
-      'select data',
-      'from message',
-      `where session_id = ${quoteSQLite(sessionId)}`,
-      'order by time_updated desc',
-      'limit 8;',
-    ].join(' ');
-    const output = execFileSync('sqlite3', [OPENCODE_DB, sql], {
+    const output = execFileSync('sqlite3', ['-separator', '\t', OPENCODE_DB, sql], {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
-    if (!output) return [];
+    if (!output) return new Map();
 
-    return output
-      .split(/\r?\n/)
-      .map((line) => {
-        try {
-          return JSON.parse(line) as OpenCodeMessage;
-        } catch {
-          return null;
-        }
-      })
-      .filter((message): message is OpenCodeMessage => message !== null);
+    const result = new Map<string, OpenCodeMessage[]>();
+    for (const line of output.split(/\r?\n/)) {
+      const tabIdx = line.indexOf('\t');
+      if (tabIdx < 0) continue;
+      const sessionId = line.slice(0, tabIdx);
+      const data = line.slice(tabIdx + 1);
+      try {
+        const message = JSON.parse(data) as OpenCodeMessage;
+        const arr = result.get(sessionId);
+        if (arr) arr.push(message);
+        else result.set(sessionId, [message]);
+      } catch {
+        // skip malformed message
+      }
+    }
+    return result;
   } catch {
-    return [];
+    return new Map();
   }
 }
 

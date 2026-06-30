@@ -22,6 +22,9 @@ interface AltarControlProfile {
 }
 
 const SETUP_CONTROL_SIGIL = '⚙';
+const CONTACT_EMAIL = 'contact@e-accs.ai';
+const CONTACT_HREF = `mailto:${CONTACT_EMAIL}`;
+const CONTACT_CONTROL_SIGIL = '@';
 
 const ALTAR_CONTROL_PROFILES: Record<ThemeName, AltarControlProfile> = {
   cyber: {
@@ -71,6 +74,7 @@ export function App() {
       || marketState.blacklist.length > 0
     )
   );
+  const showMarketControl = hasMarketSignals || marketOpen;
 
   // Set color-scheme for light/dark themes
   useEffect(() => {
@@ -135,7 +139,9 @@ export function App() {
     background: controlBackground,
     boxShadow: controlBoxShadow,
   };
-  const setupButtonLeft = hasMarketSignals ? 'calc(50% + 30px)' : '50%';
+  const setupButtonLeft = '50%';
+  const marketButtonLeft = 'calc(50% - 60px)';
+  const contactButtonLeft = 'calc(50% + 60px)';
 
   return (
     <div style={{ ...cssVars, ...styles.root }} onClick={handleFirstClick}>
@@ -147,6 +153,15 @@ export function App() {
         <p style={{ fontFamily: t.dataFont, fontSize: 12, marginTop: 16, opacity: 0.5 }}>
           The altar requires a wider viewport.
         </p>
+        <a
+          href={CONTACT_HREF}
+          onClick={(e) => e.stopPropagation()}
+          style={{ ...styles.mobileContactLink, fontFamily: t.dataFont, color: t.textSecondary }}
+          title={`Email ${CONTACT_EMAIL}`}
+          aria-label={`Email ${CONTACT_EMAIL}`}
+        >
+          {CONTACT_EMAIL}
+        </a>
       </div>
       <div className="desktop-container" style={styles.desktopContainer}>
         <div className="crt-scanlines" />
@@ -160,13 +175,14 @@ export function App() {
         <FocusTimer />
         <Pulse />
         <Chant />
-        {(hasMarketSignals || marketOpen) && (
+        {showMarketControl && (
           <button
             className="market-btn"
             onClick={(e) => { e.stopPropagation(); toggleMarket(); }}
             style={{
               ...styles.marketButton,
               ...sharedControlButtonStyle,
+              left: marketButtonLeft,
               opacity: t.isLightTheme ? 0.62 : styles.marketButton.opacity,
             }}
             title="Market Rite"
@@ -207,6 +223,30 @@ export function App() {
             {controlProfile.setupLabel}
           </span>
         </button>
+        <a
+          className="contact-link"
+          href={CONTACT_HREF}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            ...styles.contactLink,
+            ...sharedControlButtonStyle,
+            left: contactButtonLeft,
+            opacity: t.isLightTheme ? 0.56 : styles.contactLink.opacity,
+          }}
+          title={`Email ${CONTACT_EMAIL}`}
+          aria-label={`Email ${CONTACT_EMAIL}`}
+        >
+          <span style={{ ...styles.controlGlyph, color: t.textSecondary }}>{CONTACT_CONTROL_SIGIL}</span>
+          <span
+            style={{
+              ...styles.controlLabel,
+              color: t.isLightTheme ? t.textSecondary : styles.controlLabel.color,
+              opacity: t.isLightTheme ? 0.78 : styles.controlLabel.opacity,
+            }}
+          >
+            contact
+          </span>
+        </a>
         {marketOpen && <MarketRite onClose={toggleMarket} />}
         {setupOpen && <Setup send={send} onClose={toggleSetup} onOpenMarket={openMarketFromSetup} hasMarketSignals={hasMarketSignals} />}
       </div>
@@ -372,12 +412,15 @@ const globalStyles = `
   .market-btn:hover {
     opacity: 0.8 !important;
   }
-  .market-btn:hover, .setup-btn:hover {
+  .contact-link:hover {
+    opacity: 0.8 !important;
+  }
+  .market-btn:hover, .setup-btn:hover, .contact-link:hover {
     transform: translateX(-50%) translateY(-2px);
   }
 
   /* Focus visible for keyboard accessibility */
-  button:focus-visible, input:focus-visible, textarea:focus-visible {
+  button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible {
     outline: 2px solid var(--fire-core);
     outline-offset: 2px;
   }
@@ -445,6 +488,14 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
     padding: 32,
   },
+  mobileContactLink: {
+    marginTop: 24,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    textDecoration: 'none',
+    opacity: 0.55,
+  },
   desktopContainer: {
     width: '100%',
     height: '100%',
@@ -475,7 +526,7 @@ const styles: Record<string, React.CSSProperties> = {
   marketButton: {
     position: 'absolute',
     bottom: 12,
-    left: 'calc(50% - 30px)',
+    left: 'calc(50% - 60px)',
     transform: 'translateX(-50%)',
     appearance: 'none',
     borderWidth: 1,
@@ -493,6 +544,28 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'opacity 0.3s, transform 0.3s, box-shadow 0.3s',
     gap: 2,
     borderRadius: 0,
+  },
+  contactLink: {
+    position: 'absolute',
+    bottom: 12,
+    transform: 'translateX(-50%)',
+    appearance: 'none',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    cursor: 'pointer',
+    opacity: 0.4,
+    zIndex: 10,
+    padding: '6px 10px',
+    minWidth: 56,
+    minHeight: 44,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'opacity 0.3s, transform 0.3s, box-shadow 0.3s',
+    gap: 2,
+    borderRadius: 0,
+    textDecoration: 'none',
   },
   controlGlyph: {
     fontSize: 15,

@@ -29,7 +29,7 @@ pnpm -r build                             # Build all packages
 ```bash
 cd eacc-panel
 ./build.sh                                # swift build → .app bundle
-# Result: EACCMonitor.app
+# Result: Tachi.app
 ```
 
 ## Architecture

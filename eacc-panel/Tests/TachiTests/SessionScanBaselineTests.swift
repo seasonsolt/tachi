@@ -1,5 +1,5 @@
 import XCTest
-@testable import EACCMonitor
+@testable import Tachi
 
 final class SessionScanBaselineTests: XCTestCase {
     func testSessionMonitorScanSessionsBaseline() throws {
