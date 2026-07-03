@@ -66,7 +66,7 @@ export interface ClaudeCodeStats {
 
 // === Session Info ===
 
-export type SessionTool = 'claude_code' | 'codex' | 'open_code' | 'pencil';
+export type SessionTool = 'claude_code' | 'claude_design' | 'codex' | 'open_code' | 'pencil';
 
 export interface SessionInfo {
   pid: number;

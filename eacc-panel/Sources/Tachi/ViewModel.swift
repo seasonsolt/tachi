@@ -191,14 +191,14 @@ final class ViewModel {
             return themeColors
         case .cyberSignal:
             return EACCThemeColors(
-                bg: Color(red: 0.03, green: 0.06, blue: 0.09),
-                cardBg: Color(red: 0.05, green: 0.09, blue: 0.12),
-                cardBorder: Color(red: 0.0, green: 0.84, blue: 1.0).opacity(0.18),
-                accent: Color(red: 0.0, green: 0.84, blue: 1.0),
-                accentEdge: Color(red: 0.09, green: 0.43, blue: 0.79),
-                textPrimary: Color(red: 0.93, green: 0.98, blue: 1.0),
-                textSecondary: Color(red: 0.69, green: 0.84, blue: 0.91),
-                textMuted: Color(red: 0.45, green: 0.62, blue: 0.70)
+                bg: Color(red: 8.0 / 255.0, green: 13.0 / 255.0, blue: 20.0 / 255.0),
+                cardBg: Color(red: 11.0 / 255.0, green: 19.0 / 255.0, blue: 28.0 / 255.0),
+                cardBorder: Color(red: 56.0 / 255.0, green: 189.0 / 255.0, blue: 248.0 / 255.0).opacity(0.15),
+                accent: Color(red: 56.0 / 255.0, green: 189.0 / 255.0, blue: 248.0 / 255.0),
+                accentEdge: Color(red: 45.0 / 255.0, green: 212.0 / 255.0, blue: 191.0 / 255.0),
+                textPrimary: Color(red: 241.0 / 255.0, green: 245.0 / 255.0, blue: 249.0 / 255.0),
+                textSecondary: Color(red: 148.0 / 255.0, green: 163.0 / 255.0, blue: 184.0 / 255.0),
+                textMuted: Color(red: 90.0 / 255.0, green: 107.0 / 255.0, blue: 126.0 / 255.0)
             )
         case .matrixAgent:
             return EACCThemeColors.forTheme(.matrix)
@@ -303,7 +303,7 @@ final class ViewModel {
     }
 
     var companionTaskVisibleSessions: [CodingSession] {
-        Array(companionTaskPreviewSessions.prefix(3))
+        Array(companionTaskPreviewSessions.prefix(1))
     }
 
     var companionTaskOverflowCount: Int {
@@ -317,7 +317,7 @@ final class ViewModel {
     var companionTaskHeader: String {
         let activeCount = activeSessions.count
         if activeCount > 0 {
-            return activeCount == 1 ? "Current task" : "\(activeCount) active tasks"
+            return "Current task"
         }
         return "No active task"
     }
@@ -375,7 +375,8 @@ final class ViewModel {
     }
 
     func companionTaskMeta(for session: CodingSession) -> String {
-        "\(session.tool.rawValue) · \(session.signal.compactLabel)"
+        let detail = session.status == .completed ? "done" : "watching"
+        return "\(session.tool.rawValue) · \(detail)"
     }
 
     private func compactTaskPreviewText(_ raw: String?) -> String? {
@@ -429,7 +430,11 @@ final class ViewModel {
         let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if normalized.isEmpty { return false }
         if normalized == projectName.lowercased() { return false }
-        if normalized == "codex" || normalized == "claude code" || normalized == "opencode" {
+        if normalized == "codex"
+            || normalized == "claude code"
+            || normalized == "claude design"
+            || normalized == "opencode"
+        {
             return false
         }
         if looksLikeAttachmentPrelude(text) {
@@ -457,7 +462,7 @@ final class ViewModel {
 
     var companionMood: CompanionMood {
         if sessions.contains(where: { $0.pulse == .hot }) { return .feasting }
-        if sessions.contains(where: { $0.status == .working || $0.pulse == .warm }) { return .alert }
+        if sessions.contains(where: { $0.status == .working }) { return .alert }
         if waitingSessionCount > 0 { return .expecting }
         if !sessions.isEmpty { return .dozing }
         return .sleeping
@@ -468,7 +473,7 @@ final class ViewModel {
     }
 
     var companionHasMotion: Bool {
-        !activeSessions.isEmpty
+        sessions.contains(where: { $0.status == .working })
     }
 
     var companionHeadline: String {
@@ -489,9 +494,9 @@ final class ViewModel {
 
     var companionSubtitle: String {
         if let session = dominantSession {
-            return "\(session.signal.label) in \(session.projectName)"
+            return "watching in \(session.projectName)"
         }
-        return "Fast session sensing runs every \(Int(sessionRefreshInterval))s"
+        return "watching every \(Int(sessionRefreshInterval))s"
     }
 
     var companionAccent: Color {
@@ -515,7 +520,8 @@ final class ViewModel {
 
     var menuBarText: String {
         let activeCount = activeSessions.count
-        let face = companionMood.menuFace(frame: menuAnimationFrame)
+        let faceFrame = companionHasMotion ? menuAnimationFrame : 0
+        let face = companionMood.menuFace(frame: faceFrame)
         if activeCount > 0 {
             return "\(face) \(weightedUtil)% [\(activeCount)]"
         }

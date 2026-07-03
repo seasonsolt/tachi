@@ -6,6 +6,14 @@ let redAccent = Color(red: 1.0, green: 0.28, blue: 0.28)
 let purpleAccent = Color(red: 0.58, green: 0.38, blue: 1.0)
 let matrixGreen = Color(red: 0, green: 0.9, blue: 0.4)
 
+private let auroraTeal = Color(red: 45.0 / 255.0, green: 212.0 / 255.0, blue: 191.0 / 255.0)
+private let auroraPurple = Color(red: 167.0 / 255.0, green: 139.0 / 255.0, blue: 250.0 / 255.0)
+private let auroraGreen = Color(red: 52.0 / 255.0, green: 211.0 / 255.0, blue: 153.0 / 255.0)
+private let auroraAmber = Color(red: 245.0 / 255.0, green: 158.0 / 255.0, blue: 11.0 / 255.0)
+private let auroraRed = Color(red: 248.0 / 255.0, green: 113.0 / 255.0, blue: 113.0 / 255.0)
+private let auroraMuted = Color(red: 148.0 / 255.0, green: 163.0 / 255.0, blue: 184.0 / 255.0)
+private let auroraMutedDeep = Color(red: 90.0 / 255.0, green: 107.0 / 255.0, blue: 126.0 / 255.0)
+
 private struct RitualPanelBackdrop: View {
     let themeColors: EACCThemeColors
     let accent: Color
@@ -13,13 +21,20 @@ private struct RitualPanelBackdrop: View {
 
     var body: some View {
         ZStack {
-            themeColors.bg
+            LinearGradient(
+                colors: [
+                    themeColors.cardBg.opacity(0.98),
+                    themeColors.bg.opacity(0.98)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
             LinearGradient(
                 colors: [
-                    accent.opacity(theme == .voidTheme ? 0.04 : 0.12),
+                    accent.opacity(theme == .voidTheme ? 0.04 : 0.08),
                     .clear,
-                    themeColors.accentEdge.opacity(theme == .voidTheme ? 0.02 : 0.08)
+                    themeColors.accentEdge.opacity(theme == .voidTheme ? 0.02 : 0.06)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -27,7 +42,7 @@ private struct RitualPanelBackdrop: View {
 
             RadialGradient(
                 colors: [
-                    accent.opacity(theme == .voidTheme ? 0.06 : 0.18),
+                    accent.opacity(theme == .voidTheme ? 0.06 : 0.15),
                     .clear
                 ],
                 center: .topTrailing,
@@ -38,7 +53,7 @@ private struct RitualPanelBackdrop: View {
 
             RadialGradient(
                 colors: [
-                    themeColors.accentEdge.opacity(theme == .voidTheme ? 0.05 : 0.12),
+                    themeColors.accentEdge.opacity(theme == .voidTheme ? 0.05 : 0.09),
                     .clear
                 ],
                 center: .bottomLeading,
@@ -59,7 +74,7 @@ private struct RitualPanelBackdrop: View {
                 }
             }
             .blendMode(.overlay)
-            .opacity(theme == .voidTheme ? 0.45 : 1)
+            .opacity(theme == .voidTheme ? 0.45 : (theme == .cyber ? 0.18 : 1))
 
             if theme == .matrix {
                 MatrixRainView()
@@ -75,18 +90,7 @@ private struct RitualDivider: View {
 
     var body: some View {
         Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        .clear,
-                        accent.opacity(0.32),
-                        themeColors.cardBorder.opacity(0.8),
-                        .clear
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .fill(auroraMuted.opacity(0.08))
             .frame(height: 1)
     }
 }
@@ -97,28 +101,27 @@ private struct RitualSectionModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .padding(12)
+            .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(
                         LinearGradient(
                             colors: [
-                                themeColors.cardBg.opacity(0.94),
-                                accent.opacity(0.05)
+                                auroraMuted.opacity(0.035),
+                                accent.opacity(0.035)
                             ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
                     )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
                             colors: [
-                                accent.opacity(0.18),
-                                themeColors.cardBorder,
-                                themeColors.accentEdge.opacity(0.1)
+                                accent.opacity(0.16),
+                                auroraMuted.opacity(0.10)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -126,7 +129,7 @@ private struct RitualSectionModifier: ViewModifier {
                         lineWidth: 1
                     )
             )
-            .shadow(color: accent.opacity(0.08), radius: 12, y: 6)
+            .shadow(color: .black.opacity(0.18), radius: 18, y: 10)
     }
 }
 
@@ -168,11 +171,11 @@ private struct RitualDataCardModifier: ViewModifier {
                     .fill(
                         LinearGradient(
                             colors: [
-                                themeColors.cardBg.opacity(0.92),
-                                emphasis.opacity(0.045)
+                                auroraMuted.opacity(0.035),
+                                emphasis.opacity(0.035)
                             ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
                     )
             )
@@ -181,9 +184,8 @@ private struct RitualDataCardModifier: ViewModifier {
                     .strokeBorder(
                         LinearGradient(
                             colors: [
-                                emphasis.opacity(0.22),
-                                themeColors.cardBorder.opacity(0.95),
-                                themeColors.accentEdge.opacity(0.12)
+                                emphasis.opacity(0.18),
+                                auroraMuted.opacity(0.10)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -191,7 +193,51 @@ private struct RitualDataCardModifier: ViewModifier {
                         lineWidth: 1
                     )
             )
-            .shadow(color: emphasis.opacity(0.05), radius: 10, y: 4)
+            .shadow(color: .black.opacity(0.16), radius: 14, y: 8)
+    }
+}
+
+private struct AuroraStatusDot: View {
+    let color: Color
+    var isActive = true
+
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(color.opacity(0.45), lineWidth: 1)
+                .frame(width: 18, height: 18)
+                .scaleEffect(pulse && isActive ? 1.28 : 0.72)
+                .opacity(pulse && isActive ? 0 : 0.72)
+
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+                .scaleEffect(pulse && isActive ? 0.82 : 1)
+                .opacity(pulse && isActive ? 0.55 : 1)
+                .shadow(color: color.opacity(0.42), radius: 8)
+        }
+        .frame(width: 18, height: 18)
+        .onAppear {
+            guard isActive else { return }
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
+    }
+}
+
+private struct AuroraDashedDivider: View {
+    var body: some View {
+        GeometryReader { geo in
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: 0.5))
+                path.addLine(to: CGPoint(x: geo.size.width, y: 0.5))
+            }
+            .stroke(auroraMuted.opacity(0.12), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+        }
+        .frame(height: 1)
     }
 }
 
@@ -221,7 +267,7 @@ struct ContentView: View {
     @Bindable var vm: ViewModel
 
     private let panelWidth: CGFloat = 400
-    private let panelHeight: CGFloat = 560
+    private let scrollMaxHeight: CGFloat = 560
 
     private var panelColors: EACCThemeColors {
         vm.panelThemeColors
@@ -239,7 +285,7 @@ struct ContentView: View {
             RitualDivider(themeColors: panelColors, accent: panelColors.accent)
             footer
         }
-        .frame(width: panelWidth, height: panelHeight)
+        .frame(width: panelWidth)
         .clipped()
         .background {
             RitualPanelBackdrop(
@@ -248,35 +294,39 @@ struct ContentView: View {
                 theme: vm.selectedTheme
             )
         }
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(panelColors.accent.opacity(0.15), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.72), radius: 36, y: 24)
     }
 
     private var header: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(panelColors.accent)
-                .frame(width: 13, height: 13)
-                .shadow(color: panelColors.accent.opacity(0.55), radius: 10)
+            AuroraStatusDot(color: panelColors.accent, isActive: !vm.isLoading)
+                .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(activeTaskTitle)
-                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                    .font(AuroraFont.display(22, weight: .bold))
                     .foregroundStyle(panelColors.textPrimary)
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
-                    Text(activeTaskSubtitle)
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(panelColors.textMuted)
-                        .lineLimit(1)
-
                     if let date = vm.lastUpdated {
-                        Text("·")
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(panelColors.textMuted)
                         Text(date, style: .time)
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced).monospacedDigit())
-                            .foregroundStyle(panelColors.textSecondary)
+                            .font(AuroraFont.mono(11, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(auroraMuted)
+                        Text("·")
+                            .font(AuroraFont.mono(11, weight: .semibold))
+                            .foregroundStyle(auroraMutedDeep)
                     }
+
+                    Text(activeTaskSubtitle)
+                        .font(AuroraFont.mono(11, weight: .semibold))
+                        .foregroundStyle(auroraMutedDeep)
+                        .lineLimit(1)
                 }
             }
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
@@ -287,24 +337,24 @@ struct ContentView: View {
                 Task { await vm.refresh() }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .bold))
-                    .frame(width: 28, height: 28)
+                    .font(.system(size: 13, weight: .bold))
+                    .frame(width: 34, height: 34)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(panelColors.cardBorder.opacity(0.32))
+                            .fill(panelColors.accent.opacity(0.08))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(panelColors.accent.opacity(0.16), lineWidth: 1)
+                            .strokeBorder(panelColors.accent.opacity(0.20), lineWidth: 1)
                     )
             }
             .buttonStyle(.plain)
-            .foregroundStyle(panelColors.textSecondary)
+            .foregroundStyle(panelColors.accent)
             .help("Refresh")
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
     }
 
     private var activeTaskTitle: String {
@@ -315,15 +365,11 @@ struct ContentView: View {
     }
 
     private var activeTaskSubtitle: String {
-        let codex = vm.codexSessionCount
-        let warm = vm.warmSessionCount
-        if codex > 0 && warm > 0 {
-            return "\(codex) codex · \(warm) warm"
-        }
-        if warm > 0 {
-            return "\(warm) warm threads"
-        }
-        return "session pulse \(Int(vm.sessionRefreshInterval))s"
+        guard let lastUpdated = vm.lastUpdated else { return "sync pending" }
+        let seconds = max(0, Int(Date().timeIntervalSince(lastUpdated).rounded()))
+        if seconds < 5 { return "synced now" }
+        if seconds < 60 { return "synced \(seconds)s ago" }
+        return "synced \(seconds / 60)m ago"
     }
 
     private var syncStatusText: String {
@@ -331,15 +377,9 @@ struct ContentView: View {
         let connected = vm.recipeSources.filter { $0.data.connected }.count
         let pulse = "pulse \(Int(vm.sessionRefreshInterval))s"
 
-        guard total > 0 else {
-            return "local agents synced · \(pulse)"
-        }
-
-        if connected == total {
-            return "all collectors synced · \(pulse)"
-        }
-
-        return "\(connected)/\(total) collectors live · \(pulse)"
+        guard total > 0 else { return "all synced · \(pulse)" }
+        if connected == total { return "all synced · \(pulse)" }
+        return "\(connected)/\(total) synced · \(pulse)"
     }
 
     private var footer: some View {
@@ -347,9 +387,9 @@ struct ContentView: View {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.shield")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(panelColors.accent)
+                    .foregroundStyle(auroraGreen)
                 Text(syncStatusText)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(AuroraFont.mono(10, weight: .semibold))
                     .foregroundStyle(panelColors.textSecondary)
                     .lineLimit(1)
             }
@@ -373,13 +413,17 @@ struct ContentView: View {
                     Image(systemName: "timer")
                         .font(.system(size: 10, weight: .semibold))
                     Text("\(Int(vm.refreshInterval))s")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced).monospacedDigit())
+                        .font(AuroraFont.mono(10, weight: .semibold).monospacedDigit())
                 }
                 .padding(.horizontal, 8)
-                .frame(height: 26)
+                .frame(height: 32)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(panelColors.cardBorder.opacity(0.26))
+                        .fill(auroraMuted.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(auroraMuted.opacity(0.12), lineWidth: 1)
                 )
                 .foregroundStyle(panelColors.textSecondary)
             }
@@ -399,20 +443,20 @@ struct ContentView: View {
             Button {
                 NSApplication.shared.terminate(nil)
             } label: {
-                footerIcon("power", tint: redAccent)
+                footerIcon("power", tint: auroraRed)
             }
             .buttonStyle(.plain)
             .help("Disconnect")
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 9)
-        .background(panelColors.bg.opacity(0.96))
+        .padding(.vertical, 12)
+        .background(Color.black.opacity(0.25))
     }
 
     private func footerIcon(_ systemName: String, tint: Color) -> some View {
         Image(systemName: systemName)
             .font(.system(size: 11, weight: .bold))
-            .frame(width: 26, height: 26)
+            .frame(width: 32, height: 32)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(tint.opacity(0.10))
@@ -429,7 +473,7 @@ struct ContentView: View {
             ProgressView()
                 .scaleEffect(0.8)
             Text("Initializing ritual link...")
-                .font(.system(size: 12, design: .monospaced))
+                .font(AuroraFont.mono(12))
                 .foregroundStyle(panelColors.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -437,7 +481,7 @@ struct ContentView: View {
 
     private var scrollContent: some View {
         ScrollView {
-            LazyVStack(spacing: 8) {
+            LazyVStack(spacing: 16) {
                 companionSection
                 if let snapshot = vm.codexRateLimits {
                     codexUsageSection(snapshot)
@@ -449,42 +493,22 @@ struct ContentView: View {
                     recipeSourcesSection
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .layoutPriority(1)
+        .frame(maxWidth: .infinity)
+        .frame(maxHeight: scrollMaxHeight)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var companionSection: some View {
         CompanionCard(vm: vm)
-            .padding(.bottom, 4)
     }
 
     // MARK: - Codex Usage
 
     private func codexUsageSection(_ snapshot: CodexRateLimitSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "gauge.with.dots.needle.bottom.50percent")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(panelColors.accent)
-                Text("CODEX USAGE")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(panelColors.textSecondary)
-                Spacer()
-                Text("OFFICIAL")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(panelColors.accent.opacity(0.12)))
-                    .foregroundStyle(panelColors.accent)
-            }
-            .padding(.horizontal, 4)
-
-            CodexQuotaCard(snapshot: snapshot, themeColors: panelColors)
-        }
-        .ritualSection(themeColors: panelColors, accent: panelColors.accent)
+        CodexQuotaCard(snapshot: snapshot, themeColors: panelColors)
     }
 
     // MARK: - Recipe Sources
@@ -513,46 +537,38 @@ struct ContentView: View {
     }
 
     private var sessionsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
                 Image(systemName: "waveform.path")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(panelColors.accent)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(auroraTeal)
                 Text("AI CODING SESSIONS")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(AuroraFont.mono(12, weight: .bold))
+                    .tracking(1.5)
                     .foregroundStyle(panelColors.textSecondary)
                 Spacer()
-                if vm.codexSessionCount > 0 {
-                    Text("\(vm.codexSessionCount) CODEX")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(panelColors.accent.opacity(0.12)))
-                        .foregroundStyle(panelColors.accent)
-                } else if vm.workingSessionCount > 0 {
-                    Text("\(vm.workingSessionCount) FEEDING")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(panelColors.accent.opacity(0.12)))
-                        .foregroundStyle(panelColors.accent)
-                } else if vm.waitingSessionCount > 0 {
-                    Text("\(vm.waitingSessionCount) WATCHING")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(panelColors.accent.opacity(0.12)))
-                        .foregroundStyle(panelColors.accent)
-                }
+                Text("\(vm.menuSessions.count) WATCHING")
+                    .font(AuroraFont.mono(9, weight: .bold))
+                    .tracking(1.0)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(panelColors.accent.opacity(0.10))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .strokeBorder(panelColors.accent.opacity(0.25), lineWidth: 1)
+                    )
+                    .foregroundStyle(panelColors.accent)
             }
-            .padding(.horizontal, 4)
 
             ForEach(vm.menuSessions) { session in
                 SessionRow(session: session, themeColors: panelColors)
             }
         }
-        .ritualSection(themeColors: panelColors, accent: panelColors.accent)
-        .padding(.bottom, 4)
+        .padding(16)
+        .ritualDataCard(themeColors: panelColors, emphasis: panelColors.accent, radius: 18)
     }
 
     private var providersSection: some View {
@@ -595,61 +611,81 @@ struct CompanionCard: View {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            CompanionPetView(
-                persona: vm.companionPersona,
-                mood: vm.companionMood,
-                accent: vm.companionPetAccent,
-                themeColors: panelColors,
-                hasMotion: vm.companionHasMotion
-            )
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 16) {
+                mascotBadge
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(vm.companionMood.badge)
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(panelColors.accent.opacity(0.14)))
-                        .foregroundStyle(panelColors.accent)
-                    Spacer()
-                    CompanionPersonaMenu(vm: vm, accent: panelColors.accent)
-                    Text("\(vm.weightedUtil)% util")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 8) {
+                        Text(vm.companionMood.badge)
+                            .font(AuroraFont.mono(10, weight: .bold))
+                            .tracking(1.1)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(panelColors.accent.opacity(0.10))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .strokeBorder(panelColors.accent.opacity(0.25), lineWidth: 1)
+                            )
+                            .foregroundStyle(panelColors.accent)
+
+                        Text("\(vm.weightedUtil)% util")
+                            .font(AuroraFont.mono(11, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(auroraMutedDeep)
+                    }
+
+                    Text(vm.companionHeadline)
+                        .font(AuroraFont.display(19, weight: .semibold))
+                        .foregroundStyle(panelColors.textPrimary)
+                        .lineLimit(2)
+
+                    Text(vm.companionSubtitle)
+                        .font(AuroraFont.mono(12, weight: .medium))
                         .foregroundStyle(panelColors.textSecondary)
+                        .lineLimit(2)
                 }
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            }
 
-                Text(vm.companionHeadline)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(panelColors.textPrimary)
-
-                Text(vm.companionSubtitle)
-                    .font(.system(size: 11))
-                    .foregroundStyle(panelColors.textSecondary)
-                    .lineLimit(2)
-
-                HStack(spacing: 6) {
-                    companionChip(icon: "flame", text: "\(vm.workingSessionCount) live", tint: panelColors.accent)
-                    companionChip(icon: "sparkle.magnifyingglass", text: "\(vm.waitingSessionCount) waiting", tint: panelColors.accent)
-                    companionChip(icon: "waveform.path.ecg", text: "\(vm.warmSessionCount) warm", tint: purpleAccent)
-                }
+            HStack(spacing: 8) {
+                statTile(value: vm.workingSessionCount, label: "live", tint: panelColors.textPrimary)
+                statTile(value: vm.waitingSessionCount, label: "waiting", tint: panelColors.accent)
+                statTile(value: vm.warmSessionCount, label: "warm", tint: auroraPurple)
             }
         }
-        .padding(14)
+        .padding(18)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [panelColors.cardBg.opacity(0.96), panelColors.accent.opacity(0.08)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                        colors: [
+                            panelColors.accent.opacity(0.055),
+                            panelColors.accent.opacity(0.012)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
                     ))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(panelColors.accent.opacity(0.18), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(panelColors.accent.opacity(0.15), lineWidth: 1)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [panelColors.accent, auroraTeal],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 3)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .onTapGesture {
             Task { await vm.refreshSessionPulse() }
         }
@@ -659,17 +695,57 @@ struct CompanionCard: View {
         .help("Tap to sniff for fresh session activity")
     }
 
-    private func companionChip(icon: String, text: String, tint: Color) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 9, weight: .medium))
-            Text(text)
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
+    private var mascotBadge: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            panelColors.accent.opacity(0.18),
+                            panelColors.accent.opacity(0.04)
+                        ],
+                        center: .center,
+                        startRadius: 4,
+                        endRadius: 42
+                    )
+                )
+
+            CompanionPetView(
+                persona: vm.companionPersona,
+                mood: vm.companionMood,
+                accent: vm.companionPetAccent,
+                themeColors: panelColors,
+                hasMotion: vm.companionHasMotion,
+                motionScale: 0.18
+            )
+            .frame(width: 108, height: 108)
+            .scaleEffect(0.56)
         }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 4)
-        .background(Capsule().fill(tint.opacity(0.1)))
-        .foregroundStyle(tint)
+        .frame(width: 66, height: 66)
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(panelColors.accent.opacity(0.35), lineWidth: 2))
+    }
+
+    private func statTile(value: Int, label: String, tint: Color) -> some View {
+        VStack(spacing: 2) {
+            Text("\(value)")
+                .font(AuroraFont.display(18, weight: .bold).monospacedDigit())
+                .foregroundStyle(tint)
+            Text(label)
+                .font(AuroraFont.mono(10, weight: .semibold))
+                .tracking(0.8)
+                .foregroundStyle(auroraMutedDeep)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(tint.opacity(0.07))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(tint.opacity(0.18), lineWidth: 1)
+        )
     }
 }
 
@@ -686,35 +762,25 @@ struct CompanionPersonaMenu: View {
         Menu {
             CompanionPersonaActions(vm: vm)
         } label: {
-            HStack(spacing: isProminent ? 8 : 4) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: isProminent ? 13 : 9, weight: .semibold))
+            HStack(spacing: isProminent ? 6 : 5) {
                 Text(vm.companionPersonaMode.badge)
-                    .font(.system(size: isProminent ? 12 : 9, weight: .bold, design: .monospaced))
-                if isProminent {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(menuAccent.opacity(0.72))
-                }
+                    .font(AuroraFont.mono(isProminent ? 11 : 10, weight: .bold))
+                    .tracking(isProminent ? 1.0 : 0.8)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: isProminent ? 8 : 7, weight: .bold))
+                    .foregroundStyle(auroraMutedDeep)
             }
-            .padding(.horizontal, isProminent ? 11 : 7)
-            .padding(.vertical, isProminent ? 8 : 4)
+            .padding(.horizontal, isProminent ? 10 : 8)
+            .padding(.vertical, isProminent ? 7 : 5)
             .background {
-                if isProminent {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .fill(menuAccent.opacity(0.16))
-                } else {
-                    Capsule()
-                        .fill(menuAccent.opacity(0.12))
-                }
+                RoundedRectangle(cornerRadius: isProminent ? 9 : 8, style: .continuous)
+                    .fill(auroraMuted.opacity(0.06))
             }
             .overlay {
-                if isProminent {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .strokeBorder(menuAccent.opacity(0.18), lineWidth: 1)
-                }
+                RoundedRectangle(cornerRadius: isProminent ? 9 : 8, style: .continuous)
+                    .strokeBorder(auroraMuted.opacity(0.14), lineWidth: 1)
             }
-            .foregroundStyle(menuAccent)
+            .foregroundStyle(isProminent ? auroraMuted : menuAccent)
         }
         .menuStyle(.borderlessButton)
         .help("Switch companion")
@@ -1753,90 +1819,149 @@ struct CodexQuotaCard: View {
     let themeColors: EACCThemeColors
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
-                Image(systemName: "cube.transparent")
-                    .font(.system(size: 11, weight: .semibold))
+                Image(systemName: "clock")
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(themeColors.accent)
-                VStack(alignment: .leading, spacing: 1) {
+                Text("CODEX USAGE")
+                    .font(AuroraFont.mono(12, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(themeColors.textSecondary)
+                Spacer()
+                Text("OFFICIAL")
+                    .font(AuroraFont.mono(9, weight: .bold))
+                    .tracking(1.0)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(auroraGreen.opacity(0.10))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .strokeBorder(auroraGreen.opacity(0.25), lineWidth: 1)
+                    )
+                    .foregroundStyle(auroraGreen)
+            }
+
+            HStack(spacing: 10) {
+                Image(systemName: "cube.transparent")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(themeColors.accent.opacity(0.10))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(themeColors.accent.opacity(0.20), lineWidth: 1)
+                    )
+                    .foregroundStyle(themeColors.accent)
+
+                VStack(alignment: .leading, spacing: 2) {
                     Text("Codex account")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(AuroraFont.display(14, weight: .semibold))
                         .foregroundStyle(themeColors.textPrimary)
-                    Text(snapshot.limitName ?? snapshot.limitId ?? "OpenAI Codex")
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundStyle(themeColors.textMuted)
+                    Text(snapshot.limitName ?? snapshot.limitId ?? "codex")
+                        .font(AuroraFont.mono(10, weight: .medium))
+                        .foregroundStyle(auroraMutedDeep)
                         .lineLimit(1)
                 }
+
                 Spacer()
+
                 if let count = snapshot.resetCreditCount {
                     Text("\(count) resets")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced).monospacedDigit())
+                        .font(AuroraFont.mono(12, weight: .bold).monospacedDigit())
                         .foregroundStyle(themeColors.accent)
                 }
             }
 
-            VStack(spacing: 6) {
+            VStack(spacing: 12) {
                 ForEach(snapshot.windows, id: \.kind.rawValue) { window in
                     quotaWindowRow(window)
                 }
             }
 
             if !snapshot.availableResetCredits.isEmpty {
-                VStack(spacing: 4) {
+                VStack(spacing: 7) {
+                    AuroraDashedDivider()
                     ForEach(Array(snapshot.availableResetCredits.prefix(4).enumerated()), id: \.offset) { index, credit in
                         resetCreditRow(index: index, credit: credit)
                     }
                     if snapshot.availableResetCredits.count > 4 {
-                        Text("+\(snapshot.availableResetCredits.count - 4) more reset valid dates")
-                            .font(.system(size: 8, design: .monospaced))
-                            .foregroundStyle(themeColors.textMuted)
+                        Text("+\(snapshot.availableResetCredits.count - 4) more reset date ▾")
+                            .font(AuroraFont.mono(10, weight: .medium))
+                            .foregroundStyle(auroraMutedDeep)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(.top, snapshot.windows.isEmpty ? 0 : 2)
             } else if (snapshot.resetCreditCount ?? 0) > 0 {
                 Text("Reset valid dates unavailable")
-                    .font(.system(size: 8, design: .monospaced))
-                    .foregroundStyle(themeColors.textMuted)
+                    .font(AuroraFont.mono(10, weight: .medium))
+                    .foregroundStyle(auroraMutedDeep)
             }
         }
-        .padding(10)
-        .ritualDataCard(themeColors: themeColors, emphasis: themeColors.accent, radius: 10)
+        .padding(16)
+        .ritualDataCard(themeColors: themeColors, emphasis: themeColors.accent, radius: 18)
     }
 
     private func quotaWindowRow(_ window: CodexRateLimitWindow) -> some View {
-        HStack(spacing: 8) {
-            Text(window.validityLabel)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(themeColors.accent)
-                .frame(width: 24, alignment: .leading)
-            UtilBar(value: Int(window.usedPercent.rounded()), accent: themeColors.accent)
-                .frame(height: 5)
-            Text("\(formatPercent(window.remainingPercent))% left")
-                .font(.system(size: 9, weight: .semibold, design: .monospaced).monospacedDigit())
-                .foregroundStyle(themeColors.textSecondary)
-                .frame(width: 58, alignment: .trailing)
-            Text(formatResetDate(window.resetsAt))
-                .font(.system(size: 9, design: .monospaced).monospacedDigit())
-                .foregroundStyle(themeColors.textMuted)
-                .frame(width: 50, alignment: .trailing)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(window.validityLabel) window")
+                    .font(AuroraFont.mono(11, weight: .bold))
+                    .foregroundStyle(auroraMuted)
+                Spacer()
+                Text("\(formatPercent(window.remainingPercent))% left")
+                    .font(AuroraFont.mono(11, weight: .bold).monospacedDigit())
+                    .foregroundStyle(remainingColor(window.remainingPercent))
+                Text("· \(formatResetDate(window.resetsAt))")
+                    .font(AuroraFont.mono(11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(themeColors.textSecondary)
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(auroraMuted.opacity(0.10))
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [themeColors.accent, auroraTeal],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(4, geo.size.width * CGFloat(window.remainingPercent) / 100))
+                }
+            }
+            .frame(height: 6)
         }
     }
 
     private func resetCreditRow(index: Int, credit: CodexResetCredit) -> some View {
         HStack(spacing: 8) {
             Text("Reset \(index + 1)")
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .font(AuroraFont.mono(11, weight: .semibold))
                 .foregroundStyle(themeColors.textSecondary)
                 .frame(width: 58, alignment: .leading)
             Text("valid until")
-                .font(.system(size: 8, design: .monospaced))
-                .foregroundStyle(themeColors.textMuted)
+                .font(AuroraFont.mono(10, weight: .medium))
+                .foregroundStyle(auroraMutedDeep)
             Spacer()
             Text(formatResetValidDate(credit.expiresAt))
-                .font(.system(size: 9, weight: .semibold, design: .monospaced).monospacedDigit())
+                .font(AuroraFont.mono(11, weight: .bold).monospacedDigit())
                 .foregroundStyle(themeColors.accent)
         }
+    }
+
+    private func remainingColor(_ value: Double) -> Color {
+        if value < 5 { return auroraRed }
+        if value < 20 { return auroraAmber }
+        return auroraGreen
     }
 
     private func formatPercent(_ value: Double) -> String {
@@ -1874,50 +1999,35 @@ struct CodexQuotaCard: View {
 struct SessionRow: View {
     let session: CodingSession
     let themeColors: EACCThemeColors
-    @State private var isPulsing = false
 
     var body: some View {
-        HStack(spacing: 11) {
-            statusIndicator
-
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(session.projectName)
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .font(AuroraFont.mono(12, weight: .bold))
                         .lineLimit(1)
                         .truncationMode(.middle)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(statusColor.opacity(0.16))
-                        )
-                        .foregroundStyle(statusColor)
-                        .frame(maxWidth: 105, alignment: .leading)
+                        .foregroundStyle(themeColors.textPrimary)
 
-                    Text(session.signal.compactLabel)
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(themeColors.textMuted)
+                    Text(statusLabel)
+                        .font(AuroraFont.mono(10, weight: .semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(statusChipColor.opacity(0.12))
+                        )
+                        .foregroundStyle(statusChipColor)
                         .lineLimit(1)
                 }
 
-                Text(session.displayTitle)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(themeColors.textPrimary)
+                Text(agentStatusLine)
+                    .font(AuroraFont.mono(11, weight: .medium))
+                    .foregroundStyle(themeColors.textSecondary)
                     .lineLimit(1)
             }
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(agentStatusLine)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(signalColor)
-                    .lineLimit(1)
-                    .frame(width: 96, alignment: .leading)
-
-                activityMeter
-                    .frame(width: 92, height: 5)
-            }
 
             Button {
                 Task { @MainActor in
@@ -1940,83 +2050,34 @@ struct SessionRow: View {
             .buttonStyle(.plain)
             .help("Open \(session.tool.rawValue)")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .ritualDataCard(themeColors: themeColors, emphasis: statusColor, radius: 12)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(themeColors.accent.opacity(0.04))
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(statusBorderColor, lineWidth: 1)
+                .strokeBorder(themeColors.accent.opacity(0.12), lineWidth: 1)
         )
-    }
-
-    @ViewBuilder
-    private var statusIndicator: some View {
-        RoundedRectangle(cornerRadius: 2, style: .continuous)
-            .fill(statusColor)
-            .frame(width: 5, height: 58)
-            .shadow(color: statusColor.opacity(session.pulse == .hot ? 0.42 : 0.18), radius: 8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .stroke(statusColor.opacity(0.65), lineWidth: 1)
-                    .frame(width: 9, height: 62)
-                    .scaleEffect(x: isPulsing ? 1.8 : 1.0, y: 1.0)
-                    .opacity(isPulsing ? 0 : 1)
-                    .opacity(session.pulse == .hot || session.pulse == .warm ? 1 : 0)
-            )
-            .onAppear {
-                if session.pulse == .hot || session.pulse == .warm {
-                    withAnimation(
-                        .easeOut(duration: 1.2)
-                        .repeatForever(autoreverses: false)
-                    ) {
-                        isPulsing = true
-                    }
-                }
-            }
-            .onChange(of: session.pulse) { _, newValue in
-                if newValue == .hot || newValue == .warm {
-                    isPulsing = false
-                    withAnimation(
-                        .easeOut(duration: 1.2)
-                        .repeatForever(autoreverses: false)
-                    ) {
-                        isPulsing = true
-                    }
-                } else {
-                    isPulsing = false
-                }
-            }
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(auroraTeal)
+                .frame(width: 3)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var agentStatusLine: String {
-        "\(session.tool.rawValue) · \(session.signal.compactLabel)"
+        let detail = session.status == .waitingForInput ? "waiting for input" : session.signal.compactLabel
+        return "\(session.tool.rawValue) · \(detail)"
     }
 
-    private var activityMeter: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(themeColors.cardBorder.opacity(0.48))
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [statusColor.opacity(0.65), statusColor],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: max(7, geo.size.width * CGFloat(pulseLevel)))
-            }
-        }
-    }
-
-    private var pulseLevel: Double {
-        switch session.pulse {
-        case .hot: return 0.92
-        case .warm: return 0.66
-        case .listening: return 0.44
-        case .drowsy: return 0.24
-        case .sleeping: return 0.10
+    private var statusLabel: String {
+        switch session.status {
+        case .working: return "working"
+        case .waitingForInput: return "waiting"
+        case .completed: return "done"
+        case .idle: return "warm"
         }
     }
 
@@ -2030,29 +2091,13 @@ struct SessionRow: View {
         }
     }
 
-    private var signalColor: Color {
-        switch session.pulse {
-        case .hot, .warm: return themeColors.textSecondary
-        case .listening: return themeColors.accent.opacity(0.7)
-        case .drowsy: return themeColors.textMuted
-        case .sleeping: return themeColors.textMuted
-        }
-    }
-
-    private var statusBorderColor: Color {
+    private var statusChipColor: Color {
         switch session.status {
-        case .working: return themeColors.accent.opacity(0.25)
-        case .waitingForInput: return themeColors.accent.opacity(0.15)
-        default: return .clear
+        case .working: return themeColors.accent
+        case .waitingForInput: return auroraAmber
+        case .completed: return auroraGreen
+        case .idle: return themeColors.textMuted
         }
-    }
-
-    private func timeAgo(_ date: Date) -> String {
-        let seconds = Int(Date().timeIntervalSince(date))
-        if seconds < 60 { return "just now" }
-        if seconds < 3600 { return "\(seconds / 60)m ago" }
-        if seconds < 86400 { return "\(seconds / 3600)h ago" }
-        return "\(seconds / 86400)d ago"
     }
 }
 

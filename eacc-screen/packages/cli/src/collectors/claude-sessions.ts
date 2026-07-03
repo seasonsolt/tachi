@@ -1,11 +1,12 @@
 import { watch } from 'chokidar';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import type { SessionInfo, SessionTool } from '@eacc/shared';
 
 const CLAUDE_SESSIONS_DIR = join(homedir(), '.claude', 'sessions');
+const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects');
 const OPENCODE_DIR = join(homedir(), '.local', 'share', 'opencode');
 const OPENCODE_DB = join(OPENCODE_DIR, 'opencode.db');
 
@@ -29,6 +30,16 @@ interface OpenCodeSessionRecord {
   taskSummary?: string;
 }
 
+interface ClaudeProjectEntry {
+  timestamp?: unknown;
+  type?: unknown;
+  cwd?: unknown;
+  slug?: unknown;
+  entrypoint?: unknown;
+  message?: unknown;
+  content?: unknown;
+}
+
 function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -39,7 +50,31 @@ function isAlive(pid: number): boolean {
 }
 
 function readSessions(): SessionInfo[] {
-  return [...readClaudeSessions(), ...readOpenCodeSessions()];
+  return dedupeSessions([
+    ...readClaudeSessions(),
+    ...readClaudeProjectSessions(),
+    ...readOpenCodeSessions(),
+  ]);
+}
+
+function dedupeSessions(sessions: SessionInfo[]): SessionInfo[] {
+  const result = new Map<string, SessionInfo>();
+  for (const session of sessions) {
+    const key = `${session.tool ?? 'session'}:${session.sessionId}`;
+    const existing = result.get(key);
+    if (!existing || isBetterSession(session, existing)) {
+      result.set(key, session);
+    }
+  }
+  return Array.from(result.values());
+}
+
+function isBetterSession(candidate: SessionInfo, existing: SessionInfo): boolean {
+  const candidateHasTask = Boolean(candidate.taskTitle || candidate.taskSummary);
+  const existingHasTask = Boolean(existing.taskTitle || existing.taskSummary);
+  if (candidateHasTask !== existingHasTask) return candidateHasTask;
+  if (candidate.alive !== existing.alive) return candidate.alive;
+  return candidate.startedAt >= existing.startedAt;
 }
 
 function readClaudeSessions(): SessionInfo[] {
@@ -71,6 +106,73 @@ function readClaudeSessions(): SessionInfo[] {
   }
 
   return sessions.filter((s) => s.alive);
+}
+
+export function readClaudeProjectSessions(
+  projectsDir = CLAUDE_PROJECTS_DIR,
+  nowMs = Date.now(),
+): SessionInfo[] {
+  if (!existsSync(projectsDir)) return [];
+
+  const cutoffMs = nowMs - 60 * 60 * 1000;
+  const sessions: SessionInfo[] = [];
+
+  try {
+    const projectDirs = readdirSync(projectsDir);
+    for (const dir of projectDirs) {
+      const projectDir = join(projectsDir, dir);
+      let files: string[];
+      try {
+        files = readdirSync(projectDir).filter((file) => file.endsWith('.jsonl'));
+      } catch {
+        continue;
+      }
+
+      for (const file of files) {
+        const filePath = join(projectDir, file);
+        let modifiedMs: number;
+        try {
+          modifiedMs = statSync(filePath).mtimeMs;
+        } catch {
+          continue;
+        }
+        if (modifiedMs <= cutoffMs) continue;
+
+        const recentEntries = readRecentClaudeProjectEntries(filePath, 12);
+        const lastEntry = recentEntries[0];
+        const sessionId = file.slice(0, -'.jsonl'.length);
+        const cwd = typeof lastEntry?.cwd === 'string' ? lastEntry.cwd : decodeClaudeProjectDir(dir);
+        const slug = typeof lastEntry?.slug === 'string' ? lastEntry.slug : '';
+        const startedAt = parseTimestampMs(lastEntry?.timestamp) ?? modifiedMs;
+        const isDesktop = recentEntries.some((entry) => entry.entrypoint === 'claude-desktop');
+        const tool: SessionTool = isDesktop ? 'claude_design' : 'claude_code';
+        const projectName = sanitizeTaskText(cwd.split('/').filter(Boolean).at(-1));
+
+        sessions.push({
+          pid: 0,
+          sessionId,
+          cwd,
+          startedAt,
+          alive: true,
+          tool,
+          taskTitle: sanitizeTaskText(slug) ?? projectName,
+          taskSummary: claudeProjectTaskSummary(recentEntries, sanitizeTaskText(slug) ?? projectName),
+        });
+      }
+    }
+  } catch {
+    return [];
+  }
+
+  const best = new Map<string, SessionInfo>();
+  for (const session of sessions) {
+    const key = `${session.tool ?? 'session'}:${session.cwd}`;
+    const existing = best.get(key);
+    if (!existing || session.startedAt > existing.startedAt) {
+      best.set(key, session);
+    }
+  }
+  return Array.from(best.values());
 }
 
 function readOpenCodeSessions(): SessionInfo[] {
@@ -110,6 +212,50 @@ function readOpenCodeSessions(): SessionInfo[] {
   }
 
   return Array.from(sessionsById.values());
+}
+
+function readRecentClaudeProjectEntries(path: string, limit: number, maxBytes = 131_072): ClaudeProjectEntry[] {
+  try {
+    const raw = readFileSync(path);
+    const tail = raw.subarray(Math.max(0, raw.length - maxBytes)).toString('utf-8');
+    const entries: ClaudeProjectEntry[] = [];
+    for (const line of tail.split(/\r?\n/).reverse()) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        entries.push(JSON.parse(trimmed) as ClaudeProjectEntry);
+        if (entries.length === limit) break;
+      } catch {
+        // skip malformed lines
+      }
+    }
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
+function decodeClaudeProjectDir(encoded: string): string {
+  const path = encoded.startsWith('-') ? encoded.slice(1) : encoded;
+  return `/${path.replaceAll('-', '/')}`;
+}
+
+function parseTimestampMs(raw: unknown): number | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function claudeProjectTaskSummary(
+  recentEntries: ClaudeProjectEntry[],
+  fallback?: string,
+): string | undefined {
+  const userEntry = recentEntries.find((entry) => entry.type === 'user');
+  if (userEntry) {
+    const summary = extractText(userEntry.message ?? userEntry.content);
+    if (summary) return summary;
+  }
+  return sanitizeTaskText(fallback);
 }
 
 function readOpenCodeProcesses(): OpenCodeProcess[] {
@@ -304,10 +450,10 @@ export function startSessionCollector(
     }, 2000);
   }
 
-  const watcher = watch([CLAUDE_SESSIONS_DIR, OPENCODE_DIR], {
+  const watcher = watch([CLAUDE_SESSIONS_DIR, CLAUDE_PROJECTS_DIR, OPENCODE_DIR], {
     persistent: true,
     ignoreInitial: true,
-    depth: 1,
+    depth: 2,
   });
 
   watcher.on('add', debouncedUpdate);

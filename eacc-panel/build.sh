@@ -21,6 +21,10 @@ mkdir -p "$APP_RESOURCES"
 cp -X "$EXEC" "$APP_DIR/"
 cp -X Info.plist "$APP_BUNDLE/Contents/"
 cp -X Resources/AppIcon.icns "$APP_RESOURCES/"
+if [ -d Resources/Fonts ]; then
+    mkdir -p "$APP_RESOURCES/Fonts"
+    cp -X Resources/Fonts/* "$APP_RESOURCES/Fonts/"
+fi
 
 # Re-sign so Info.plist is bound to the bundle identity
 codesign --force --sign - --deep "$APP_BUNDLE"
