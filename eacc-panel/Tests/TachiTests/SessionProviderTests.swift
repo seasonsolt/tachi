@@ -73,6 +73,52 @@ final class SessionProviderTests: XCTestCase {
         XCTAssertEqual(info.taskSummary, "Connected agents: codexCLI")
     }
 
+    func testClaudeDesignSessionMapsToWireSessionInfo() {
+        let session = CodingSession(
+            id: "claude-design-1",
+            tool: .claudeDesign,
+            projectPath: "/tmp/tachi",
+            slug: "design-popup",
+            taskTitle: "Design taskbar popup",
+            taskSummary: "Optimize smiling boy theme",
+            status: .working,
+            lastActivity: Date(timeIntervalSince1970: 220),
+            signal: .booting,
+            pulse: .warm
+        )
+
+        let info = EACCSessionInfo(session: session)
+
+        XCTAssertEqual(info.tool, "claude_design")
+    }
+
+    func testWaitingCompanionRemainsVisibleButStopsMotion() {
+        let vm = ViewModel()
+        vm.sessions = [
+            CodingSession(
+                id: "paused-claude",
+                tool: .claudeCode,
+                projectPath: "/tmp/tachi",
+                slug: "paused-task",
+                taskTitle: "Paused task",
+                taskSummary: nil,
+                status: .waitingForInput,
+                lastActivity: Date(timeIntervalSince1970: 200),
+                signal: .awaitingUser,
+                pulse: .warm
+            )
+        ]
+
+        XCTAssertTrue(vm.shouldShowCompanionTaskPreview)
+        XCTAssertEqual(vm.companionMood, .expecting)
+        XCTAssertFalse(vm.companionHasMotion)
+
+        vm.menuAnimationFrame = 0
+        let calmMenuBarText = vm.menuBarText
+        vm.menuAnimationFrame = 1
+        XCTAssertEqual(vm.menuBarText, calmMenuBarText)
+    }
+
     func testPencilProviderAggregatesMainProcessAndConnectedAgents() throws {
         let now = Date(timeIntervalSince1970: 200)
         let provider = PencilSessionProvider(processRunner: StubProcessListingRunner(lines: [
@@ -299,6 +345,49 @@ final class SessionProviderTests: XCTestCase {
         let result = provider.scanSessions(now: Date(timeIntervalSince1970: 220))
 
         XCTAssertEqual(result.sessions.map(\.id), ["newer"])
+    }
+
+    func testClaudeDesignProviderReadsDesktopLaunchedProjectJsonl() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let projectDir = tempDir.appendingPathComponent("-tmp-tachi-design", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let sessionURL = projectDir.appendingPathComponent("design-1.jsonl")
+        try """
+        {"timestamp":"1970-01-01T00:03:20Z","type":"user","entrypoint":"claude-desktop","cwd":"/tmp/tachi-design","slug":"design-taskbar-popup","message":{"role":"user","content":"Design the taskbar popup"}}
+        """.write(to: sessionURL, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeDesignSessionProvider(projectsPath: tempDir.path)
+        let result = provider.scanSessions(now: Date(timeIntervalSince1970: 220))
+
+        XCTAssertEqual(result.sessions.count, 1)
+        let session = try XCTUnwrap(result.sessions.first)
+        XCTAssertEqual(session.id, "design-1")
+        XCTAssertEqual(session.tool, .claudeDesign)
+        XCTAssertEqual(session.projectPath, "/tmp/tachi-design")
+        XCTAssertEqual(session.taskTitle, "design-taskbar-popup")
+        XCTAssertEqual(session.taskSummary, "Design the taskbar popup")
+        XCTAssertEqual(session.signal, .booting)
+        XCTAssertEqual(session.pulse, .warm)
+    }
+
+    func testClaudeCodeProviderSkipsDesktopLaunchedProjectJsonl() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let projectDir = tempDir.appendingPathComponent("-tmp-tachi-design", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        try """
+        {"timestamp":"1970-01-01T00:03:20Z","type":"user","entrypoint":"claude-desktop","cwd":"/tmp/tachi-design","slug":"design-taskbar-popup","message":"Design the taskbar popup"}
+        """.write(to: projectDir.appendingPathComponent("design-1.jsonl"), atomically: true, encoding: .utf8)
+
+        let provider = ClaudeCodeSessionProvider(projectsPath: tempDir.path)
+        let result = provider.scanSessions(now: Date(timeIntervalSince1970: 220))
+
+        XCTAssertTrue(result.sessions.isEmpty)
     }
 }
 

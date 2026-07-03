@@ -39,6 +39,10 @@ enum SessionLauncher {
             return [
                 "/Applications/Pencil.app"
             ]
+        case .claudeDesign:
+            return [
+                "/Applications/Claude.app"
+            ]
         case .claudeCode:
             return [
                 "/Applications/iTerm.app",

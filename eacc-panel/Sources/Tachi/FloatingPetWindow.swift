@@ -1,6 +1,40 @@
 import AppKit
 import SwiftUI
 
+private let desktopAuroraCyan = Color(red: 56.0 / 255.0, green: 189.0 / 255.0, blue: 248.0 / 255.0)
+private let desktopAuroraTeal = Color(red: 45.0 / 255.0, green: 212.0 / 255.0, blue: 191.0 / 255.0)
+private let desktopAuroraAmber = Color(red: 245.0 / 255.0, green: 158.0 / 255.0, blue: 11.0 / 255.0)
+private let desktopAuroraMutedDeep = Color(red: 90.0 / 255.0, green: 107.0 / 255.0, blue: 126.0 / 255.0)
+
+private struct DesktopPulseDot: View {
+    let color: Color
+
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(color.opacity(0.38), lineWidth: 1)
+                .frame(width: 16, height: 16)
+                .scaleEffect(pulse ? 1.28 : 0.72)
+                .opacity(pulse ? 0 : 0.78)
+
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+                .scaleEffect(pulse ? 0.82 : 1)
+                .opacity(pulse ? 0.55 : 1)
+                .shadow(color: color.opacity(0.42), radius: 8)
+        }
+        .frame(width: 16, height: 16)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
+    }
+}
+
 @MainActor
 final class FloatingPetWindowController {
     static let shared = FloatingPetWindowController()
@@ -81,11 +115,12 @@ final class FloatingPetWindowController {
 }
 
 struct DesktopPetView: View {
-    private static let panelWidth: CGFloat = 276
+    private static let collapsedPanelWidth: CGFloat = 168
+    private static let expandedPanelWidth: CGFloat = 420
     private static let collapsedContentHeight: CGFloat = 148
-    private static let previewLift: CGFloat = 148
-    private static let previewOffsetY: CGFloat = 118
-    private static let horizontalPadding: CGFloat = 10
+    private static let previewLift: CGFloat = 170
+    private static let previewOffsetY: CGFloat = 136
+    private static let horizontalPadding: CGFloat = 20
     private static let verticalPadding: CGFloat = 12
 
     let vm: ViewModel
@@ -105,14 +140,18 @@ struct DesktopPetView: View {
         Self.estimatedBubbleHeight(for: vm)
     }
 
+    private var currentPanelWidth: CGFloat {
+        isShowingPreview ? Self.expandedPanelWidth : Self.collapsedPanelWidth
+    }
+
     private var contentHeight: CGFloat {
-        guard vm.shouldShowCompanionTaskPreview else { return Self.collapsedContentHeight }
+        guard isShowingPreview else { return Self.collapsedContentHeight }
         return max(Self.collapsedContentHeight, estimatedBubbleHeight + Self.previewLift)
     }
 
     private var panelSize: CGSize {
         CGSize(
-            width: Self.panelWidth,
+            width: currentPanelWidth,
             height: contentHeight + (Self.verticalPadding * 2)
         )
     }
@@ -171,7 +210,7 @@ struct DesktopPetView: View {
                 }
             }
         }
-        .frame(width: Self.panelWidth - (Self.horizontalPadding * 2), height: contentHeight, alignment: .bottomTrailing)
+        .frame(width: currentPanelWidth - (Self.horizontalPadding * 2), height: contentHeight, alignment: .bottomTrailing)
         .padding(.horizontal, Self.horizontalPadding)
         .padding(.vertical, Self.verticalPadding)
         .background(Color.clear)
@@ -258,6 +297,7 @@ struct DesktopPetView: View {
         withAnimation(.easeOut(duration: 0.16)) {
             isPreviewVisible = true
         }
+        onPanelSizeChange?(Self.panelSize(for: vm, showingPreview: true))
     }
 
     private func schedulePreviewDismissIfNeeded() {
@@ -272,6 +312,7 @@ struct DesktopPetView: View {
                 withAnimation(.easeOut(duration: 0.16)) {
                     isPreviewVisible = false
                 }
+                onPanelSizeChange?(Self.panelSize(for: vm, showingPreview: false))
             }
         }
     }
@@ -282,56 +323,35 @@ struct DesktopPetView: View {
             ? max(collapsedContentHeight, estimatedBubbleHeight + previewLift)
             : collapsedContentHeight
         return CGSize(
-            width: panelWidth,
+            width: showingPreview ? expandedPanelWidth : collapsedPanelWidth,
             height: contentHeight + (verticalPadding * 2)
         )
     }
 
     private static func estimatedBubbleHeight(for vm: ViewModel) -> CGFloat {
         let taskCount = max(1, vm.companionTaskVisibleSessions.count)
-        let itemHeight: CGFloat = 78
-        let itemSpacing: CGFloat = CGFloat(max(0, taskCount - 1)) * 9
+        let itemHeight: CGFloat = 86
+        let itemSpacing: CGFloat = CGFloat(max(0, taskCount - 1)) * 10
         let footerHeight: CGFloat = vm.companionTaskFooter == nil ? 0 : 18
-        return 64 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
+        return 74 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
     }
 
     private var taskBubble: some View {
         let panelColors = vm.panelThemeColors
-        let fillTint = LinearGradient(
+        let bubbleFill = LinearGradient(
             colors: [
-                panelColors.accent.opacity(0.20),
-                panelColors.accentEdge.opacity(0.14),
-                panelColors.bg.opacity(0.28)
+                Color(red: 20.0 / 255.0, green: 32.0 / 255.0, blue: 44.0 / 255.0).opacity(0.92),
+                Color(red: 11.0 / 255.0, green: 19.0 / 255.0, blue: 28.0 / 255.0).opacity(0.92)
             ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        let sheen = LinearGradient(
-            colors: [
-                Color.white.opacity(0.28),
-                Color.white.opacity(0.06),
-                Color.clear
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        let strokeGradient = LinearGradient(
-            colors: [
-                Color.white.opacity(0.38),
-                panelColors.accent.opacity(0.48),
-                panelColors.accentEdge.opacity(0.32)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
+            startPoint: .top,
+            endPoint: .bottom
         )
 
-        return VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(panelColors.accent)
-                    .frame(width: 10, height: 10)
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                DesktopPulseDot(color: panelColors.accent)
                 Text(vm.companionTaskHeader)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(AuroraFont.display(16, weight: .semibold))
                     .foregroundStyle(panelColors.textPrimary)
                 Spacer()
                 CompanionPersonaMenu(
@@ -340,114 +360,140 @@ struct DesktopPetView: View {
                 )
             }
 
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(vm.companionTaskVisibleSessions) { session in
-                    Button {
-                        vm.openCompanionTask(session)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            if vm.companionTaskShowsProjectBadge(for: session) {
-                                Text(vm.companionTaskProject(for: session))
-                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(
-                                        Capsule()
-                                            .fill(panelColors.accent.opacity(0.12))
-                                    )
-                                    .foregroundStyle(panelColors.accent)
-                            }
-
-                            Text(vm.companionTaskLine(for: session))
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundStyle(panelColors.textPrimary)
-                                .lineLimit(2)
-
-                            HStack(spacing: 6) {
-                                Text(vm.companionTaskMeta(for: session))
-                                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                                    .foregroundStyle(panelColors.textSecondary)
-                                    .lineLimit(1)
-
-                                Spacer(minLength: 0)
-
-                                Image(systemName: "arrow.up.forward")
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .foregroundStyle(panelColors.accent.opacity(0.9))
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(fillTint.opacity(0.42))
-                            }
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.white.opacity(0.10), lineWidth: 0.6)
-                            }
-                    )
-                    .help("Open \(session.tool.rawValue)")
+                    taskPreviewItem(session, panelColors: panelColors)
                 }
             }
 
             if let footer = vm.companionTaskFooter {
                 Text(footer)
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                    .foregroundStyle(panelColors.textMuted)
+                    .font(AuroraFont.mono(11, weight: .medium))
+                    .foregroundStyle(desktopAuroraMutedDeep)
                     .lineLimit(1)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 16)
-        .padding(.bottom, 20)
-        .frame(width: 242, alignment: .leading)
+        .padding(18)
+        .frame(width: 380, alignment: .leading)
         .background(
-            ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(fillTint)
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(sheen)
-                    }
-                    .padding(.bottom, 14)
-
-                BubbleTail()
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        BubbleTail()
-                            .fill(fillTint)
-                    }
-                    .frame(width: 20, height: 18)
-                    .offset(x: 40, y: 2)
-            }
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(bubbleFill)
+                }
         )
         .overlay(
-            ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(strokeGradient, lineWidth: 1)
-                    .padding(.bottom, 14)
-
-                BubbleTail()
-                    .stroke(strokeGradient, lineWidth: 1)
-                    .frame(width: 20, height: 18)
-                    .offset(x: 40, y: 2)
-            }
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(panelColors.accent.opacity(0.20), lineWidth: 1)
         )
-        .shadow(color: panelColors.accent.opacity(0.14), radius: 24, y: 10)
-        .shadow(color: .black.opacity(0.10), radius: 12, y: 6)
+        .overlay(alignment: .bottomLeading) {
+            Rectangle()
+                .fill(Color(red: 11.0 / 255.0, green: 19.0 / 255.0, blue: 28.0 / 255.0).opacity(0.92))
+                .frame(width: 18, height: 18)
+                .rotationEffect(.degrees(45))
+                .overlay(
+                    Rectangle()
+                        .stroke(panelColors.accent.opacity(0.16), lineWidth: 1)
+                        .rotationEffect(.degrees(45))
+                )
+                .offset(x: 44, y: 9)
+        }
+        .shadow(color: panelColors.accent.opacity(0.25), radius: 40, y: 12)
+        .shadow(color: .black.opacity(0.55), radius: 30, y: 18)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func taskPreviewItem(_ session: CodingSession, panelColors: EACCThemeColors) -> some View {
+        Button {
+            vm.openCompanionTask(session)
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Text(vm.companionTaskProject(for: session))
+                        .font(AuroraFont.mono(11, weight: .bold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(panelColors.accent.opacity(0.10))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .strokeBorder(panelColors.accent.opacity(0.25), lineWidth: 1)
+                        )
+                        .foregroundStyle(panelColors.accent)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text(sessionStatusLabel(session))
+                        .font(AuroraFont.mono(10, weight: .bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(sessionStatusTint(session).opacity(0.12))
+                        )
+                        .foregroundStyle(sessionStatusTint(session))
+
+                    Spacer(minLength: 0)
+                }
+
+                Text(vm.companionTaskLine(for: session))
+                    .font(AuroraFont.display(16, weight: .semibold))
+                    .foregroundStyle(panelColors.textPrimary)
+                    .lineLimit(3)
+
+                HStack(spacing: 8) {
+                    Text(sessionMetaLine(session))
+                        .font(AuroraFont.mono(11, weight: .medium))
+                        .foregroundStyle(panelColors.textSecondary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "arrow.up.forward")
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(width: 32, height: 32)
+                        .background(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(panelColors.accent.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .strokeBorder(panelColors.accent.opacity(0.20), lineWidth: 1)
+                        )
+                        .foregroundStyle(panelColors.accent)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help("Open \(session.tool.rawValue)")
+    }
+
+    private func sessionStatusTint(_ session: CodingSession) -> Color {
+        switch session.status {
+        case .working: return desktopAuroraCyan
+        case .waitingForInput: return desktopAuroraAmber
+        case .completed: return desktopAuroraTeal
+        case .idle: return desktopAuroraMutedDeep
+        }
+    }
+
+    private func sessionStatusLabel(_ session: CodingSession) -> String {
+        switch session.status {
+        case .working: return "working"
+        case .waitingForInput: return "waiting"
+        case .completed: return "done"
+        case .idle: return "warm"
+        }
+    }
+
+    private func sessionMetaLine(_ session: CodingSession) -> String {
+        let detail = session.status == .completed ? "done" : "watching"
+        return "\(session.tool.rawValue) · \(detail)"
     }
 }
 
@@ -485,16 +531,5 @@ private struct TaskCompletionBurstView: View {
                 isAnimating = true
             }
         }
-    }
-}
-
-struct BubbleTail: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: 0, y: 0))
-        path.addLine(to: CGPoint(x: rect.width, y: 0))
-        path.addLine(to: CGPoint(x: rect.width / 2, y: rect.height))
-        path.closeSubpath()
-        return path
     }
 }

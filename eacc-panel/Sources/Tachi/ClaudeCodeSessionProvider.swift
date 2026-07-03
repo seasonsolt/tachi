@@ -1,14 +1,83 @@
 import Foundation
 
 final class ClaudeCodeSessionProvider: CodingSessionProvider {
-    let id = "claude-code"
-    let displayName = "Claude Code"
-    let tool = CodingTool.claudeCode
+    private let scanner: ClaudeProjectSessionProvider
 
-    private let projectsPath: String
+    var id: String { scanner.id }
+    var displayName: String { scanner.displayName }
+    var tool: CodingTool { scanner.tool }
 
     init(projectsPath: String = NSHomeDirectory() + "/.claude/projects") {
+        scanner = ClaudeProjectSessionProvider(
+            id: "claude-code",
+            displayName: "Claude Code",
+            tool: .claudeCode,
+            projectsPath: projectsPath,
+            desktopLaunchPolicy: .exclude
+        )
+    }
+
+    func scanSessions(now: Date = Date()) -> SessionProviderResult {
+        scanner.scanSessions(now: now)
+    }
+}
+
+final class ClaudeDesignSessionProvider: CodingSessionProvider {
+    private let scanner: ClaudeProjectSessionProvider
+
+    var id: String { scanner.id }
+    var displayName: String { scanner.displayName }
+    var tool: CodingTool { scanner.tool }
+
+    init(projectsPath: String = NSHomeDirectory() + "/.claude/projects") {
+        scanner = ClaudeProjectSessionProvider(
+            id: "claude-design",
+            displayName: "Claude Design",
+            tool: .claudeDesign,
+            projectsPath: projectsPath,
+            desktopLaunchPolicy: .require
+        )
+    }
+
+    func scanSessions(now: Date = Date()) -> SessionProviderResult {
+        scanner.scanSessions(now: now)
+    }
+}
+
+private enum ClaudeDesktopLaunchPolicy {
+    case exclude
+    case require
+
+    func allows(desktopLaunched: Bool) -> Bool {
+        switch self {
+        case .exclude:
+            return !desktopLaunched
+        case .require:
+            return desktopLaunched
+        }
+    }
+}
+
+private final class ClaudeProjectSessionProvider: CodingSessionProvider {
+    let id: String
+    let displayName: String
+    let tool: CodingTool
+
+    private let projectsPath: String
+    private let desktopLaunchPolicy: ClaudeDesktopLaunchPolicy
+
+    init(
+        id: String,
+        displayName: String,
+        tool: CodingTool,
+        projectsPath: String,
+        desktopLaunchPolicy: ClaudeDesktopLaunchPolicy
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.tool = tool
         self.projectsPath = projectsPath
+        self.desktopLaunchPolicy = desktopLaunchPolicy
     }
 
     func scanSessions(now: Date = Date()) -> SessionProviderResult {
@@ -32,6 +101,9 @@ final class ClaudeCodeSessionProvider: CodingSessionProvider {
                 else { continue }
 
                 let recentEntries = readRecentJsonlEntries(path: filePath, limit: 12)
+                let desktopLaunched = isDesktopLaunched(recentEntries: recentEntries)
+                guard desktopLaunchPolicy.allows(desktopLaunched: desktopLaunched) else { continue }
+
                 let lastEntry = recentEntries.first
                 let sessionId = String(file.dropLast(6))
                 let cwd = lastEntry?["cwd"] as? String ?? decodeDirName(dir)
@@ -42,7 +114,7 @@ final class ClaudeCodeSessionProvider: CodingSessionProvider {
                 sessions.append(
                     CodingSession(
                         id: sessionId,
-                        tool: .claudeCode,
+                        tool: tool,
                         projectPath: cwd,
                         slug: slug,
                         taskTitle: sanitizeTaskText(slug) ?? projectName,
@@ -69,6 +141,12 @@ final class ClaudeCodeSessionProvider: CodingSessionProvider {
             }
         }
         return SessionProviderResult(sessions: Array(best.values))
+    }
+
+    private func isDesktopLaunched(recentEntries: [[String: Any]]) -> Bool {
+        recentEntries.contains { entry in
+            (entry["entrypoint"] as? String) == "claude-desktop"
+        }
     }
 
     private func claudeTrace(recentEntries: [[String: Any]], fallbackDate: Date, now: Date) -> SessionTrace {

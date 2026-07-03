@@ -34,7 +34,11 @@ struct CodingSession: Identifiable, Sendable {
         guard !text.isEmpty else { return false }
         let normalized = text.lowercased()
         if normalized == projectName.lowercased() { return false }
-        if normalized == "codex" || normalized == "claude code" || normalized == "opencode" {
+        if normalized == "codex"
+            || normalized == "claude code"
+            || normalized == "claude design"
+            || normalized == "opencode"
+        {
             return false
         }
         if normalized.hasPrefix("# files mentioned by the user")
@@ -57,6 +61,10 @@ struct SessionScanBreakdown: Sendable {
         providerDurations["claude-code"] ?? 0
     }
 
+    var claudeDesignDuration: TimeInterval {
+        providerDurations["claude-design"] ?? 0
+    }
+
     var codexDuration: TimeInterval {
         providerDurations["codex"] ?? 0
     }
@@ -71,6 +79,10 @@ struct SessionScanBreakdown: Sendable {
 
     var claudeCount: Int {
         sessions.filter { $0.tool == .claudeCode }.count
+    }
+
+    var claudeDesignCount: Int {
+        sessions.filter { $0.tool == .claudeDesign }.count
     }
 
     var codexCount: Int {
@@ -88,6 +100,7 @@ struct SessionScanBreakdown: Sendable {
 
 enum CodingTool: String, Sendable, Equatable {
     case claudeCode = "Claude Code"
+    case claudeDesign = "Claude Design"
     case codex = "Codex"
     case openCode = "OpenCode"
     case pencil = "Pencil"
@@ -95,6 +108,7 @@ enum CodingTool: String, Sendable, Equatable {
     var icon: String {
         switch self {
         case .claudeCode: return "brain.head.profile"
+        case .claudeDesign: return "paintpalette"
         case .codex: return "cube.transparent"
         case .openCode: return "terminal"
         case .pencil: return "pencil.and.outline"
@@ -104,6 +118,7 @@ enum CodingTool: String, Sendable, Equatable {
     var wireName: String {
         switch self {
         case .claudeCode: return "claude_code"
+        case .claudeDesign: return "claude_design"
         case .codex: return "codex"
         case .openCode: return "open_code"
         case .pencil: return "pencil"
@@ -186,6 +201,7 @@ final class SessionMonitor {
 
     init(registry: SessionProviderRegistry = SessionProviderRegistry(providers: [
         ClaudeCodeSessionProvider(),
+        ClaudeDesignSessionProvider(),
         CodexSessionProvider(),
         OpenCodeSessionProvider(),
         PencilSessionProvider()

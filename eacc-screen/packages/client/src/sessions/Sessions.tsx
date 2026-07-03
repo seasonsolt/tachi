@@ -51,6 +51,8 @@ function sessionToolLabel(tool?: SessionTool): string | null {
   switch (tool) {
     case 'claude_code':
       return 'CLAUDE';
+    case 'claude_design':
+      return 'DESIGN';
     case 'codex':
       return 'CODEX';
     case 'open_code':
