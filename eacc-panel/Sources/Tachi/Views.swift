@@ -12,6 +12,31 @@ private let auroraAmber = Color(red: 245.0 / 255.0, green: 158.0 / 255.0, blue: 
 private let auroraRed = Color(red: 248.0 / 255.0, green: 113.0 / 255.0, blue: 113.0 / 255.0)
 private let auroraMuted = Color(red: 148.0 / 255.0, green: 163.0 / 255.0, blue: 184.0 / 255.0)
 
+// Whole-surface CRT flicker for the Matrix skin (design sn-flicker): steady
+// for most of a 7s cycle, then two brief brightness drops near the end.
+struct CRTFlickerModifier: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.keyframeAnimator(initialValue: 1.0, repeating: true) { view, value in
+                view.opacity(value)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    LinearKeyframe(1.0, duration: 6.44)
+                    LinearKeyframe(0.82, duration: 0.07)
+                    LinearKeyframe(1.0, duration: 0.07)
+                    LinearKeyframe(1.0, duration: 0.21)
+                    LinearKeyframe(0.9, duration: 0.07)
+                    LinearKeyframe(1.0, duration: 0.14)
+                }
+            }
+        } else {
+            content
+        }
+    }
+}
+
 // CRT scanline overlay for the Matrix skin (design .mtx-scan): thin dark
 // lines every 4pt plus a bottom vignette. Shared by the menu panel and the
 // companion bubble.
@@ -345,6 +370,7 @@ struct ContentView: View {
             }
         }
         .shadow(color: .black.opacity(0.72), radius: 36, y: 24)
+        .modifier(CRTFlickerModifier(enabled: vm.selectedTheme == .matrix))
     }
 
     private var header: some View {
@@ -769,20 +795,56 @@ struct CompanionCard: View {
         .help("Tap to sniff for fresh session activity")
     }
 
+    @ViewBuilder
     private var mascotBadge: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            panelColors.accent.opacity(0.18),
-                            panelColors.accent.opacity(0.04)
-                        ],
-                        center: .center,
-                        startRadius: 4,
-                        endRadius: 42
+        if vm.companionPersona == .voidMonolith {
+            monolithWhiteRoom
+        } else {
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                panelColors.accent.opacity(0.18),
+                                panelColors.accent.opacity(0.04)
+                            ],
+                            center: .center,
+                            startRadius: 4,
+                            endRadius: 42
+                        )
                     )
+
+                CompanionPetView(
+                    persona: vm.companionPersona,
+                    mood: vm.companionMood,
+                    accent: vm.companionPetAccent,
+                    themeColors: panelColors,
+                    hasMotion: vm.companionHasMotion,
+                    motionScale: 0.18
                 )
+                .frame(width: 108, height: 108)
+                .scaleEffect(0.56)
+            }
+            .frame(width: 66, height: 66)
+            .clipShape(Circle())
+            .overlay(Circle().strokeBorder(panelColors.accent.opacity(0.35), lineWidth: 2))
+        }
+    }
+
+    // Odyssey (5A/5B): the monolith scene is a composition — eclipse, slab,
+    // shadow, reflection — so it gets an uncropped white-room stage instead
+    // of the circular badge that beheads it.
+    private var monolithWhiteRoom: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.953, green: 0.953, blue: 0.933),
+                    Color(red: 0.902, green: 0.902, blue: 0.875),
+                    Color(red: 0.863, green: 0.863, blue: 0.831)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
             CompanionPetView(
                 persona: vm.companionPersona,
@@ -793,11 +855,14 @@ struct CompanionCard: View {
                 motionScale: 0.18
             )
             .frame(width: 108, height: 108)
-            .scaleEffect(0.56)
+            .scaleEffect(0.82)
         }
-        .frame(width: 66, height: 66)
-        .clipShape(Circle())
-        .overlay(Circle().strokeBorder(panelColors.accent.opacity(0.35), lineWidth: 2))
+        .frame(width: 92, height: 92)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.08), lineWidth: 1)
+        )
     }
 
     private func voidStatColumn(value: Int, label: String, divider: Bool) -> some View {
