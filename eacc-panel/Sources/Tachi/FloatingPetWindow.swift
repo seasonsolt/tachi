@@ -116,7 +116,7 @@ final class FloatingPetWindowController {
 
 struct DesktopPetView: View {
     private static let collapsedPanelWidth: CGFloat = 168
-    private static let expandedPanelWidth: CGFloat = 420
+    private static let expandedPanelWidth: CGFloat = 372
     private static let collapsedContentHeight: CGFloat = 148
     private static let previewLift: CGFloat = 170
     private static let previewOffsetY: CGFloat = 136
@@ -330,18 +330,19 @@ struct DesktopPetView: View {
 
     private static func estimatedBubbleHeight(for vm: ViewModel) -> CGFloat {
         let taskCount = max(1, vm.companionTaskVisibleSessions.count)
-        let itemHeight: CGFloat = 86
+        let itemHeight: CGFloat = 62
         let itemSpacing: CGFloat = CGFloat(max(0, taskCount - 1)) * 10
         let footerHeight: CGFloat = vm.companionTaskFooter == nil ? 0 : 18
-        return 74 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
+        return 62 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
     }
 
     private var taskBubble: some View {
         let panelColors = vm.panelThemeColors
+        let skin = panelColors
         let bubbleFill = LinearGradient(
             colors: [
-                Color(red: 20.0 / 255.0, green: 32.0 / 255.0, blue: 44.0 / 255.0).opacity(0.92),
-                Color(red: 11.0 / 255.0, green: 19.0 / 255.0, blue: 28.0 / 255.0).opacity(0.92)
+                panelColors.cardBg.opacity(0.92),
+                panelColors.bg.opacity(0.92)
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -351,7 +352,7 @@ struct DesktopPetView: View {
             HStack(spacing: 10) {
                 DesktopPulseDot(color: panelColors.accent)
                 Text(vm.companionTaskHeader)
-                    .font(AuroraFont.display(16, weight: .semibold))
+                    .font(skin.display(16, weight: .semibold))
                     .foregroundStyle(panelColors.textPrimary)
                 Spacer()
                 CompanionPersonaMenu(
@@ -368,13 +369,13 @@ struct DesktopPetView: View {
 
             if let footer = vm.companionTaskFooter {
                 Text(footer)
-                    .font(AuroraFont.mono(11, weight: .medium))
-                    .foregroundStyle(desktopAuroraMutedDeep)
+                    .font(skin.mono(11, weight: .medium))
+                    .foregroundStyle(panelColors.textMuted)
                     .lineLimit(1)
             }
         }
-        .padding(18)
-        .frame(width: 380, alignment: .leading)
+        .padding(16)
+        .frame(width: 332, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(.ultraThinMaterial)
@@ -389,7 +390,7 @@ struct DesktopPetView: View {
         )
         .overlay(alignment: .bottomLeading) {
             Rectangle()
-                .fill(Color(red: 11.0 / 255.0, green: 19.0 / 255.0, blue: 28.0 / 255.0).opacity(0.92))
+                .fill(panelColors.cardBg.opacity(0.92))
                 .frame(width: 18, height: 18)
                 .rotationEffect(.degrees(45))
                 .overlay(
@@ -405,13 +406,14 @@ struct DesktopPetView: View {
     }
 
     private func taskPreviewItem(_ session: CodingSession, panelColors: EACCThemeColors) -> some View {
-        Button {
+        let skin = panelColors
+        return Button {
             vm.openCompanionTask(session)
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Text(vm.companionTaskProject(for: session))
-                        .font(AuroraFont.mono(11, weight: .bold))
+                        .font(skin.mono(11, weight: .bold))
                         .padding(.horizontal, 9)
                         .padding(.vertical, 4)
                         .background(
@@ -427,7 +429,7 @@ struct DesktopPetView: View {
                         .truncationMode(.middle)
 
                     Text(sessionStatusLabel(session))
-                        .font(AuroraFont.mono(10, weight: .bold))
+                        .font(skin.mono(10, weight: .bold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(
@@ -440,13 +442,13 @@ struct DesktopPetView: View {
                 }
 
                 Text(vm.companionTaskLine(for: session))
-                    .font(AuroraFont.display(16, weight: .semibold))
+                    .font(skin.display(15, weight: .semibold))
                     .foregroundStyle(panelColors.textPrimary)
-                    .lineLimit(3)
+                    .lineLimit(2)
 
                 HStack(spacing: 8) {
                     Text(sessionMetaLine(session))
-                        .font(AuroraFont.mono(11, weight: .medium))
+                        .font(skin.mono(11, weight: .medium))
                         .foregroundStyle(panelColors.textSecondary)
                         .lineLimit(1)
 
