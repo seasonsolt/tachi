@@ -449,6 +449,32 @@ final class SessionProviderTests: XCTestCase {
         XCTAssertTrue(session.processAlive)
         XCTAssertEqual(session.status, .idle)
     }
+
+    func testClaudeTaskSummarySkipsToolResultsAndMetaLines() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let projectDir = tempDir.appendingPathComponent("-tmp-tachi", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let lines = [
+            #"{"timestamp":"1970-01-01T00:03:00Z","type":"user","cwd":"/tmp/tachi","slug":"fix-popup","message":"Fix the glass popup"}"#,
+            #"{"timestamp":"1970-01-01T00:03:10Z","type":"assistant","cwd":"/tmp/tachi","slug":"fix-popup","message":{"role":"assistant","content":[{"type":"text","text":"On it"}]}}"#,
+            #"{"timestamp":"1970-01-01T00:03:15Z","type":"user","cwd":"/tmp/tachi","slug":"fix-popup","isMeta":true,"message":"Caveat: local commands"}"#,
+            #"{"timestamp":"1970-01-01T00:03:20Z","type":"user","cwd":"/tmp/tachi","slug":"fix-popup","toolUseResult":{"stdout":"No xauth data"},"message":{"role":"user","content":[{"type":"tool_result","content":"No xauth data; using fake authentication data"}]}}"#
+        ]
+        try lines.joined(separator: "\n")
+            .write(to: projectDir.appendingPathComponent("claude-2.jsonl"), atomically: true, encoding: .utf8)
+
+        let provider = ClaudeCodeSessionProvider(
+            projectsPath: tempDir.path,
+            sessionsPath: tempDir.appendingPathComponent("sessions").path
+        )
+        let result = provider.scanSessions(now: Date(timeIntervalSince1970: 220))
+
+        let session = try XCTUnwrap(result.sessions.first)
+        XCTAssertEqual(session.taskSummary, "Fix the glass popup")
+    }
 }
 
 private struct StaticSessionProvider: CodingSessionProvider {

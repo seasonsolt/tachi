@@ -112,7 +112,9 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
                       modified > cutoff
                 else { continue }
 
-                let recentEntries = readRecentJsonlEntries(path: filePath, limit: 12)
+                // 40 entries: during a long agent turn the tail is mostly
+                // assistant/tool_result lines; the real prompt sits further back.
+                let recentEntries = readRecentJsonlEntries(path: filePath, limit: 40, maxBytes: 262_144)
                 let sessionId = String(file.dropLast(6))
                 // The Claude Code desktop app also writes entrypoint "claude-desktop",
                 // so a desktop-launched trace only counts as Claude Design when no
@@ -218,12 +220,28 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
 
     private func claudeTaskSummary(recentEntries: [[String: Any]], fallback: String?) -> String? {
         for entry in recentEntries {
-            guard entry["type"] as? String == "user" else { continue }
-            if let summary = extractText(from: entry["message"] ?? entry["content"]) {
+            guard entry["type"] as? String == "user", isGenuineUserPrompt(entry) else { continue }
+            if let summary = extractText(from: entry["message"] ?? entry["content"]),
+               !summary.hasPrefix("<")
+            {
                 return summary
             }
         }
         return sanitizeTaskText(fallback)
+    }
+
+    // Transcript tool results and meta lines also carry type "user"; only a
+    // typed prompt should become the task summary.
+    private func isGenuineUserPrompt(_ entry: [String: Any]) -> Bool {
+        if entry["toolUseResult"] != nil { return false }
+        if entry["isMeta"] as? Bool == true { return false }
+        if let message = entry["message"] as? [String: Any],
+           let blocks = message["content"] as? [[String: Any]],
+           blocks.contains(where: { ($0["type"] as? String) == "tool_result" })
+        {
+            return false
+        }
+        return true
     }
 
     private func replySignal(at timestamp: Date, now: Date) -> SessionSignal {

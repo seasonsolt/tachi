@@ -24,6 +24,18 @@ private struct GlassBackdrop: NSViewRepresentable {
     }
 }
 
+private struct DiamondShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
+        path.closeSubpath()
+        return path
+    }
+}
+
 private struct DesktopPulseDot: View {
     let color: Color
 
@@ -348,10 +360,12 @@ struct DesktopPetView: View {
 
     private static func estimatedBubbleHeight(for vm: ViewModel) -> CGFloat {
         let taskCount = max(1, vm.companionTaskVisibleSessions.count)
-        let itemHeight: CGFloat = 62
+        // Real card height: chip row (~24) + two-line title (~38) + meta row (32)
+        // + internal spacing. Underestimating clips the bubble at the panel edge.
+        let itemHeight: CGFloat = 118
         let itemSpacing: CGFloat = CGFloat(max(0, taskCount - 1)) * 10
-        let footerHeight: CGFloat = vm.companionTaskFooter == nil ? 0 : 18
-        return 62 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
+        let footerHeight: CGFloat = vm.companionTaskFooter == nil ? 0 : 32
+        return 76 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
     }
 
     private var taskBubble: some View {
@@ -360,8 +374,8 @@ struct DesktopPetView: View {
         // Keep the tint light so the behind-window blur stays visible.
         let bubbleFill = LinearGradient(
             colors: [
-                panelColors.cardBg.opacity(0.42),
-                panelColors.bg.opacity(0.50)
+                panelColors.cardBg.opacity(0.55),
+                panelColors.bg.opacity(0.62)
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -420,16 +434,14 @@ struct DesktopPetView: View {
                 .stroke(panelColors.accent.opacity(0.18), lineWidth: 1)
         )
         .overlay(alignment: .bottomLeading) {
-            Rectangle()
-                .fill(panelColors.bg.opacity(0.58))
-                .frame(width: 18, height: 18)
-                .rotationEffect(.degrees(45))
-                .overlay(
-                    Rectangle()
-                        .stroke(panelColors.accent.opacity(0.16), lineWidth: 1)
-                        .rotationEffect(.degrees(45))
-                )
-                .offset(x: 44, y: 9)
+            // Same glass treatment as the bubble so the tail doesn't read as a
+            // solid chip; DiamondShape clips without rotating the NSView.
+            GlassBackdrop()
+                .clipShape(DiamondShape())
+                .overlay(DiamondShape().fill(panelColors.bg.opacity(0.62)))
+                .overlay(DiamondShape().stroke(panelColors.accent.opacity(0.16), lineWidth: 1))
+                .frame(width: 26, height: 26)
+                .offset(x: 40, y: 13)
         }
         .shadow(color: panelColors.accent.opacity(0.18), radius: 40, y: 12)
         .shadow(color: .black.opacity(0.32), radius: 26, y: 14)

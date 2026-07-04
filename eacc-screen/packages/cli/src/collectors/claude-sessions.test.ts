@@ -77,6 +77,26 @@ describe('readClaudeProjectSessions', () => {
     expect(ids).toEqual(new Set(['desktop-code-1']));
   });
 
+  it('skips tool results and meta lines when picking the task summary', () => {
+    const projectsDir = makeTempDir();
+    const projectDir = join(projectsDir, '-tmp-tachi');
+    mkdirSync(projectDir, { recursive: true });
+
+    const sessionPath = join(projectDir, 'claude-2.jsonl');
+    const lines = [
+      '{"timestamp":"1970-01-01T00:03:00Z","type":"user","cwd":"/tmp/tachi","slug":"fix-popup","message":"Fix the glass popup"}',
+      '{"timestamp":"1970-01-01T00:03:10Z","type":"assistant","cwd":"/tmp/tachi","slug":"fix-popup","message":{"role":"assistant","content":[{"type":"text","text":"On it"}]}}',
+      '{"timestamp":"1970-01-01T00:03:20Z","type":"user","cwd":"/tmp/tachi","slug":"fix-popup","toolUseResult":{"stdout":"No xauth data"},"message":{"role":"user","content":[{"type":"tool_result","content":"No xauth data; using fake authentication data"}]}}',
+    ];
+    writeFileSync(sessionPath, `${lines.join('\n')}\n`);
+    utimesSync(sessionPath, new Date(200_000), new Date(200_000));
+
+    const sessions = readClaudeProjectSessions(projectsDir, 220_000, new Set());
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.taskSummary).toBe('Fix the glass popup');
+  });
+
   it('keeps terminal Claude project traces as Claude Code', () => {
     const projectsDir = makeTempDir();
     const projectDir = join(projectsDir, '-tmp-tachi');
