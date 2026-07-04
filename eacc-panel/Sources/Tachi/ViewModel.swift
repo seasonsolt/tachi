@@ -307,7 +307,7 @@ final class ViewModel {
     }
 
     var companionTaskVisibleSessions: [CodingSession] {
-        Array(companionTaskPreviewSessions.prefix(4))
+        Array(companionTaskPreviewSessions.prefix(3))
     }
 
     var companionTaskOverflowCount: Int {

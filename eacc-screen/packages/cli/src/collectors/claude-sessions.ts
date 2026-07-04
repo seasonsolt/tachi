@@ -38,6 +38,8 @@ interface ClaudeProjectEntry {
   entrypoint?: unknown;
   message?: unknown;
   content?: unknown;
+  toolUseResult?: unknown;
+  isMeta?: unknown;
 }
 
 function isAlive(pid: number): boolean {
@@ -160,7 +162,9 @@ export function readClaudeProjectSessions(
         }
         if (modifiedMs <= cutoffMs) continue;
 
-        const recentEntries = readRecentClaudeProjectEntries(filePath, 12);
+        // 40 entries: during a long agent turn the tail is mostly
+        // assistant/tool_result lines; the real prompt sits further back.
+        const recentEntries = readRecentClaudeProjectEntries(filePath, 40, 262_144);
         const lastEntry = recentEntries[0];
         const sessionId = file.slice(0, -'.jsonl'.length);
         const cwd = typeof lastEntry?.cwd === 'string' ? lastEntry.cwd : decodeClaudeProjectDir(dir);
@@ -273,12 +277,30 @@ function claudeProjectTaskSummary(
   recentEntries: ClaudeProjectEntry[],
   fallback?: string,
 ): string | undefined {
-  const userEntry = recentEntries.find((entry) => entry.type === 'user');
-  if (userEntry) {
-    const summary = extractText(userEntry.message ?? userEntry.content);
-    if (summary) return summary;
+  for (const entry of recentEntries) {
+    if (entry.type !== 'user' || !isGenuineUserPrompt(entry)) continue;
+    const summary = extractText(entry.message ?? entry.content);
+    if (summary && !summary.startsWith('<')) return summary;
   }
   return sanitizeTaskText(fallback);
+}
+
+// Transcript tool results and meta lines also carry type "user"; only a
+// typed prompt should become the task summary.
+function isGenuineUserPrompt(entry: ClaudeProjectEntry): boolean {
+  if (entry.toolUseResult !== undefined) return false;
+  if (entry.isMeta === true) return false;
+  const message = entry.message;
+  if (message && typeof message === 'object') {
+    const content = (message as Record<string, unknown>).content;
+    if (
+      Array.isArray(content) &&
+      content.some((block) => (block as Record<string, unknown>)?.type === 'tool_result')
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function readOpenCodeProcesses(): OpenCodeProcess[] {
