@@ -146,7 +146,7 @@ final class FloatingPetWindowController {
 
 struct DesktopPetView: View {
     private static let collapsedPanelWidth: CGFloat = 168
-    private static let expandedPanelWidth: CGFloat = 372
+    private static let expandedPanelWidth: CGFloat = 340
     private static let collapsedContentHeight: CGFloat = 148
     private static let previewLift: CGFloat = 170
     private static let previewOffsetY: CGFloat = 136
@@ -360,12 +360,12 @@ struct DesktopPetView: View {
 
     private static func estimatedBubbleHeight(for vm: ViewModel) -> CGFloat {
         let taskCount = max(1, vm.companionTaskVisibleSessions.count)
-        // Real card height: chip row (~24) + two-line title (~38) + meta row (32)
+        // Real card height: chip row (~20) + two-line title (~32) + meta row (26)
         // + internal spacing. Underestimating clips the bubble at the panel edge.
-        let itemHeight: CGFloat = 118
+        let itemHeight: CGFloat = 96
         let itemSpacing: CGFloat = CGFloat(max(0, taskCount - 1)) * 10
-        let footerHeight: CGFloat = vm.companionTaskFooter == nil ? 0 : 32
-        return 76 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
+        let footerHeight: CGFloat = vm.companionTaskFooter == nil ? 0 : 26
+        return 66 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
     }
 
     private var taskBubble: some View {
@@ -381,11 +381,11 @@ struct DesktopPetView: View {
             endPoint: .bottom
         )
 
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
                 DesktopPulseDot(color: panelColors.accent)
                 Text(vm.companionTaskHeader)
-                    .font(skin.display(16, weight: .semibold))
+                    .font(skin.display(13, weight: .semibold))
                     .foregroundStyle(panelColors.textPrimary)
                 Spacer()
                 CompanionPersonaMenu(
@@ -402,13 +402,13 @@ struct DesktopPetView: View {
 
             if let footer = vm.companionTaskFooter {
                 Text(footer)
-                    .font(skin.mono(11, weight: .medium))
+                    .font(skin.mono(10, weight: .medium))
                     .foregroundStyle(panelColors.textMuted)
                     .lineLimit(1)
             }
         }
-        .padding(16)
-        .frame(width: 332, alignment: .leading)
+        .padding(14)
+        .frame(width: 300, alignment: .leading)
         .background(
             GlassBackdrop()
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -453,12 +453,12 @@ struct DesktopPetView: View {
         return Button {
             vm.openCompanionTask(session)
         } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
                     Text(vm.companionTaskProject(for: session))
-                        .font(skin.mono(11, weight: .bold))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
+                        .font(skin.mono(10, weight: .bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
                         .background(
                             RoundedRectangle(cornerRadius: 7, style: .continuous)
                                 .fill(panelColors.accent.opacity(0.10))
@@ -472,9 +472,9 @@ struct DesktopPetView: View {
                         .truncationMode(.middle)
 
                     Text(sessionStatusLabel(session))
-                        .font(skin.mono(10, weight: .bold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .font(skin.mono(9, weight: .bold))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2.5)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(sessionStatusTint(session).opacity(0.12))
@@ -485,21 +485,21 @@ struct DesktopPetView: View {
                 }
 
                 Text(vm.companionTaskLine(for: session))
-                    .font(skin.display(15, weight: .semibold))
+                    .font(skin.display(12, weight: .semibold))
                     .foregroundStyle(panelColors.textPrimary)
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
                     Text(sessionMetaLine(session))
-                        .font(skin.mono(11, weight: .medium))
+                        .font(skin.mono(10, weight: .medium))
                         .foregroundStyle(panelColors.textSecondary)
                         .lineLimit(1)
 
                     Spacer(minLength: 0)
 
                     Image(systemName: "arrow.up.forward")
-                        .font(.system(size: 12, weight: .bold))
-                        .frame(width: 32, height: 32)
+                        .font(.system(size: 10, weight: .bold))
+                        .frame(width: 26, height: 26)
                         .background(
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
                                 .fill(panelColors.accent.opacity(0.08))
