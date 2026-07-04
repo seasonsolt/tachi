@@ -52,9 +52,16 @@ function isAlive(pid: number): boolean {
 }
 
 function readSessions(): SessionInfo[] {
+  const claudeSessions = readClaudeSessions();
+  const aliveSessionIds = new Set(claudeSessions.map((s) => s.sessionId));
   return dedupeSessions([
-    ...readClaudeSessions(),
-    ...readClaudeProjectSessions(CLAUDE_PROJECTS_DIR, Date.now(), readRegisteredClaudeSessionIds()),
+    ...claudeSessions,
+    ...readClaudeProjectSessions(
+      CLAUDE_PROJECTS_DIR,
+      Date.now(),
+      readRegisteredClaudeSessionIds(),
+      aliveSessionIds,
+    ),
     ...readOpenCodeSessions(),
   ]);
 }
@@ -135,6 +142,7 @@ export function readClaudeProjectSessions(
   projectsDir = CLAUDE_PROJECTS_DIR,
   nowMs = Date.now(),
   registeredSessionIds: ReadonlySet<string> = new Set(),
+  aliveSessionIds: ReadonlySet<string> = new Set(),
 ): SessionInfo[] {
   if (!existsSync(projectsDir)) return [];
 
@@ -180,7 +188,10 @@ export function readClaudeProjectSessions(
           sessionId,
           cwd,
           startedAt,
-          alive: true,
+          // Claude Code registers a live pid in ~/.claude/sessions; a missing
+          // registration means the conversation is over. Design sessions have
+          // no local process to check.
+          alive: tool === 'claude_design' || aliveSessionIds.has(sessionId),
           tool,
           taskTitle: sanitizeTaskText(slug) ?? projectName,
           taskSummary: claudeProjectTaskSummary(recentEntries, sanitizeTaskText(slug) ?? projectName),
