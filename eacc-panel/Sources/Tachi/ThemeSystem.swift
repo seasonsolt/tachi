@@ -87,6 +87,18 @@ struct EACCThemeColors {
     let textPrimary: Color
     let textSecondary: Color
     let textMuted: Color
+    // Per-skin typography — display for headlines/numbers, mono for labels/meta.
+    // Defaults match the Aurora (cyber) skin so existing call sites stay valid.
+    var displayFont: String = "Space Grotesk"
+    var monoFont: String = "JetBrains Mono"
+
+    func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom(displayFont, size: size).weight(weight)
+    }
+
+    func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom(monoFont, size: size).weight(weight)
+    }
 
     static func forTheme(_ theme: EACCThemeName) -> EACCThemeColors {
         switch theme {
@@ -110,7 +122,9 @@ struct EACCThemeColors {
                 accentEdge: Color(red: 0, green: 0.56, blue: 0.07),
                 textPrimary: Color(red: 0.93, green: 1.0, blue: 0.94),
                 textSecondary: Color(red: 0.64, green: 0.97, blue: 0.71),
-                textMuted: Color(red: 0.38, green: 0.72, blue: 0.46)
+                textMuted: Color(red: 0.38, green: 0.72, blue: 0.46),
+                displayFont: "Share Tech Mono",
+                monoFont: "JetBrains Mono"
             )
         case .amber:
             return EACCThemeColors(
@@ -132,7 +146,9 @@ struct EACCThemeColors {
                 accentEdge: Color(red: 0.4, green: 0.4, blue: 0.4),
                 textPrimary: Color(red: 0.1, green: 0.1, blue: 0.1),
                 textSecondary: Color(red: 0.4, green: 0.4, blue: 0.4),
-                textMuted: Color(red: 0.6, green: 0.6, blue: 0.6)
+                textMuted: Color(red: 0.6, green: 0.6, blue: 0.6),
+                displayFont: "Jost",
+                monoFont: "IBM Plex Mono"
             )
         }
     }

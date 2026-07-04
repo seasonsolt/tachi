@@ -6,13 +6,11 @@ let redAccent = Color(red: 1.0, green: 0.28, blue: 0.28)
 let purpleAccent = Color(red: 0.58, green: 0.38, blue: 1.0)
 let matrixGreen = Color(red: 0, green: 0.9, blue: 0.4)
 
-private let auroraTeal = Color(red: 45.0 / 255.0, green: 212.0 / 255.0, blue: 191.0 / 255.0)
 private let auroraPurple = Color(red: 167.0 / 255.0, green: 139.0 / 255.0, blue: 250.0 / 255.0)
 private let auroraGreen = Color(red: 52.0 / 255.0, green: 211.0 / 255.0, blue: 153.0 / 255.0)
 private let auroraAmber = Color(red: 245.0 / 255.0, green: 158.0 / 255.0, blue: 11.0 / 255.0)
 private let auroraRed = Color(red: 248.0 / 255.0, green: 113.0 / 255.0, blue: 113.0 / 255.0)
 private let auroraMuted = Color(red: 148.0 / 255.0, green: 163.0 / 255.0, blue: 184.0 / 255.0)
-private let auroraMutedDeep = Color(red: 90.0 / 255.0, green: 107.0 / 255.0, blue: 126.0 / 255.0)
 
 private struct RitualPanelBackdrop: View {
     let themeColors: EACCThemeColors
@@ -273,6 +271,8 @@ struct ContentView: View {
         vm.panelThemeColors
     }
 
+    private var skin: EACCThemeColors { panelColors }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -309,23 +309,23 @@ struct ContentView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(activeTaskTitle)
-                    .font(AuroraFont.display(22, weight: .bold))
+                    .font(skin.display(22, weight: .bold))
                     .foregroundStyle(panelColors.textPrimary)
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
                     if let date = vm.lastUpdated {
                         Text(date, style: .time)
-                            .font(AuroraFont.mono(11, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(auroraMuted)
+                            .font(skin.mono(11, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(skin.textSecondary)
                         Text("·")
-                            .font(AuroraFont.mono(11, weight: .semibold))
-                            .foregroundStyle(auroraMutedDeep)
+                            .font(skin.mono(11, weight: .semibold))
+                            .foregroundStyle(skin.textMuted)
                     }
 
                     Text(activeTaskSubtitle)
-                        .font(AuroraFont.mono(11, weight: .semibold))
-                        .foregroundStyle(auroraMutedDeep)
+                        .font(skin.mono(11, weight: .semibold))
+                        .foregroundStyle(skin.textMuted)
                         .lineLimit(1)
                 }
             }
@@ -389,7 +389,7 @@ struct ContentView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(auroraGreen)
                 Text(syncStatusText)
-                    .font(AuroraFont.mono(10, weight: .semibold))
+                    .font(skin.mono(10, weight: .semibold))
                     .foregroundStyle(panelColors.textSecondary)
                     .lineLimit(1)
             }
@@ -413,7 +413,7 @@ struct ContentView: View {
                     Image(systemName: "timer")
                         .font(.system(size: 10, weight: .semibold))
                     Text("\(Int(vm.refreshInterval))s")
-                        .font(AuroraFont.mono(10, weight: .semibold).monospacedDigit())
+                        .font(skin.mono(10, weight: .semibold).monospacedDigit())
                 }
                 .padding(.horizontal, 8)
                 .frame(height: 32)
@@ -473,7 +473,7 @@ struct ContentView: View {
             ProgressView()
                 .scaleEffect(0.8)
             Text("Initializing ritual link...")
-                .font(AuroraFont.mono(12))
+                .font(skin.mono(12))
                 .foregroundStyle(panelColors.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -541,14 +541,14 @@ struct ContentView: View {
             HStack(spacing: 8) {
                 Image(systemName: "waveform.path")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(auroraTeal)
+                    .foregroundStyle(skin.accentEdge)
                 Text("AI CODING SESSIONS")
-                    .font(AuroraFont.mono(12, weight: .bold))
+                    .font(skin.mono(12, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(panelColors.textSecondary)
                 Spacer()
                 Text("\(vm.menuSessions.count) WATCHING")
-                    .font(AuroraFont.mono(9, weight: .bold))
+                    .font(skin.mono(9, weight: .bold))
                     .tracking(1.0)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
@@ -610,6 +610,8 @@ struct CompanionCard: View {
         vm.panelThemeColors
     }
 
+    private var skin: EACCThemeColors { panelColors }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 16) {
@@ -618,7 +620,7 @@ struct CompanionCard: View {
                 VStack(alignment: .leading, spacing: 7) {
                     HStack(spacing: 8) {
                         Text(vm.companionMood.badge)
-                            .font(AuroraFont.mono(10, weight: .bold))
+                            .font(skin.mono(10, weight: .bold))
                             .tracking(1.1)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -633,17 +635,17 @@ struct CompanionCard: View {
                             .foregroundStyle(panelColors.accent)
 
                         Text("\(vm.weightedUtil)% util")
-                            .font(AuroraFont.mono(11, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(auroraMutedDeep)
+                            .font(skin.mono(11, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(skin.textMuted)
                     }
 
                     Text(vm.companionHeadline)
-                        .font(AuroraFont.display(19, weight: .semibold))
+                        .font(skin.display(19, weight: .semibold))
                         .foregroundStyle(panelColors.textPrimary)
                         .lineLimit(2)
 
                     Text(vm.companionSubtitle)
-                        .font(AuroraFont.mono(12, weight: .medium))
+                        .font(skin.mono(12, weight: .medium))
                         .foregroundStyle(panelColors.textSecondary)
                         .lineLimit(2)
                 }
@@ -677,7 +679,7 @@ struct CompanionCard: View {
             Rectangle()
                 .fill(
                     LinearGradient(
-                        colors: [panelColors.accent, auroraTeal],
+                        colors: [panelColors.accent, skin.accentEdge],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -729,12 +731,12 @@ struct CompanionCard: View {
     private func statTile(value: Int, label: String, tint: Color) -> some View {
         VStack(spacing: 2) {
             Text("\(value)")
-                .font(AuroraFont.display(18, weight: .bold).monospacedDigit())
+                .font(skin.display(18, weight: .bold).monospacedDigit())
                 .foregroundStyle(tint)
             Text(label)
-                .font(AuroraFont.mono(10, weight: .semibold))
+                .font(skin.mono(10, weight: .semibold))
                 .tracking(0.8)
-                .foregroundStyle(auroraMutedDeep)
+                .foregroundStyle(skin.textMuted)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)
@@ -758,17 +760,19 @@ struct CompanionPersonaMenu: View {
         accent ?? vm.themeColors.accent
     }
 
+    private var skin: EACCThemeColors { vm.panelThemeColors }
+
     var body: some View {
         Menu {
             CompanionPersonaActions(vm: vm)
         } label: {
             HStack(spacing: isProminent ? 6 : 5) {
                 Text(vm.companionPersonaMode.badge)
-                    .font(AuroraFont.mono(isProminent ? 11 : 10, weight: .bold))
+                    .font(skin.mono(isProminent ? 11 : 10, weight: .bold))
                     .tracking(isProminent ? 1.0 : 0.8)
                 Image(systemName: "chevron.down")
                     .font(.system(size: isProminent ? 8 : 7, weight: .bold))
-                    .foregroundStyle(auroraMutedDeep)
+                    .foregroundStyle(skin.textMuted)
             }
             .padding(.horizontal, isProminent ? 10 : 8)
             .padding(.vertical, isProminent ? 7 : 5)
@@ -780,7 +784,7 @@ struct CompanionPersonaMenu: View {
                 RoundedRectangle(cornerRadius: isProminent ? 9 : 8, style: .continuous)
                     .strokeBorder(auroraMuted.opacity(0.14), lineWidth: 1)
             }
-            .foregroundStyle(isProminent ? auroraMuted : menuAccent)
+            .foregroundStyle(isProminent ? skin.textSecondary : menuAccent)
         }
         .menuStyle(.borderlessButton)
         .help("Switch companion")
@@ -1818,6 +1822,8 @@ struct CodexQuotaCard: View {
     let snapshot: CodexRateLimitSnapshot
     let themeColors: EACCThemeColors
 
+    private var skin: EACCThemeColors { themeColors }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
@@ -1825,12 +1831,12 @@ struct CodexQuotaCard: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(themeColors.accent)
                 Text("CODEX USAGE")
-                    .font(AuroraFont.mono(12, weight: .bold))
+                    .font(skin.mono(12, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(themeColors.textSecondary)
                 Spacer()
                 Text("OFFICIAL")
-                    .font(AuroraFont.mono(9, weight: .bold))
+                    .font(skin.mono(9, weight: .bold))
                     .tracking(1.0)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
@@ -1861,11 +1867,11 @@ struct CodexQuotaCard: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Codex account")
-                        .font(AuroraFont.display(14, weight: .semibold))
+                        .font(skin.display(14, weight: .semibold))
                         .foregroundStyle(themeColors.textPrimary)
                     Text(snapshot.limitName ?? snapshot.limitId ?? "codex")
-                        .font(AuroraFont.mono(10, weight: .medium))
-                        .foregroundStyle(auroraMutedDeep)
+                        .font(skin.mono(10, weight: .medium))
+                        .foregroundStyle(skin.textMuted)
                         .lineLimit(1)
                 }
 
@@ -1873,7 +1879,7 @@ struct CodexQuotaCard: View {
 
                 if let count = snapshot.resetCreditCount {
                     Text("\(count) resets")
-                        .font(AuroraFont.mono(12, weight: .bold).monospacedDigit())
+                        .font(skin.mono(12, weight: .bold).monospacedDigit())
                         .foregroundStyle(themeColors.accent)
                 }
             }
@@ -1892,16 +1898,16 @@ struct CodexQuotaCard: View {
                     }
                     if snapshot.availableResetCredits.count > 4 {
                         Text("+\(snapshot.availableResetCredits.count - 4) more reset date ▾")
-                            .font(AuroraFont.mono(10, weight: .medium))
-                            .foregroundStyle(auroraMutedDeep)
+                            .font(skin.mono(10, weight: .medium))
+                            .foregroundStyle(skin.textMuted)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(.top, snapshot.windows.isEmpty ? 0 : 2)
             } else if (snapshot.resetCreditCount ?? 0) > 0 {
                 Text("Reset valid dates unavailable")
-                    .font(AuroraFont.mono(10, weight: .medium))
-                    .foregroundStyle(auroraMutedDeep)
+                    .font(skin.mono(10, weight: .medium))
+                    .foregroundStyle(skin.textMuted)
             }
         }
         .padding(16)
@@ -1912,14 +1918,14 @@ struct CodexQuotaCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text("\(window.validityLabel) window")
-                    .font(AuroraFont.mono(11, weight: .bold))
-                    .foregroundStyle(auroraMuted)
+                    .font(skin.mono(11, weight: .bold))
+                    .foregroundStyle(skin.textSecondary)
                 Spacer()
                 Text("\(formatPercent(window.remainingPercent))% left")
-                    .font(AuroraFont.mono(11, weight: .bold).monospacedDigit())
+                    .font(skin.mono(11, weight: .bold).monospacedDigit())
                     .foregroundStyle(remainingColor(window.remainingPercent))
                 Text("· \(formatResetDate(window.resetsAt))")
-                    .font(AuroraFont.mono(11, weight: .medium).monospacedDigit())
+                    .font(skin.mono(11, weight: .medium).monospacedDigit())
                     .foregroundStyle(themeColors.textSecondary)
             }
 
@@ -1930,7 +1936,7 @@ struct CodexQuotaCard: View {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [themeColors.accent, auroraTeal],
+                                colors: [themeColors.accent, skin.accentEdge],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -1945,15 +1951,15 @@ struct CodexQuotaCard: View {
     private func resetCreditRow(index: Int, credit: CodexResetCredit) -> some View {
         HStack(spacing: 8) {
             Text("Reset \(index + 1)")
-                .font(AuroraFont.mono(11, weight: .semibold))
+                .font(skin.mono(11, weight: .semibold))
                 .foregroundStyle(themeColors.textSecondary)
                 .frame(width: 58, alignment: .leading)
             Text("valid until")
-                .font(AuroraFont.mono(10, weight: .medium))
-                .foregroundStyle(auroraMutedDeep)
+                .font(skin.mono(10, weight: .medium))
+                .foregroundStyle(skin.textMuted)
             Spacer()
             Text(formatResetValidDate(credit.expiresAt))
-                .font(AuroraFont.mono(11, weight: .bold).monospacedDigit())
+                .font(skin.mono(11, weight: .bold).monospacedDigit())
                 .foregroundStyle(themeColors.accent)
         }
     }
@@ -2000,18 +2006,20 @@ struct SessionRow: View {
     let session: CodingSession
     let themeColors: EACCThemeColors
 
+    private var skin: EACCThemeColors { themeColors }
+
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(session.projectName)
-                        .font(AuroraFont.mono(12, weight: .bold))
+                        .font(skin.mono(12, weight: .bold))
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .foregroundStyle(themeColors.textPrimary)
 
                     Text(statusLabel)
-                        .font(AuroraFont.mono(10, weight: .semibold))
+                        .font(skin.mono(10, weight: .semibold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
@@ -2023,7 +2031,7 @@ struct SessionRow: View {
                 }
 
                 Text(agentStatusLine)
-                    .font(AuroraFont.mono(11, weight: .medium))
+                    .font(skin.mono(11, weight: .medium))
                     .foregroundStyle(themeColors.textSecondary)
                     .lineLimit(1)
             }
@@ -2061,7 +2069,7 @@ struct SessionRow: View {
         )
         .overlay(alignment: .leading) {
             Rectangle()
-                .fill(auroraTeal)
+                .fill(skin.accentEdge)
                 .frame(width: 3)
         }
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
