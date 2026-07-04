@@ -98,7 +98,7 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
         }
 
         let cutoff = now.addingTimeInterval(-3600)
-        let registeredSessionIds = readRegisteredSessionIds()
+        let registry = readSessionRegistry()
         var sessions: [CodingSession] = []
 
         for dir in dirs {
@@ -118,7 +118,7 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
                 // so a desktop-launched trace only counts as Claude Design when no
                 // local Claude Code process registered the session in ~/.claude/sessions.
                 let isDesignSession = isDesktopLaunched(recentEntries: recentEntries)
-                    && !registeredSessionIds.contains(sessionId)
+                    && !registry.registeredIds.contains(sessionId)
                 guard designPolicy.allows(isDesignSession: isDesignSession) else { continue }
 
                 let lastEntry = recentEntries.first
@@ -126,6 +126,9 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
                 let slug = lastEntry?["slug"] as? String ?? ""
                 let projectName = sanitizeTaskText((cwd as NSString).lastPathComponent)
                 let trace = claudeTrace(recentEntries: recentEntries, fallbackDate: modified, now: now)
+                let processAlive = registry.aliveIds.contains(sessionId)
+                // A quiet transcript is not "done" while its process is still attached.
+                let status: SessionStatus = (processAlive && trace.status == .completed) ? .idle : trace.status
 
                 sessions.append(
                     CodingSession(
@@ -138,10 +141,11 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
                             recentEntries: recentEntries,
                             fallback: sanitizeTaskText(slug) ?? projectName
                         ),
-                        status: trace.status,
+                        status: status,
                         lastActivity: trace.lastActivity,
                         signal: trace.signal,
-                        pulse: trace.pulse
+                        pulse: trace.pulse,
+                        processAlive: processAlive
                     ))
             }
         }
@@ -159,19 +163,29 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
         return SessionProviderResult(sessions: Array(best.values))
     }
 
-    private func readRegisteredSessionIds() -> Set<String> {
-        let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(atPath: sessionsPath) else { return [] }
+    private struct SessionRegistry {
+        var registeredIds: Set<String> = []
+        var aliveIds: Set<String> = []
+    }
 
-        var ids: Set<String> = []
+    private func readSessionRegistry() -> SessionRegistry {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(atPath: sessionsPath) else { return SessionRegistry() }
+
+        var registry = SessionRegistry()
         for file in files where file.hasSuffix(".json") {
             guard let data = fm.contents(atPath: sessionsPath + "/" + file),
                   let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
                   let sessionId = json["sessionId"] as? String
             else { continue }
-            ids.insert(sessionId)
+            registry.registeredIds.insert(sessionId)
+            if let pid = json["pid"] as? Int, pid > 0,
+               kill(pid_t(pid), 0) == 0 || errno == EPERM
+            {
+                registry.aliveIds.insert(sessionId)
+            }
         }
-        return ids
+        return registry
     }
 
     private func isDesktopLaunched(recentEntries: [[String: Any]]) -> Bool {

@@ -13,6 +13,9 @@ struct CodingSession: Identifiable, Sendable {
     let lastActivity: Date
     let signal: SessionSignal
     let pulse: SessionPulse
+    // True when a local process registration (~/.claude/sessions) confirms the
+    // session is still attached, even if the transcript has gone quiet.
+    var processAlive: Bool = false
 
     var projectName: String {
         let name = (projectPath as NSString).lastPathComponent
