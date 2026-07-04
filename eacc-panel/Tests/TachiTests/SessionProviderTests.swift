@@ -423,6 +423,32 @@ final class SessionProviderTests: XCTestCase {
 
         XCTAssertTrue(designResult.sessions.isEmpty)
     }
+
+    func testClaudeCodeProviderKeepsQuietSessionOpenWhileProcessAlive() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let projectDir = tempDir.appendingPathComponent("-tmp-tachi", isDirectory: true)
+        let sessionsDir = tempDir.appendingPathComponent("sessions", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Last assistant reply is 1000s old — completed by transcript age alone.
+        try """
+        {"timestamp":"1970-01-01T00:00:00Z","type":"assistant","entrypoint":"claude-desktop","cwd":"/tmp/tachi","slug":"long-idle","message":"All done"}
+        """.write(to: projectDir.appendingPathComponent("idle-1.jsonl"), atomically: true, encoding: .utf8)
+        let livePid = ProcessInfo.processInfo.processIdentifier
+        try """
+        {"pid":\(livePid),"sessionId":"idle-1","cwd":"/tmp/tachi","startedAt":1,"entrypoint":"claude-desktop"}
+        """.write(to: sessionsDir.appendingPathComponent("\(livePid).json"), atomically: true, encoding: .utf8)
+
+        let provider = ClaudeCodeSessionProvider(projectsPath: tempDir.path, sessionsPath: sessionsDir.path)
+        let result = provider.scanSessions(now: Date(timeIntervalSince1970: 1000))
+
+        let session = try XCTUnwrap(result.sessions.first)
+        XCTAssertTrue(session.processAlive)
+        XCTAssertEqual(session.status, .idle)
+    }
 }
 
 private struct StaticSessionProvider: CodingSessionProvider {

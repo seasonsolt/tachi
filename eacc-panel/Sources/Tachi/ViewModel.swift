@@ -250,7 +250,11 @@ final class ViewModel {
     }
 
     var activeSessions: [CodingSession] {
-        sessions.filter { $0.status == .working || $0.status == .waitingForInput }
+        sessions.filter {
+            $0.status == .working
+                || $0.status == .waitingForInput
+                || ($0.processAlive && $0.status != .completed)
+        }
     }
 
     var sessionRefreshInterval: TimeInterval { 15 }
@@ -303,7 +307,7 @@ final class ViewModel {
     }
 
     var companionTaskVisibleSessions: [CodingSession] {
-        Array(companionTaskPreviewSessions.prefix(1))
+        Array(companionTaskPreviewSessions.prefix(4))
     }
 
     var companionTaskOverflowCount: Int {
@@ -316,7 +320,10 @@ final class ViewModel {
 
     var companionTaskHeader: String {
         let activeCount = activeSessions.count
-        if activeCount > 0 {
+        if activeCount > 1 {
+            return "\(activeCount) active sessions"
+        }
+        if activeCount == 1 {
             return "Current task"
         }
         return "No active task"
