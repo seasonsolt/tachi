@@ -305,15 +305,21 @@ final class SessionProviderTests: XCTestCase {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let projectDir = tempDir.appendingPathComponent("-tmp-tachi", isDirectory: true)
+        let sessionsDir = tempDir.appendingPathComponent("sessions", isDirectory: true)
         try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
         let sessionURL = projectDir.appendingPathComponent("claude-1.jsonl")
         try """
         {"timestamp":"1970-01-01T00:03:20Z","type":"user","cwd":"/tmp/tachi","slug":"build-plugin-provider","message":"Build Claude provider"}
         """.write(to: sessionURL, atomically: true, encoding: .utf8)
+        let livePid = ProcessInfo.processInfo.processIdentifier
+        try """
+        {"pid":\(livePid),"sessionId":"claude-1","cwd":"/tmp/tachi","startedAt":1}
+        """.write(to: sessionsDir.appendingPathComponent("\(livePid).json"), atomically: true, encoding: .utf8)
 
-        let provider = ClaudeCodeSessionProvider(projectsPath: tempDir.path)
+        let provider = ClaudeCodeSessionProvider(projectsPath: tempDir.path, sessionsPath: sessionsDir.path)
         let result = provider.scanSessions(now: Date(timeIntervalSince1970: 220))
 
         XCTAssertEqual(result.sessions.count, 1)
@@ -448,6 +454,32 @@ final class SessionProviderTests: XCTestCase {
         let session = try XCTUnwrap(result.sessions.first)
         XCTAssertTrue(session.processAlive)
         XCTAssertEqual(session.status, .idle)
+    }
+
+    func testClaudeCodeProviderMarksSessionsWithoutLiveProcessAsDone() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let projectDir = tempDir.appendingPathComponent("-tmp-tachi", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Fresh assistant reply that would read as "waiting" by transcript age,
+        // but the process is gone — the conversation is over.
+        try """
+        {"timestamp":"1970-01-01T00:03:20Z","type":"assistant","cwd":"/tmp/tachi","slug":"wrapped-up","message":"Ship it"}
+        """.write(to: projectDir.appendingPathComponent("closed-1.jsonl"), atomically: true, encoding: .utf8)
+
+        let provider = ClaudeCodeSessionProvider(
+            projectsPath: tempDir.path,
+            sessionsPath: tempDir.appendingPathComponent("sessions").path
+        )
+        let result = provider.scanSessions(now: Date(timeIntervalSince1970: 260))
+
+        let session = try XCTUnwrap(result.sessions.first)
+        XCTAssertEqual(session.status, .completed)
+        XCTAssertEqual(session.signal, .completed)
+        XCTAssertEqual(session.pulse, .sleeping)
+        XCTAssertFalse(session.processAlive)
     }
 
     func testClaudeTaskSummarySkipsToolResultsAndMetaLines() throws {

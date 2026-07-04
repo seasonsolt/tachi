@@ -77,6 +77,27 @@ describe('readClaudeProjectSessions', () => {
     expect(ids).toEqual(new Set(['desktop-code-1']));
   });
 
+  it('marks Claude Code project traces without a live process as not alive', () => {
+    const projectsDir = makeTempDir();
+    const projectDir = join(projectsDir, '-tmp-tachi');
+    mkdirSync(projectDir, { recursive: true });
+
+    for (const name of ['closed-1', 'open-1']) {
+      const sessionPath = join(projectDir, `${name}.jsonl`);
+      writeFileSync(
+        sessionPath,
+        `{"timestamp":"1970-01-01T00:03:20Z","type":"user","cwd":"/tmp/tachi-${name}","slug":"${name}","message":"Work on ${name}"}\n`,
+      );
+      utimesSync(sessionPath, new Date(200_000), new Date(200_000));
+    }
+
+    const sessions = readClaudeProjectSessions(projectsDir, 220_000, new Set(), new Set(['open-1']));
+
+    const byId = new Map(sessions.map((s) => [s.sessionId, s]));
+    expect(byId.get('open-1')?.alive).toBe(true);
+    expect(byId.get('closed-1')?.alive).toBe(false);
+  });
+
   it('skips tool results and meta lines when picking the task summary', () => {
     const projectsDir = makeTempDir();
     const projectDir = join(projectsDir, '-tmp-tachi');

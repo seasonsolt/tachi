@@ -129,8 +129,22 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
                 let projectName = sanitizeTaskText((cwd as NSString).lastPathComponent)
                 let trace = claudeTrace(recentEntries: recentEntries, fallbackDate: modified, now: now)
                 let processAlive = registry.aliveIds.contains(sessionId)
-                // A quiet transcript is not "done" while its process is still attached.
-                let status: SessionStatus = (processAlive && trace.status == .completed) ? .idle : trace.status
+
+                var status = trace.status
+                var signal = trace.signal
+                var pulse = trace.pulse
+                if tool == .claudeCode {
+                    if processAlive {
+                        // A quiet transcript is not "done" while its process is attached.
+                        if status == .completed { status = .idle }
+                    } else {
+                        // Claude Code always registers a pid in ~/.claude/sessions;
+                        // no live registration means the window or CLI was closed.
+                        status = .completed
+                        signal = .completed
+                        pulse = .sleeping
+                    }
+                }
 
                 sessions.append(
                     CodingSession(
@@ -145,8 +159,8 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
                         ),
                         status: status,
                         lastActivity: trace.lastActivity,
-                        signal: trace.signal,
-                        pulse: trace.pulse,
+                        signal: signal,
+                        pulse: pulse,
                         processAlive: processAlive
                     ))
             }
