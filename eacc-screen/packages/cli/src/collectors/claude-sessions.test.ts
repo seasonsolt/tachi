@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readClaudeProjectSessions } from './claude-sessions.js';
+import { readClaudeProjectSessions, readRegisteredClaudeSessionIds } from './claude-sessions.js';
 
 const tempDirs: string[] = [];
 
@@ -31,7 +31,7 @@ describe('readClaudeProjectSessions', () => {
     );
     utimesSync(sessionPath, new Date(200_000), new Date(200_000));
 
-    const sessions = readClaudeProjectSessions(projectsDir, 220_000);
+    const sessions = readClaudeProjectSessions(projectsDir, 220_000, new Set());
 
     expect(sessions).toHaveLength(1);
     expect(sessions[0]).toMatchObject({
@@ -44,6 +44,37 @@ describe('readClaudeProjectSessions', () => {
       taskTitle: 'design-taskbar-popup',
       taskSummary: 'Design the taskbar popup',
     });
+  });
+
+  it('keeps desktop-launched traces with a local session registration as Claude Code', () => {
+    const projectsDir = makeTempDir();
+    const projectDir = join(projectsDir, '-tmp-tachi');
+    mkdirSync(projectDir, { recursive: true });
+
+    const sessionPath = join(projectDir, 'desktop-code-1.jsonl');
+    writeFileSync(
+      sessionPath,
+      '{"timestamp":"1970-01-01T00:03:20Z","type":"user","entrypoint":"claude-desktop","cwd":"/tmp/tachi","slug":"fix-monitor","message":"Fix the monitor"}\n',
+    );
+    utimesSync(sessionPath, new Date(200_000), new Date(200_000));
+
+    const sessions = readClaudeProjectSessions(projectsDir, 220_000, new Set(['desktop-code-1']));
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.tool).toBe('claude_code');
+  });
+
+  it('reads registered session ids from the Claude sessions directory', () => {
+    const sessionsDir = makeTempDir();
+    writeFileSync(
+      join(sessionsDir, '12345.json'),
+      '{"pid":12345,"sessionId":"desktop-code-1","cwd":"/tmp/tachi","startedAt":1,"entrypoint":"claude-desktop"}',
+    );
+    writeFileSync(join(sessionsDir, 'broken.json'), '{not json');
+
+    const ids = readRegisteredClaudeSessionIds(sessionsDir);
+
+    expect(ids).toEqual(new Set(['desktop-code-1']));
   });
 
   it('keeps terminal Claude project traces as Claude Code', () => {
