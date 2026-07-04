@@ -6,6 +6,24 @@ private let desktopAuroraTeal = Color(red: 45.0 / 255.0, green: 212.0 / 255.0, b
 private let desktopAuroraAmber = Color(red: 245.0 / 255.0, green: 158.0 / 255.0, blue: 11.0 / 255.0)
 private let desktopAuroraMutedDeep = Color(red: 90.0 / 255.0, green: 107.0 / 255.0, blue: 126.0 / 255.0)
 
+// Behind-window vibrancy: blurs the actual desktop content underneath the
+// panel, which SwiftUI materials (within-window blending) cannot do.
+private struct GlassBackdrop: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .hudWindow
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+    }
+}
+
 private struct DesktopPulseDot: View {
     let color: Color
 
@@ -339,10 +357,11 @@ struct DesktopPetView: View {
     private var taskBubble: some View {
         let panelColors = vm.panelThemeColors
         let skin = panelColors
+        // Keep the tint light so the behind-window blur stays visible.
         let bubbleFill = LinearGradient(
             colors: [
-                panelColors.cardBg.opacity(0.92),
-                panelColors.bg.opacity(0.92)
+                panelColors.cardBg.opacity(0.42),
+                panelColors.bg.opacity(0.50)
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -377,20 +396,32 @@ struct DesktopPetView: View {
         .padding(16)
         .frame(width: 332, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
+            GlassBackdrop()
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .fill(bubbleFill)
                 }
+                .overlay {
+                    // Specular top edge, the detail that sells native glass.
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.28), Color.white.opacity(0.04)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1
+                        )
+                }
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(panelColors.accent.opacity(0.20), lineWidth: 1)
+                .stroke(panelColors.accent.opacity(0.18), lineWidth: 1)
         )
         .overlay(alignment: .bottomLeading) {
             Rectangle()
-                .fill(panelColors.cardBg.opacity(0.92))
+                .fill(panelColors.bg.opacity(0.58))
                 .frame(width: 18, height: 18)
                 .rotationEffect(.degrees(45))
                 .overlay(
@@ -400,8 +431,8 @@ struct DesktopPetView: View {
                 )
                 .offset(x: 44, y: 9)
         }
-        .shadow(color: panelColors.accent.opacity(0.25), radius: 40, y: 12)
-        .shadow(color: .black.opacity(0.55), radius: 30, y: 18)
+        .shadow(color: panelColors.accent.opacity(0.18), radius: 40, y: 12)
+        .shadow(color: .black.opacity(0.32), radius: 26, y: 14)
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -489,7 +520,7 @@ struct DesktopPetView: View {
         case .working: return "working"
         case .waitingForInput: return "waiting"
         case .completed: return "done"
-        case .idle: return "warm"
+        case .idle: return "open"
         }
     }
 
