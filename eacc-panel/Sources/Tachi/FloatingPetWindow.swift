@@ -24,15 +24,99 @@ private struct GlassBackdrop: NSViewRepresentable {
     }
 }
 
-private struct DiamondShape: Shape {
+// Bubble body and speech tail traced as one outline so the border never
+// crosses the tail — the seam a separate diamond overlay always shows.
+// The bottom `tailDepth` strip of the frame is reserved for the tail.
+private struct TaskBubbleShape: Shape {
+    var cornerRadius: CGFloat = 22
+    var tailCenterX: CGFloat = 53
+    var tailHalfWidth: CGFloat = 12
+    var tailDepth: CGFloat = 12
+
     func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
-        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
-        path.closeSubpath()
-        return path
+        let body = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height - tailDepth)
+        let r = min(cornerRadius, min(body.width, body.height) / 2)
+        var p = Path()
+        p.move(to: CGPoint(x: body.minX + r, y: body.minY))
+        p.addLine(to: CGPoint(x: body.maxX - r, y: body.minY))
+        p.addArc(center: CGPoint(x: body.maxX - r, y: body.minY + r), radius: r,
+                 startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+        p.addLine(to: CGPoint(x: body.maxX, y: body.maxY - r))
+        p.addArc(center: CGPoint(x: body.maxX - r, y: body.maxY - r), radius: r,
+                 startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        p.addLine(to: CGPoint(x: tailCenterX + tailHalfWidth, y: body.maxY))
+        p.addLine(to: CGPoint(x: tailCenterX, y: body.maxY + tailDepth))
+        p.addLine(to: CGPoint(x: tailCenterX - tailHalfWidth, y: body.maxY))
+        p.addLine(to: CGPoint(x: body.minX + r, y: body.maxY))
+        p.addArc(center: CGPoint(x: body.minX + r, y: body.maxY - r), radius: r,
+                 startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        p.addLine(to: CGPoint(x: body.minX, y: body.minY + r))
+        p.addArc(center: CGPoint(x: body.minX + r, y: body.minY + r), radius: r,
+                 startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        p.closeSubpath()
+        return p
+    }
+}
+
+// Per-theme bubble treatment from the design mockup: Aurora glass (3A),
+// Matrix CRT (4B), Odyssey white room (5B). Amber follows the Aurora look.
+private struct BubbleSkinStyle {
+    var cornerRadius: CGFloat = 22
+    var isOpaque = false
+    var headerUppercase = false
+    var headerTracking: CGFloat = 0
+    var monolithMarker = false
+    var matrixEffects = false
+
+    static func forTheme(_ theme: EACCThemeName) -> BubbleSkinStyle {
+        switch theme {
+        case .matrix:
+            return BubbleSkinStyle(cornerRadius: 16, matrixEffects: true)
+        case .voidTheme:
+            return BubbleSkinStyle(
+                cornerRadius: 14,
+                isOpaque: true,
+                headerUppercase: true,
+                headerTracking: 2.5,
+                monolithMarker: true
+            )
+        case .cyber, .amber:
+            return BubbleSkinStyle()
+        }
+    }
+}
+
+// The 5B header mark: a tiny monolith slab instead of a pulse dot.
+private struct MonolithMarker: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 1, style: .continuous)
+            .fill(Color(white: 0.07))
+            .frame(width: 7, height: 15)
+            .background(
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.black.opacity(0.05))
+                    .padding(-3)
+            )
+    }
+}
+
+private struct BlinkingCursor: View {
+    let color: Color
+    let fontSize: CGFloat
+    let fontName: String
+
+    @State private var isOn = false
+
+    var body: some View {
+        Text("_")
+            .font(.custom(fontName, size: fontSize).weight(.bold))
+            .foregroundStyle(color)
+            .opacity(isOn ? 1 : 0.15)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+                    isOn = true
+                }
+            }
     }
 }
 
@@ -365,28 +449,30 @@ struct DesktopPetView: View {
         let itemHeight: CGFloat = 96
         let itemSpacing: CGFloat = CGFloat(max(0, taskCount - 1)) * 10
         let footerHeight: CGFloat = vm.companionTaskFooter == nil ? 0 : 26
-        return 66 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
+        return 66 + bubbleTailDepth + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
     }
 
     private var taskBubble: some View {
         let panelColors = vm.panelThemeColors
         let skin = panelColors
-        // Keep the tint light so the behind-window blur stays visible.
-        let bubbleFill = LinearGradient(
-            colors: [
-                panelColors.cardBg.opacity(0.55),
-                panelColors.bg.opacity(0.62)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        let style = BubbleSkinStyle.forTheme(vm.selectedTheme)
+        let shape = TaskBubbleShape(cornerRadius: style.cornerRadius, tailDepth: Self.bubbleTailDepth)
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                DesktopPulseDot(color: panelColors.accent)
-                Text(vm.companionTaskHeader)
-                    .font(skin.display(13, weight: .semibold))
+                if style.monolithMarker {
+                    MonolithMarker()
+                } else {
+                    DesktopPulseDot(color: panelColors.accent)
+                }
+                Text(style.headerUppercase ? vm.companionTaskHeader.uppercased() : vm.companionTaskHeader)
+                    .font(skin.display(13, weight: style.headerUppercase ? .medium : .semibold))
+                    .tracking(style.headerTracking)
                     .foregroundStyle(panelColors.textPrimary)
+                    .shadow(
+                        color: style.matrixEffects ? panelColors.accent.opacity(0.45) : .clear,
+                        radius: style.matrixEffects ? 6 : 0
+                    )
                 Spacer()
                 CompanionPersonaMenu(
                     vm: vm,
@@ -396,7 +482,7 @@ struct DesktopPetView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(vm.companionTaskVisibleSessions) { session in
-                    taskPreviewItem(session, panelColors: panelColors)
+                    taskPreviewItem(session, panelColors: panelColors, style: style)
                 }
             }
 
@@ -409,46 +495,77 @@ struct DesktopPetView: View {
         }
         .padding(14)
         .frame(width: 300, alignment: .leading)
-        .background(
-            GlassBackdrop()
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(bubbleFill)
-                }
-                .overlay {
-                    // Specular top edge, the detail that sells native glass.
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.28), Color.white.opacity(0.04)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 1
-                        )
-                }
-        )
+        // Reserve the tail strip inside the bounds so the glass NSView
+        // actually covers it; the shape carves the tail out of this strip.
+        .padding(.bottom, Self.bubbleTailDepth)
+        .background(bubbleSurface(shape: shape, style: style, panelColors: panelColors))
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(panelColors.accent.opacity(0.18), lineWidth: 1)
+            shape.stroke(
+                style.isOpaque
+                    ? Color.black.opacity(0.12)
+                    : panelColors.accent.opacity(style.matrixEffects ? 0.35 : 0.18),
+                lineWidth: 1
+            )
         )
-        .overlay(alignment: .bottomLeading) {
-            // Same glass treatment as the bubble so the tail doesn't read as a
-            // solid chip; DiamondShape clips without rotating the NSView.
-            GlassBackdrop()
-                .clipShape(DiamondShape())
-                .overlay(DiamondShape().fill(panelColors.bg.opacity(0.62)))
-                .overlay(DiamondShape().stroke(panelColors.accent.opacity(0.16), lineWidth: 1))
-                .frame(width: 26, height: 26)
-                .offset(x: 40, y: 13)
-        }
-        .shadow(color: panelColors.accent.opacity(0.18), radius: 40, y: 12)
-        .shadow(color: .black.opacity(0.32), radius: 26, y: 14)
+        .shadow(color: panelColors.accent.opacity(style.isOpaque ? 0 : 0.18), radius: 40, y: 12)
+        .shadow(color: .black.opacity(style.isOpaque ? 0.28 : 0.32), radius: 26, y: 14)
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func taskPreviewItem(_ session: CodingSession, panelColors: EACCThemeColors) -> some View {
+    private static let bubbleTailDepth: CGFloat = 12
+
+    @ViewBuilder
+    private func bubbleSurface(
+        shape: TaskBubbleShape,
+        style: BubbleSkinStyle,
+        panelColors: EACCThemeColors
+    ) -> some View {
+        // Keep the glass tint light so the behind-window blur stays visible.
+        let bubbleFill = LinearGradient(
+            colors: [
+                panelColors.cardBg.opacity(0.55),
+                panelColors.bg.opacity(0.62)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+
+        ZStack {
+            if style.isOpaque {
+                // Odyssey white room: solid warm surface, no vibrancy.
+                shape.fill(panelColors.cardBg)
+            } else {
+                GlassBackdrop()
+                    .clipShape(shape)
+                shape.fill(bubbleFill)
+            }
+
+            if style.matrixEffects {
+                MatrixRainView()
+                    .opacity(0.12)
+                    .clipShape(shape)
+                CRTScanlines()
+                    .clipShape(shape)
+            }
+
+            // Specular top edge, the detail that sells native glass.
+            shape.stroke(
+                LinearGradient(
+                    colors: [Color.white.opacity(style.isOpaque ? 0.7 : 0.28), Color.white.opacity(0.04)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                lineWidth: 1
+            )
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func taskPreviewItem(
+        _ session: CodingSession,
+        panelColors: EACCThemeColors,
+        style: BubbleSkinStyle
+    ) -> some View {
         let skin = panelColors
         return Button {
             vm.openCompanionTask(session)
@@ -484,16 +601,27 @@ struct DesktopPetView: View {
                     Spacer(minLength: 0)
                 }
 
-                Text(vm.companionTaskLine(for: session))
-                    .font(skin.display(12, weight: .semibold))
-                    .foregroundStyle(panelColors.textPrimary)
+                taskTitleText(vm.companionTaskLine(for: session), skin: skin)
                     .lineLimit(2)
+                    .shadow(
+                        color: style.matrixEffects ? panelColors.accent.opacity(0.3) : .clear,
+                        radius: style.matrixEffects ? 5 : 0
+                    )
 
                 HStack(spacing: 8) {
-                    Text(sessionMetaLine(session))
-                        .font(skin.mono(10, weight: .medium))
-                        .foregroundStyle(panelColors.textSecondary)
-                        .lineLimit(1)
+                    HStack(spacing: 1) {
+                        Text(sessionMetaLine(session))
+                            .font(skin.mono(10, weight: .medium))
+                            .foregroundStyle(panelColors.textSecondary)
+                            .lineLimit(1)
+                        if style.matrixEffects {
+                            BlinkingCursor(
+                                color: panelColors.accent,
+                                fontSize: 10,
+                                fontName: skin.monoFont
+                            )
+                        }
+                    }
 
                     Spacer(minLength: 0)
 
@@ -516,6 +644,23 @@ struct DesktopPetView: View {
         }
         .buttonStyle(.plain)
         .help("Open \(session.tool.rawValue)")
+    }
+
+    // Design 3A styles a leading commit hash in accent mono before the title.
+    private func taskTitleText(_ line: String, skin: EACCThemeColors) -> Text {
+        if let match = line.range(of: "^[0-9a-f]{7,10}(?=\\s)", options: .regularExpression) {
+            let hash = String(line[match])
+            let rest = String(line[match.upperBound...])
+            return Text(hash)
+                .font(skin.mono(11, weight: .semibold))
+                .foregroundStyle(skin.accent)
+                + Text(rest)
+                .font(skin.display(12, weight: .semibold))
+                .foregroundStyle(skin.textPrimary)
+        }
+        return Text(line)
+            .font(skin.display(12, weight: .semibold))
+            .foregroundStyle(skin.textPrimary)
     }
 
     private func sessionStatusTint(_ session: CodingSession) -> Color {

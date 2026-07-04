@@ -12,6 +12,36 @@ private let auroraAmber = Color(red: 245.0 / 255.0, green: 158.0 / 255.0, blue: 
 private let auroraRed = Color(red: 248.0 / 255.0, green: 113.0 / 255.0, blue: 113.0 / 255.0)
 private let auroraMuted = Color(red: 148.0 / 255.0, green: 163.0 / 255.0, blue: 184.0 / 255.0)
 
+// CRT scanline overlay for the Matrix skin (design .mtx-scan): thin dark
+// lines every 4pt plus a bottom vignette. Shared by the menu panel and the
+// companion bubble.
+struct CRTScanlines: View {
+    var body: some View {
+        ZStack {
+            Canvas { context, size in
+                var y: CGFloat = 2
+                while y < size.height {
+                    context.fill(
+                        Path(CGRect(x: 0, y: y, width: size.width, height: 1)),
+                        with: .color(Color(red: 0, green: 0.1, blue: 0.04).opacity(0.22))
+                    )
+                    y += 4
+                }
+            }
+            .blendMode(.overlay)
+
+            RadialGradient(
+                colors: [.clear, Color.black.opacity(0.4)],
+                center: .top,
+                startRadius: 40,
+                endRadius: 560
+            )
+            .opacity(0.55)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 private struct RitualPanelBackdrop: View {
     let themeColors: EACCThemeColors
     let accent: Color
@@ -76,7 +106,8 @@ private struct RitualPanelBackdrop: View {
 
             if theme == .matrix {
                 MatrixRainView()
-                    .opacity(0.24)
+                    .opacity(0.14)
+                CRTScanlines()
             }
         }
     }
@@ -299,6 +330,20 @@ struct ContentView: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(panelColors.accent.opacity(0.15), lineWidth: 1)
         )
+        .overlay {
+            // Odyssey white room: 1px specular highlight inside the top edge.
+            if vm.selectedTheme == .voidTheme {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.7), Color.white.opacity(0)],
+                            startPoint: .top,
+                            endPoint: .center
+                        ),
+                        lineWidth: 1
+                    )
+            }
+        }
         .shadow(color: .black.opacity(0.72), radius: 36, y: 24)
     }
 
@@ -309,8 +354,14 @@ struct ContentView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(activeTaskTitle)
-                    .font(skin.display(22, weight: .bold))
+                    .font(skin.display(vm.selectedTheme == .voidTheme ? 20 : 22,
+                                       weight: vm.selectedTheme == .voidTheme ? .medium : .bold))
+                    .tracking(vm.selectedTheme == .voidTheme ? 2 : 0)
                     .foregroundStyle(panelColors.textPrimary)
+                    .shadow(
+                        color: vm.selectedTheme == .matrix ? panelColors.accent.opacity(0.4) : .clear,
+                        radius: vm.selectedTheme == .matrix ? 7 : 0
+                    )
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
@@ -359,6 +410,12 @@ struct ContentView: View {
 
     private var activeTaskTitle: String {
         let count = vm.activeSessions.count
+        // Odyssey (5A) speaks in mission-control uppercase.
+        if vm.selectedTheme == .voidTheme {
+            if count == 1 { return "1 ACTIVE TASK" }
+            if count > 1 { return "\(count) ACTIVE TASKS" }
+            return "ALL SYSTEMS NOMINAL"
+        }
         if count == 1 { return "1 active task" }
         if count > 1 { return "\(count) active tasks" }
         return "all agents quiet"
@@ -652,10 +709,25 @@ struct CompanionCard: View {
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             }
 
-            HStack(spacing: 8) {
-                statTile(value: vm.workingSessionCount, label: "live", tint: panelColors.textPrimary)
-                statTile(value: vm.waitingSessionCount, label: "waiting", tint: panelColors.accent)
-                statTile(value: vm.warmSessionCount, label: "warm", tint: auroraPurple)
+            if vm.selectedTheme == .voidTheme {
+                // Odyssey (5A): flat three-column readout split by hairlines.
+                HStack(spacing: 0) {
+                    voidStatColumn(value: vm.workingSessionCount, label: "LIVE", divider: true)
+                    voidStatColumn(value: vm.waitingSessionCount, label: "WAITING", divider: true)
+                    voidStatColumn(value: vm.warmSessionCount, label: "WARM", divider: false)
+                }
+                .padding(.top, 12)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(Color.black.opacity(0.08))
+                        .frame(height: 1)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    statTile(value: vm.workingSessionCount, label: "live", tint: panelColors.textPrimary)
+                    statTile(value: vm.waitingSessionCount, label: "waiting", tint: panelColors.accent)
+                    statTile(value: vm.warmSessionCount, label: "warm", tint: auroraPurple)
+                }
             }
         }
         .padding(18)
@@ -728,6 +800,26 @@ struct CompanionCard: View {
         .overlay(Circle().strokeBorder(panelColors.accent.opacity(0.35), lineWidth: 2))
     }
 
+    private func voidStatColumn(value: Int, label: String, divider: Bool) -> some View {
+        VStack(spacing: 3) {
+            Text("\(value)")
+                .font(skin.mono(20, weight: .regular).monospacedDigit())
+                .foregroundStyle(panelColors.textPrimary)
+            Text(label)
+                .font(skin.display(10, weight: .medium))
+                .tracking(2)
+                .foregroundStyle(skin.textMuted)
+        }
+        .frame(maxWidth: .infinity)
+        .overlay(alignment: .trailing) {
+            if divider {
+                Rectangle()
+                    .fill(Color.black.opacity(0.08))
+                    .frame(width: 1)
+            }
+        }
+    }
+
     private func statTile(value: Int, label: String, tint: Color) -> some View {
         VStack(spacing: 2) {
             Text("\(value)")
@@ -784,7 +876,9 @@ struct CompanionPersonaMenu: View {
                 RoundedRectangle(cornerRadius: isProminent ? 9 : 8, style: .continuous)
                     .strokeBorder(auroraMuted.opacity(0.14), lineWidth: 1)
             }
-            .foregroundStyle(isProminent ? skin.textSecondary : menuAccent)
+            // Design keeps this control neutral so it never competes with the
+            // accent-colored status content.
+            .foregroundStyle(skin.textSecondary)
         }
         .menuStyle(.borderlessButton)
         .help("Switch companion")
