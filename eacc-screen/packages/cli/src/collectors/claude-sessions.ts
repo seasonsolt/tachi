@@ -52,9 +52,30 @@ function isAlive(pid: number): boolean {
 function readSessions(): SessionInfo[] {
   return dedupeSessions([
     ...readClaudeSessions(),
-    ...readClaudeProjectSessions(),
+    ...readClaudeProjectSessions(CLAUDE_PROJECTS_DIR, Date.now(), readRegisteredClaudeSessionIds()),
     ...readOpenCodeSessions(),
   ]);
+}
+
+// Session ids registered by a local Claude Code process (any entrypoint,
+// including the desktop app). Desktop-launched transcripts without such a
+// registration are the only ones attributed to Claude Design.
+export function readRegisteredClaudeSessionIds(sessionsDir = CLAUDE_SESSIONS_DIR): Set<string> {
+  const ids = new Set<string>();
+  if (!existsSync(sessionsDir)) return ids;
+  try {
+    for (const file of readdirSync(sessionsDir).filter((f) => f.endsWith('.json'))) {
+      try {
+        const data = JSON.parse(readFileSync(join(sessionsDir, file), 'utf-8'));
+        if (typeof data.sessionId === 'string') ids.add(data.sessionId);
+      } catch {
+        // skip malformed files
+      }
+    }
+  } catch {
+    // directory read failed
+  }
+  return ids;
 }
 
 function dedupeSessions(sessions: SessionInfo[]): SessionInfo[] {
@@ -111,6 +132,7 @@ function readClaudeSessions(): SessionInfo[] {
 export function readClaudeProjectSessions(
   projectsDir = CLAUDE_PROJECTS_DIR,
   nowMs = Date.now(),
+  registeredSessionIds: ReadonlySet<string> = new Set(),
 ): SessionInfo[] {
   if (!existsSync(projectsDir)) return [];
 
@@ -145,7 +167,8 @@ export function readClaudeProjectSessions(
         const slug = typeof lastEntry?.slug === 'string' ? lastEntry.slug : '';
         const startedAt = parseTimestampMs(lastEntry?.timestamp) ?? modifiedMs;
         const isDesktop = recentEntries.some((entry) => entry.entrypoint === 'claude-desktop');
-        const tool: SessionTool = isDesktop ? 'claude_design' : 'claude_code';
+        const isDesign = isDesktop && !registeredSessionIds.has(sessionId);
+        const tool: SessionTool = isDesign ? 'claude_design' : 'claude_code';
         const projectName = sanitizeTaskText(cwd.split('/').filter(Boolean).at(-1));
 
         sessions.push({

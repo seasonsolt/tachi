@@ -7,13 +7,17 @@ final class ClaudeCodeSessionProvider: CodingSessionProvider {
     var displayName: String { scanner.displayName }
     var tool: CodingTool { scanner.tool }
 
-    init(projectsPath: String = NSHomeDirectory() + "/.claude/projects") {
+    init(
+        projectsPath: String = NSHomeDirectory() + "/.claude/projects",
+        sessionsPath: String = NSHomeDirectory() + "/.claude/sessions"
+    ) {
         scanner = ClaudeProjectSessionProvider(
             id: "claude-code",
             displayName: "Claude Code",
             tool: .claudeCode,
             projectsPath: projectsPath,
-            desktopLaunchPolicy: .exclude
+            sessionsPath: sessionsPath,
+            designPolicy: .exclude
         )
     }
 
@@ -29,13 +33,17 @@ final class ClaudeDesignSessionProvider: CodingSessionProvider {
     var displayName: String { scanner.displayName }
     var tool: CodingTool { scanner.tool }
 
-    init(projectsPath: String = NSHomeDirectory() + "/.claude/projects") {
+    init(
+        projectsPath: String = NSHomeDirectory() + "/.claude/projects",
+        sessionsPath: String = NSHomeDirectory() + "/.claude/sessions"
+    ) {
         scanner = ClaudeProjectSessionProvider(
             id: "claude-design",
             displayName: "Claude Design",
             tool: .claudeDesign,
             projectsPath: projectsPath,
-            desktopLaunchPolicy: .require
+            sessionsPath: sessionsPath,
+            designPolicy: .require
         )
     }
 
@@ -44,16 +52,16 @@ final class ClaudeDesignSessionProvider: CodingSessionProvider {
     }
 }
 
-private enum ClaudeDesktopLaunchPolicy {
+private enum ClaudeDesignPolicy {
     case exclude
     case require
 
-    func allows(desktopLaunched: Bool) -> Bool {
+    func allows(isDesignSession: Bool) -> Bool {
         switch self {
         case .exclude:
-            return !desktopLaunched
+            return !isDesignSession
         case .require:
-            return desktopLaunched
+            return isDesignSession
         }
     }
 }
@@ -64,20 +72,23 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
     let tool: CodingTool
 
     private let projectsPath: String
-    private let desktopLaunchPolicy: ClaudeDesktopLaunchPolicy
+    private let sessionsPath: String
+    private let designPolicy: ClaudeDesignPolicy
 
     init(
         id: String,
         displayName: String,
         tool: CodingTool,
         projectsPath: String,
-        desktopLaunchPolicy: ClaudeDesktopLaunchPolicy
+        sessionsPath: String,
+        designPolicy: ClaudeDesignPolicy
     ) {
         self.id = id
         self.displayName = displayName
         self.tool = tool
         self.projectsPath = projectsPath
-        self.desktopLaunchPolicy = desktopLaunchPolicy
+        self.sessionsPath = sessionsPath
+        self.designPolicy = designPolicy
     }
 
     func scanSessions(now: Date = Date()) -> SessionProviderResult {
@@ -87,6 +98,7 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
         }
 
         let cutoff = now.addingTimeInterval(-3600)
+        let registeredSessionIds = readRegisteredSessionIds()
         var sessions: [CodingSession] = []
 
         for dir in dirs {
@@ -101,11 +113,15 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
                 else { continue }
 
                 let recentEntries = readRecentJsonlEntries(path: filePath, limit: 12)
-                let desktopLaunched = isDesktopLaunched(recentEntries: recentEntries)
-                guard desktopLaunchPolicy.allows(desktopLaunched: desktopLaunched) else { continue }
+                let sessionId = String(file.dropLast(6))
+                // The Claude Code desktop app also writes entrypoint "claude-desktop",
+                // so a desktop-launched trace only counts as Claude Design when no
+                // local Claude Code process registered the session in ~/.claude/sessions.
+                let isDesignSession = isDesktopLaunched(recentEntries: recentEntries)
+                    && !registeredSessionIds.contains(sessionId)
+                guard designPolicy.allows(isDesignSession: isDesignSession) else { continue }
 
                 let lastEntry = recentEntries.first
-                let sessionId = String(file.dropLast(6))
                 let cwd = lastEntry?["cwd"] as? String ?? decodeDirName(dir)
                 let slug = lastEntry?["slug"] as? String ?? ""
                 let projectName = sanitizeTaskText((cwd as NSString).lastPathComponent)
@@ -141,6 +157,21 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
             }
         }
         return SessionProviderResult(sessions: Array(best.values))
+    }
+
+    private func readRegisteredSessionIds() -> Set<String> {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(atPath: sessionsPath) else { return [] }
+
+        var ids: Set<String> = []
+        for file in files where file.hasSuffix(".json") {
+            guard let data = fm.contents(atPath: sessionsPath + "/" + file),
+                  let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let sessionId = json["sessionId"] as? String
+            else { continue }
+            ids.insert(sessionId)
+        }
+        return ids
     }
 
     private func isDesktopLaunched(recentEntries: [[String: Any]]) -> Bool {

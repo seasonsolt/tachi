@@ -359,7 +359,10 @@ final class SessionProviderTests: XCTestCase {
         {"timestamp":"1970-01-01T00:03:20Z","type":"user","entrypoint":"claude-desktop","cwd":"/tmp/tachi-design","slug":"design-taskbar-popup","message":{"role":"user","content":"Design the taskbar popup"}}
         """.write(to: sessionURL, atomically: true, encoding: .utf8)
 
-        let provider = ClaudeDesignSessionProvider(projectsPath: tempDir.path)
+        let provider = ClaudeDesignSessionProvider(
+            projectsPath: tempDir.path,
+            sessionsPath: tempDir.appendingPathComponent("sessions").path
+        )
         let result = provider.scanSessions(now: Date(timeIntervalSince1970: 220))
 
         XCTAssertEqual(result.sessions.count, 1)
@@ -384,10 +387,41 @@ final class SessionProviderTests: XCTestCase {
         {"timestamp":"1970-01-01T00:03:20Z","type":"user","entrypoint":"claude-desktop","cwd":"/tmp/tachi-design","slug":"design-taskbar-popup","message":"Design the taskbar popup"}
         """.write(to: projectDir.appendingPathComponent("design-1.jsonl"), atomically: true, encoding: .utf8)
 
-        let provider = ClaudeCodeSessionProvider(projectsPath: tempDir.path)
+        let provider = ClaudeCodeSessionProvider(
+            projectsPath: tempDir.path,
+            sessionsPath: tempDir.appendingPathComponent("sessions").path
+        )
         let result = provider.scanSessions(now: Date(timeIntervalSince1970: 220))
 
         XCTAssertTrue(result.sessions.isEmpty)
+    }
+
+    func testClaudeCodeProviderKeepsDesktopLaunchedSessionWithLocalRegistration() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let projectDir = tempDir.appendingPathComponent("-tmp-tachi", isDirectory: true)
+        let sessionsDir = tempDir.appendingPathComponent("sessions", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        try """
+        {"timestamp":"1970-01-01T00:03:20Z","type":"user","entrypoint":"claude-desktop","cwd":"/tmp/tachi","slug":"fix-monitor","message":"Fix the monitor"}
+        """.write(to: projectDir.appendingPathComponent("desktop-code-1.jsonl"), atomically: true, encoding: .utf8)
+        try """
+        {"pid":12345,"sessionId":"desktop-code-1","cwd":"/tmp/tachi","startedAt":1,"entrypoint":"claude-desktop"}
+        """.write(to: sessionsDir.appendingPathComponent("12345.json"), atomically: true, encoding: .utf8)
+
+        let codeProvider = ClaudeCodeSessionProvider(projectsPath: tempDir.path, sessionsPath: sessionsDir.path)
+        let codeResult = codeProvider.scanSessions(now: Date(timeIntervalSince1970: 220))
+
+        XCTAssertEqual(codeResult.sessions.map(\.id), ["desktop-code-1"])
+        XCTAssertEqual(codeResult.sessions.first?.tool, .claudeCode)
+
+        let designProvider = ClaudeDesignSessionProvider(projectsPath: tempDir.path, sessionsPath: sessionsDir.path)
+        let designResult = designProvider.scanSessions(now: Date(timeIntervalSince1970: 220))
+
+        XCTAssertTrue(designResult.sessions.isEmpty)
     }
 }
 
