@@ -16,6 +16,9 @@ struct CodingSession: Identifiable, Sendable {
     // True when a local process registration (~/.claude/sessions) confirms the
     // session is still attached, even if the transcript has gone quiet.
     var processAlive: Bool = false
+    // Pid from that registration; lets the launcher activate the exact app
+    // (Claude desktop, iTerm, ...) that owns the session.
+    var ownerPid: Int32? = nil
 
     var projectName: String {
         let name = (projectPath as NSString).lastPathComponent

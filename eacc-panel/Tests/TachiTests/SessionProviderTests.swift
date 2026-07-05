@@ -454,6 +454,7 @@ final class SessionProviderTests: XCTestCase {
         let session = try XCTUnwrap(result.sessions.first)
         XCTAssertTrue(session.processAlive)
         XCTAssertEqual(session.status, .idle)
+        XCTAssertEqual(session.ownerPid, livePid)
     }
 
     func testClaudeCodeProviderMarksSessionsWithoutLiveProcessAsDone() throws {
