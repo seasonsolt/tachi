@@ -483,6 +483,23 @@ final class SessionProviderTests: XCTestCase {
         XCTAssertFalse(session.processAlive)
     }
 
+    @MainActor
+    func testParseLsofPidCwdOutputPairsProcessesWithWorkingDirectories() {
+        let output = """
+        p4242
+        fcwd
+        n/Users/dev/project-a
+        p777
+        fcwd
+        n/Users/dev/project b
+        """
+
+        let parsed = SessionLauncher.parseLsofPidCwdOutput(output)
+
+        XCTAssertEqual(parsed.map(\.pid), [4242, 777])
+        XCTAssertEqual(parsed.map(\.cwd), ["/Users/dev/project-a", "/Users/dev/project b"])
+    }
+
     func testClaudeTaskSummarySkipsToolResultsAndMetaLines() throws {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
