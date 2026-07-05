@@ -42,11 +42,11 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
 
     var label: String {
         switch self {
-        case .automatic: return "Auto (follows theme)"
-        case .defaultOrb: return "Orb"
-        case .cyberSignal: return "Cyber Signal"
+        case .automatic: return "自动 Auto (follows theme)"
+        case .defaultOrb: return "光球 Orb"
+        case .cyberSignal: return "赛博信号 Cyber Signal"
         case .matrixAgent: return "母体代码 Matrix Code"
-        case .amberEye: return "Folded Signal"
+        case .amberEye: return "折纸 Folded Signal"
         case .voidMonolith: return "石碑 Monolith"
         }
     }
