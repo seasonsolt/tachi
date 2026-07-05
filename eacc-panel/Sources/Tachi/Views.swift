@@ -946,6 +946,8 @@ struct CompanionPersonaMenu: View {
             .foregroundStyle(skin.textSecondary)
         }
         .menuStyle(.borderlessButton)
+        // The label draws its own chevron; the system indicator doubled it.
+        .menuIndicator(.hidden)
         .help("Switch companion")
     }
 }

@@ -1,10 +1,8 @@
 import AppKit
 import SwiftUI
 
-private let desktopAuroraCyan = Color(red: 56.0 / 255.0, green: 189.0 / 255.0, blue: 248.0 / 255.0)
 private let desktopAuroraTeal = Color(red: 45.0 / 255.0, green: 212.0 / 255.0, blue: 191.0 / 255.0)
 private let desktopAuroraAmber = Color(red: 245.0 / 255.0, green: 158.0 / 255.0, blue: 11.0 / 255.0)
-private let desktopAuroraMutedDeep = Color(red: 90.0 / 255.0, green: 107.0 / 255.0, blue: 126.0 / 255.0)
 
 // Behind-window vibrancy: blurs the actual desktop content underneath the
 // panel, which SwiftUI materials (within-window blending) cannot do.
@@ -665,10 +663,12 @@ struct DesktopPetView: View {
 
     private func sessionStatusTint(_ session: CodingSession) -> Color {
         switch session.status {
-        case .working: return desktopAuroraCyan
+        case .working: return vm.panelThemeColors.accent
         case .waitingForInput: return desktopAuroraAmber
         case .completed: return desktopAuroraTeal
-        case .idle: return desktopAuroraMutedDeep
+        // Follow the skin so a quiet session reads muted in every theme
+        // instead of slate-grey against the Matrix greens.
+        case .idle: return vm.panelThemeColors.textMuted
         }
     }
 
