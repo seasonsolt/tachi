@@ -555,11 +555,13 @@ struct MatrixPetView: View {
                     .blur(radius: 10)
 
                 Canvas { context, size in
-                    drawMatrixCode(&context, size, time: time)
+                    // Idle slows the rain down rather than erasing it, so the
+                    // pet reads as "standby", not broken.
+                    drawMatrixCode(&context, size, time: time * rainTempo)
                 }
                 .frame(width: 94, height: 94)
 
-                scanline(time: time)
+                scanline(time: time * rainTempo)
                     .frame(width: 88)
             }
             .frame(width: 108, height: 108)
@@ -610,8 +612,18 @@ struct MatrixPetView: View {
         case .feasting: return 1.0
         case .alert: return 0.86
         case .expecting: return 0.68
-        case .dozing: return 0.42
-        case .sleeping: return 0.24
+        case .dozing: return 0.55
+        case .sleeping: return 0.42
+        }
+    }
+
+    private var rainTempo: Double {
+        switch mood {
+        case .feasting: return 1.0
+        case .alert: return 0.85
+        case .expecting: return 0.65
+        case .dozing: return 0.45
+        case .sleeping: return 0.3
         }
     }
 
