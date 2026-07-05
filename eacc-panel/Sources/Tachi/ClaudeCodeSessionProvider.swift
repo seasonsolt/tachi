@@ -161,7 +161,8 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
                         lastActivity: trace.lastActivity,
                         signal: signal,
                         pulse: pulse,
-                        processAlive: processAlive
+                        processAlive: processAlive,
+                        ownerPid: registry.alivePids[sessionId]
                     ))
             }
         }
@@ -181,7 +182,9 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
 
     private struct SessionRegistry {
         var registeredIds: Set<String> = []
-        var aliveIds: Set<String> = []
+        var alivePids: [String: Int32] = [:]
+
+        var aliveIds: Set<String> { Set(alivePids.keys) }
     }
 
     private func readSessionRegistry() -> SessionRegistry {
@@ -198,7 +201,7 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
             if let pid = json["pid"] as? Int, pid > 0,
                kill(pid_t(pid), 0) == 0 || errno == EPERM
             {
-                registry.aliveIds.insert(sessionId)
+                registry.alivePids[sessionId] = Int32(pid)
             }
         }
         return registry
