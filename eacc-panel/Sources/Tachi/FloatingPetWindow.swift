@@ -309,7 +309,14 @@ struct DesktopPetView: View {
     @State private var isHoveringPanel = false
     @State private var isCelebrating = false
     @State private var celebrationToken = 0
+    // Two-flag preview machine that decouples the bubble fade from the panel
+    // resize. `isPreviewVisible` reserves layout space and drives the (instant)
+    // window resize; `isBubbleVisible` animates only the bubble's opacity. On
+    // collapse the bubble fades out while the window stays expanded, then the
+    // window shrinks once the bubble is already invisible — so the fade never
+    // fights the resize (the mismatch that used to flicker).
     @State private var isPreviewVisible = false
+    @State private var isBubbleVisible = false
     @State private var isDraggingCompanion = false
     @State private var previewDismissTask: Task<Void, Never>? = nil
 
@@ -345,10 +352,10 @@ struct DesktopPetView: View {
         ZStack(alignment: .bottomTrailing) {
             if isShowingPreview {
                 taskBubble
-                    .offset(x: -8, y: isShowingPreview ? -Self.previewOffsetY : -(Self.previewOffsetY - 8))
-                    .opacity(isShowingPreview ? 1 : 0)
-                    .blur(radius: isShowingPreview ? 0 : 4)
-                    .animation(.easeOut(duration: 0.22), value: isShowingPreview)
+                    .offset(x: -8, y: -Self.previewOffsetY + (isBubbleVisible ? 0 : 8))
+                    .opacity(isBubbleVisible ? 1 : 0)
+                    .blur(radius: isBubbleVisible ? 0 : 4)
+                    .animation(.easeOut(duration: 0.2), value: isBubbleVisible)
             }
 
             ZStack {
@@ -416,9 +423,8 @@ struct DesktopPetView: View {
         }
         .onChange(of: vm.shouldShowCompanionTaskPreview) { _, newValue in
             if !newValue {
-                previewDismissTask?.cancel()
-                isPreviewVisible = false
                 isHoveringPanel = false
+                collapsePreviewInstantly()
             }
         }
         .onChange(of: vm.companionCelebrationSequence) { _, newValue in
@@ -476,19 +482,30 @@ struct DesktopPetView: View {
         return usesLaunchAwayCelebration ? 0.0 : 0.28
     }
 
+    private static let bubbleFadeDuration: Duration = .milliseconds(200)
+
     private func showPreview() {
         previewDismissTask?.cancel()
         previewDismissTask = nil
-        guard !isDraggingCompanion else {
-            hidePreviewWithoutLayoutAnimation()
+        guard !isDraggingCompanion, vm.shouldShowCompanionTaskPreview else {
+            collapsePreviewInstantly()
             return
         }
-        guard vm.shouldShowCompanionTaskPreview else {
-            hidePreviewWithoutLayoutAnimation()
+        if isPreviewVisible {
+            // Already mounted (re-hover during a fade-out): just fade back in.
+            withAnimation(.easeOut(duration: 0.2)) { isBubbleVisible = true }
             return
         }
+        // Fresh mount: reserve space + grow the transparent window instantly at
+        // opacity 0, then raise opacity on the next pass so it actually fades in
+        // (a just-inserted view renders at its target, it does not animate).
+        isBubbleVisible = false
         setPreviewVisibleWithoutLayoutAnimation(true)
         onPanelSizeChange?(Self.panelSize(for: vm, showingPreview: true))
+        Task { @MainActor in
+            guard isPreviewVisible, !isDraggingCompanion else { return }
+            withAnimation(.easeOut(duration: 0.2)) { isBubbleVisible = true }
+        }
     }
 
     private func schedulePreviewDismissIfNeeded() {
@@ -500,7 +517,17 @@ struct DesktopPetView: View {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard !isHoveringPanel else { return }
-                hidePreviewWithoutLayoutAnimation()
+                // Fade the bubble out while the window stays expanded.
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isBubbleVisible = false
+                }
+            }
+            try? await Task.sleep(for: Self.bubbleFadeDuration)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard !isHoveringPanel else { return }
+                // Bubble is invisible now; collapse layout + shrink the window.
+                setPreviewVisibleWithoutLayoutAnimation(false)
                 onPanelSizeChange?(Self.panelSize(for: vm, showingPreview: false))
             }
         }
@@ -509,14 +536,15 @@ struct DesktopPetView: View {
     private func beginCompanionDrag() {
         isDraggingCompanion = true
         isHoveringPanel = false
-        previewDismissTask?.cancel()
-        previewDismissTask = nil
-        hidePreviewWithoutLayoutAnimation()
-        onPanelSizeChange?(Self.panelSize(for: vm, showingPreview: false))
+        collapsePreviewInstantly()
     }
 
-    private func hidePreviewWithoutLayoutAnimation() {
+    private func collapsePreviewInstantly() {
+        previewDismissTask?.cancel()
+        previewDismissTask = nil
+        isBubbleVisible = false
         setPreviewVisibleWithoutLayoutAnimation(false)
+        onPanelSizeChange?(Self.panelSize(for: vm, showingPreview: false))
     }
 
     private func setPreviewVisibleWithoutLayoutAnimation(_ visible: Bool) {
