@@ -147,11 +147,57 @@ private struct DesktopPulseDot: View {
     }
 }
 
+struct FloatingPetWindowPlacement {
+    static let horizontalMargin: CGFloat = 24
+    static let bottomOffset: CGFloat = 72
+
+    static func initialFrame(size: CGSize, visibleFrame: CGRect) -> CGRect {
+        clampedFrame(
+            origin: CGPoint(
+                x: visibleFrame.maxX - size.width - horizontalMargin,
+                y: visibleFrame.minY + bottomOffset
+            ),
+            size: size,
+            visibleFrame: visibleFrame
+        )
+    }
+
+    static func resizedFrame(currentFrame: CGRect, newSize: CGSize, visibleFrame _: CGRect) -> CGRect {
+        CGRect(
+            origin: CGPoint(
+                x: currentFrame.maxX - newSize.width,
+                y: currentFrame.minY
+            ),
+            size: newSize
+        )
+    }
+
+    static func draggedFrame(startFrame: CGRect, translation: CGSize) -> CGRect {
+        CGRect(
+            origin: CGPoint(
+                x: startFrame.minX + translation.width,
+                y: startFrame.minY - translation.height
+            ),
+            size: startFrame.size
+        )
+    }
+
+    private static func clampedFrame(origin: CGPoint, size: CGSize, visibleFrame: CGRect) -> CGRect {
+        let maxX = max(visibleFrame.minX, visibleFrame.maxX - size.width)
+        let maxY = max(visibleFrame.minY, visibleFrame.maxY - size.height)
+        let x = min(max(origin.x, visibleFrame.minX), maxX)
+        let y = min(max(origin.y, visibleFrame.minY), maxY)
+
+        return CGRect(origin: CGPoint(x: x, y: y), size: size)
+    }
+}
+
 @MainActor
 final class FloatingPetWindowController {
     static let shared = FloatingPetWindowController()
 
     private var panel: NSPanel?
+    private var dragStartFrame: NSRect?
 
     func show(vm: ViewModel) {
         let initialSize = DesktopPetView.panelSize(for: vm, showingPreview: false)
@@ -191,6 +237,11 @@ final class FloatingPetWindowController {
         let view = DesktopPetView(vm: vm) { [weak self, weak panel] size in
             guard let self, let panel else { return }
             self.applySize(size, to: panel)
+        } onPanelDragChange: { [weak self, weak panel] translation in
+            guard let self, let panel else { return }
+            self.applyDrag(translation, to: panel)
+        } onPanelDragEnd: { [weak self] in
+            self?.dragStartFrame = nil
         }
         if let hosting = panel.contentView as? NSHostingView<DesktopPetView> {
             hosting.rootView = view
@@ -201,10 +252,11 @@ final class FloatingPetWindowController {
 
     private func place(panel: NSPanel) {
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let frame = screen.visibleFrame
-        let x = frame.maxX - panel.frame.width - 24
-        let y = frame.minY + 72
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        let targetFrame = FloatingPetWindowPlacement.initialFrame(
+            size: panel.frame.size,
+            visibleFrame: screen.visibleFrame
+        )
+        panel.setFrameOrigin(targetFrame.origin)
     }
 
     private func applySize(_ size: CGSize, to panel: NSPanel, animated: Bool = true) {
@@ -214,15 +266,26 @@ final class FloatingPetWindowController {
             return
         }
 
-        let frame = screen.visibleFrame
-        let targetFrame = NSRect(
-            x: frame.maxX - size.width - 24,
-            y: frame.minY + 72,
-            width: size.width,
-            height: size.height
+        let targetFrame = FloatingPetWindowPlacement.resizedFrame(
+            currentFrame: panel.frame,
+            newSize: size,
+            visibleFrame: screen.visibleFrame
         )
 
         panel.setFrame(targetFrame, display: true)
+    }
+
+    private func applyDrag(_ translation: CGSize, to panel: NSPanel) {
+        if dragStartFrame == nil {
+            dragStartFrame = panel.frame
+        }
+        guard let dragStartFrame else { return }
+
+        let targetFrame = FloatingPetWindowPlacement.draggedFrame(
+            startFrame: dragStartFrame,
+            translation: translation
+        )
+        panel.setFrameOrigin(targetFrame.origin)
     }
 }
 
@@ -237,15 +300,21 @@ struct DesktopPetView: View {
 
     let vm: ViewModel
     var onPanelSizeChange: ((CGSize) -> Void)? = nil
-    @State private var isHoveringCompanion = false
-    @State private var isHoveringTaskBubble = false
+    var onPanelDragChange: ((CGSize) -> Void)? = nil
+    var onPanelDragEnd: (() -> Void)? = nil
+    // One hover region for the whole panel (pet + bubble + the gap between
+    // them). Two separate tracking areas left a dead zone that collapsed the
+    // panel mid-interaction, and a panel resize under the cursor churned a
+    // single pet-only tracking area into a spurious exit/enter bounce.
+    @State private var isHoveringPanel = false
     @State private var isCelebrating = false
     @State private var celebrationToken = 0
     @State private var isPreviewVisible = false
+    @State private var isDraggingCompanion = false
     @State private var previewDismissTask: Task<Void, Never>? = nil
 
     private var isShowingPreview: Bool {
-        isPreviewVisible && vm.shouldShowCompanionTaskPreview
+        isPreviewVisible && vm.shouldShowCompanionTaskPreview && !isDraggingCompanion
     }
 
     private var estimatedBubbleHeight: CGFloat {
@@ -280,14 +349,6 @@ struct DesktopPetView: View {
                     .opacity(isShowingPreview ? 1 : 0)
                     .blur(radius: isShowingPreview ? 0 : 4)
                     .animation(.easeOut(duration: 0.22), value: isShowingPreview)
-                    .onHover { hovering in
-                        isHoveringTaskBubble = hovering
-                        if hovering {
-                            showPreview()
-                        } else {
-                            schedulePreviewDismissIfNeeded()
-                        }
-                    }
             }
 
             ZStack {
@@ -312,20 +373,35 @@ struct DesktopPetView: View {
                 .shadow(color: vm.companionPetAccent.opacity(companionCelebrationShadowOpacity), radius: 22, y: 4)
                 .frame(width: 124, height: 124)
                 .contentShape(Rectangle())
-                .onHover { hovering in
-                    isHoveringCompanion = hovering
-                    if hovering {
-                        showPreview()
-                    } else {
-                        schedulePreviewDismissIfNeeded()
-                    }
-                }
+                .gesture(
+                    DragGesture(minimumDistance: 1)
+                        .onChanged { value in
+                            if !isDraggingCompanion {
+                                beginCompanionDrag()
+                            }
+                            onPanelDragChange?(value.translation)
+                        }
+                        .onEnded { _ in
+                            isDraggingCompanion = false
+                            onPanelDragEnd?()
+                        }
+                )
             }
         }
         .frame(width: currentPanelWidth - (Self.horizontalPadding * 2), height: contentHeight, alignment: .bottomTrailing)
         .padding(.horizontal, Self.horizontalPadding)
         .padding(.vertical, Self.verticalPadding)
         .background(Color.clear)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHoveringPanel = hovering
+            guard !isDraggingCompanion else { return }
+            if hovering {
+                showPreview()
+            } else {
+                schedulePreviewDismissIfNeeded()
+            }
+        }
         .onAppear {
             onPanelSizeChange?(panelSize)
         }
@@ -342,7 +418,7 @@ struct DesktopPetView: View {
             if !newValue {
                 previewDismissTask?.cancel()
                 isPreviewVisible = false
-                isHoveringTaskBubble = false
+                isHoveringPanel = false
             }
         }
         .onChange(of: vm.companionCelebrationSequence) { _, newValue in
@@ -361,6 +437,7 @@ struct DesktopPetView: View {
             }
         }
         .onTapGesture {
+            guard !isDraggingCompanion else { return }
             Task { await vm.refreshSessionPulse() }
         }
         .contextMenu {
@@ -402,30 +479,51 @@ struct DesktopPetView: View {
     private func showPreview() {
         previewDismissTask?.cancel()
         previewDismissTask = nil
-        guard vm.shouldShowCompanionTaskPreview else {
-            isPreviewVisible = false
+        guard !isDraggingCompanion else {
+            hidePreviewWithoutLayoutAnimation()
             return
         }
-        withAnimation(.easeOut(duration: 0.16)) {
-            isPreviewVisible = true
+        guard vm.shouldShowCompanionTaskPreview else {
+            hidePreviewWithoutLayoutAnimation()
+            return
         }
+        setPreviewVisibleWithoutLayoutAnimation(true)
         onPanelSizeChange?(Self.panelSize(for: vm, showingPreview: true))
     }
 
     private func schedulePreviewDismissIfNeeded() {
         previewDismissTask?.cancel()
-        guard !isHoveringCompanion && !isHoveringTaskBubble else { return }
+        guard !isHoveringPanel else { return }
 
         previewDismissTask = Task {
             try? await Task.sleep(for: .milliseconds(180))
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                guard !isHoveringCompanion && !isHoveringTaskBubble else { return }
-                withAnimation(.easeOut(duration: 0.16)) {
-                    isPreviewVisible = false
-                }
+                guard !isHoveringPanel else { return }
+                hidePreviewWithoutLayoutAnimation()
                 onPanelSizeChange?(Self.panelSize(for: vm, showingPreview: false))
             }
+        }
+    }
+
+    private func beginCompanionDrag() {
+        isDraggingCompanion = true
+        isHoveringPanel = false
+        previewDismissTask?.cancel()
+        previewDismissTask = nil
+        hidePreviewWithoutLayoutAnimation()
+        onPanelSizeChange?(Self.panelSize(for: vm, showingPreview: false))
+    }
+
+    private func hidePreviewWithoutLayoutAnimation() {
+        setPreviewVisibleWithoutLayoutAnimation(false)
+    }
+
+    private func setPreviewVisibleWithoutLayoutAnimation(_ visible: Bool) {
+        var transaction = Transaction()
+        transaction.animation = nil
+        withTransaction(transaction) {
+            isPreviewVisible = visible
         }
     }
 
