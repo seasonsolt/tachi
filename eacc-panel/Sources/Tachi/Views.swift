@@ -565,8 +565,9 @@ struct ContentView: View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 companionSection
-                if let claude = vm.claudeSource {
-                    claudeUsageSection(claude)
+                if let usage = vm.claudeUsage,
+                   usage.month.costUSD > 0 || !usage.month.models.isEmpty {
+                    claudeUsageCard(usage)
                 }
                 if let snapshot = vm.codexRateLimits {
                     codexUsageSection(snapshot)
@@ -589,22 +590,117 @@ struct ContentView: View {
 
     // MARK: - Claude Usage
 
-    private func claudeUsageSection(_ source: ViewModel.RecipeSourceInfo) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+    private func claudeUsageCard(_ usage: ClaudeUsageSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Header
+            HStack(spacing: 8) {
                 Image(systemName: "brain.head.profile")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(panelColors.accent)
                 Text("CLAUDE USAGE")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(skin.mono(12, weight: .bold))
+                    .tracking(1.5)
                     .foregroundStyle(panelColors.textSecondary)
                 Spacer()
+                Text("LOCAL")
+                    .font(skin.mono(9, weight: .bold))
+                    .tracking(1.0)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(panelColors.accent.opacity(0.10))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .strokeBorder(panelColors.accent.opacity(0.25), lineWidth: 1)
+                    )
+                    .foregroundStyle(panelColors.accent)
             }
-            .padding(.horizontal, 4)
 
-            RecipeSourceCard(name: source.name, data: source.data, themeColors: panelColors)
+            // TODAY hero
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("TODAY")
+                    .font(skin.mono(9, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundStyle(panelColors.accent.opacity(0.7))
+                Spacer()
+                Text(formatCost(usage.today.costUSD))
+                    .font(skin.mono(20, weight: .bold).monospacedDigit())
+                    .foregroundStyle(panelColors.accent)
+                Text("/ \(formatCount(usage.today.totalTokens))")
+                    .font(skin.mono(11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(panelColors.textSecondary)
+            }
+
+            // WEEK + MONTH compact summary
+            HStack(spacing: 0) {
+                claudeUsagePeriod("WEEK", window: usage.week)
+                Spacer()
+                claudeUsagePeriod("MONTH", window: usage.month)
+            }
+
+            // Per-model breakdown for the week window
+            if !usage.week.models.isEmpty {
+                VStack(spacing: 7) {
+                    AuroraDashedDivider()
+                    ForEach(usage.week.models) { model in
+                        claudeUsageModelRow(model)
+                    }
+                }
+            }
         }
-        .ritualSection(themeColors: panelColors, accent: panelColors.accent)
+        .padding(16)
+        .ritualDataCard(themeColors: panelColors, emphasis: panelColors.accent, radius: 18)
+    }
+
+    private func claudeUsagePeriod(_ label: String, window: ClaudeUsageWindow) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(skin.mono(9, weight: .medium))
+                .tracking(1.0)
+                .foregroundStyle(panelColors.textMuted)
+            HStack(spacing: 4) {
+                Text(formatCost(window.costUSD))
+                    .font(skin.mono(12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(panelColors.textSecondary)
+                Text(formatCount(window.totalTokens))
+                    .font(skin.mono(9, weight: .medium).monospacedDigit())
+                    .foregroundStyle(panelColors.textMuted)
+            }
+        }
+    }
+
+    private func claudeUsageModelRow(_ model: ClaudeModelUsage) -> some View {
+        HStack(spacing: 8) {
+            Text(shortClaudeModelName(model.model))
+                .font(skin.mono(10, weight: .medium))
+                .foregroundStyle(panelColors.textSecondary)
+                .lineLimit(1)
+            Spacer()
+            Text(formatCost(model.costUSD))
+                .font(skin.mono(10, weight: .semibold).monospacedDigit())
+                .foregroundStyle(panelColors.accent)
+            Text(formatCount(model.totalTokens))
+                .font(skin.mono(9, weight: .medium).monospacedDigit())
+                .foregroundStyle(panelColors.textMuted)
+                .frame(width: 48, alignment: .trailing)
+        }
+    }
+
+    /// Shorten model ids for display: strip the "claude-" prefix and any trailing
+    /// YYYYMMDD date suffix ("claude-haiku-4-5-20251001" → "haiku-4-5").
+    private func shortClaudeModelName(_ model: String) -> String {
+        var name = model
+        if name.hasPrefix("claude-") {
+            name = String(name.dropFirst("claude-".count))
+        }
+        name = name.replacingOccurrences(
+            of: #"-\d{8}$"#,
+            with: "",
+            options: .regularExpression
+        )
+        return name.isEmpty ? model : name
     }
 
     // MARK: - Codex Usage
@@ -1437,25 +1533,6 @@ struct RecipeSourceCard: View {
             }
         }
     }
-
-    private func formatCost(_ cost: Double) -> String {
-        if cost >= 1000 {
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .decimal
-            formatter.maximumFractionDigits = 0
-            return "$" + (formatter.string(from: NSNumber(value: cost)) ?? "\(Int(cost))")
-        }
-        if cost >= 1 { return String(format: "$%.2f", cost) }
-        if cost > 0 { return String(format: "$%.4f", cost) }
-        return "$0"
-    }
-
-    private func formatCount(_ count: Int) -> String {
-        count >= 1_000_000_000 ? String(format: "%.1fB", Double(count) / 1_000_000_000) :
-        count >= 1_000_000 ? String(format: "%.1fM", Double(count) / 1_000_000) :
-        count >= 1_000 ? String(format: "%.1fK", Double(count) / 1_000) :
-        "\(count)"
-    }
 }
 
 struct ProviderCard: View {
@@ -2212,6 +2289,27 @@ struct MatrixRainView: View {
 }
 
 // MARK: - EACC Helpers
+
+/// Compact USD cost formatting shared by the token-usage cards.
+private func formatCost(_ cost: Double) -> String {
+    if cost >= 1000 {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 0
+        return "$" + (formatter.string(from: NSNumber(value: cost)) ?? "\(Int(cost))")
+    }
+    if cost >= 1 { return String(format: "$%.2f", cost) }
+    if cost > 0 { return String(format: "$%.4f", cost) }
+    return "$0"
+}
+
+/// Compact token-count formatting (K/M/B) shared by the token-usage cards.
+private func formatCount(_ count: Int) -> String {
+    count >= 1_000_000_000 ? String(format: "%.1fB", Double(count) / 1_000_000_000) :
+    count >= 1_000_000 ? String(format: "%.1fM", Double(count) / 1_000_000) :
+    count >= 1_000 ? String(format: "%.1fK", Double(count) / 1_000) :
+    "\(count)"
+}
 
 /// Gold color used as a mid-range utilization indicator (theme-independent).
 private let utilGold = Color(red: 1.0, green: 0.78, blue: 0.2)

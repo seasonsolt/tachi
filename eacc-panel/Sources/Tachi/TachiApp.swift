@@ -9,6 +9,7 @@ struct TachiApp: App {
     private let statsWatcher = StatsWatcher()
     private let sessionsWatcher = SessionsWatcher()
     private let themeWatcher = ThemeWatcher()
+    private let claudeUsageMonitor = ClaudeUsageMonitor()
     private let bridge: EACCBridge
 
     private let recipeRuntime = RecipeRuntime()
@@ -37,6 +38,12 @@ struct TachiApp: App {
         vm.recipeRuntime = recipeRuntime
         bridge.recipeRuntime = recipeRuntime
 
+        // Native Claude Code token-usage collector (reads ~/.claude/projects
+        // transcripts). Delivered on main by the monitor.
+        claudeUsageMonitor.onUpdate = { [vm] snapshot in
+            vm.claudeUsage = snapshot
+        }
+
         // Install default recipes if first run
         RecipeStore.installDefaults()
 
@@ -46,6 +53,7 @@ struct TachiApp: App {
         sessionsWatcher.start()
         themeWatcher.start()
         recipeRuntime.start()
+        claudeUsageMonitor.start()
 
         Task { @MainActor [vm] in
             FloatingPetWindowController.shared.show(vm: vm)
