@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/seasonsolt/e-acc/releases/tag/v1.1.0">Download preview</a>
+  <a href="https://github.com/seasonsolt/e-acc/releases/latest">Download</a>
   |
   <a href="#what-you-get">What you get</a>
   |
@@ -56,13 +56,30 @@ Tachi borrows from terminal glow, machine-room glass, and late-night coding room
 
 The first theme still centers on a real eclipse motion: the light disappears as the moon covers the sun, and the stone form becomes the anchor of the scene.
 
-## Download
+## Download & Install
 
-The first public preview is available on GitHub.
+Grab the latest DMG from GitHub:
 
-[Download preview build](https://github.com/seasonsolt/e-acc/releases/tag/v1.1.0)
+[Download the latest release](https://github.com/seasonsolt/e-acc/releases/latest)
 
-The current macOS artifact is an unsigned preview build for internal validation. A production-ready macOS build still needs Developer ID signing and notarization before it can pass Gatekeeper cleanly.
+1. Open `Tachi-<version>.dmg` and drag **Tachi.app** onto the **Applications** folder.
+2. Clear the download quarantine once (see below), then launch Tachi from Applications — it lives in the menu bar.
+
+### First launch: "Apple cannot verify Tachi"
+
+Tachi is an open-source, **ad-hoc-signed** build — there is no paid Apple Developer ID yet — so macOS Gatekeeper blocks it on first launch with *"Apple cannot verify 'Tachi' is free of malware."* On macOS 15 (Sequoia) that dialog no longer offers an **Open** button, so use one of these one-time fixes:
+
+**Terminal (recommended, one command):**
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Tachi.app
+```
+
+Then double-click Tachi in Applications — it opens normally from then on.
+
+**Or via System Settings:** try to open Tachi once, then go to **System Settings → Privacy & Security**, scroll to the message about Tachi, and click **Open Anyway**.
+
+This is expected for any unsigned app; it is not specific to Tachi. A fully frictionless install needs Developer ID signing + Apple notarization, which is on the roadmap.
 
 ## Status
 
