@@ -220,6 +220,16 @@ final class ViewModel {
         }
     }
 
+    // Local Claude Code token usage comes through the built-in "claude-code"
+    // collector; surface it as its own prominent card, separate from the rest.
+    var claudeSource: RecipeSourceInfo? {
+        recipeSources.first { $0.id == "claude-code" }
+    }
+
+    var nonClaudeRecipeSources: [RecipeSourceInfo] {
+        recipeSources.filter { $0.id != "claude-code" }
+    }
+
     var providers: [ProviderSummary] {
         var result: [ProviderSummary] = []
 
@@ -293,12 +303,17 @@ final class ViewModel {
         companionTaskPreviewSessions.first
     }
 
+    // All active sessions are shown; the bubble scrolls past the first few
+    // rather than truncating to a "+N more" footer.
     var companionTaskVisibleSessions: [CodingSession] {
-        Array(companionTaskPreviewSessions.prefix(3))
+        companionTaskPreviewSessions
     }
 
+    // Rows visible in the bubble before it starts scrolling.
+    static let companionTaskVisibleRowCap = 3
+
     var companionTaskOverflowCount: Int {
-        max(0, companionTaskPreviewSessions.count - companionTaskVisibleSessions.count)
+        max(0, companionTaskPreviewSessions.count - Self.companionTaskVisibleRowCap)
     }
 
     var shouldShowCompanionTaskPreview: Bool {
@@ -327,12 +342,8 @@ final class ViewModel {
     }
 
     var companionTaskContext: String {
-        if activeSessions.count > 1 {
-            return companionTaskOverflowCount > 0
-                ? "+\(companionTaskOverflowCount) more active tasks"
-                : ""
-        }
-        return ""
+        // The list scrolls; hint that there is more below the fold.
+        companionTaskOverflowCount > 0 ? "↓ \(companionTaskOverflowCount) more — scroll" : ""
     }
 
     var companionTaskFooter: String? {
