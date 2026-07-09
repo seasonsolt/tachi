@@ -1,98 +1,92 @@
 # Tachi
 
 <p align="center">
-  <img src="eacc-panel/Resources/AppIcon-1024.png" alt="Tachi blue electronic pet app icon" width="260">
+  <img src="eacc-panel/Resources/AppIcon-1024.png" alt="Tachi app icon" width="200">
 </p>
 
 <p align="center">
-  <strong>Your reliable electronic pet for AI coding.</strong>
+  <strong>See your AI coding sessions and token spend, right in the menu bar.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/seasonsolt/e-acc/releases/latest">Download</a>
-  |
-  <a href="#what-you-get">What you get</a>
-  |
-  <a href="#status">Status</a>
+  ·
+  <a href="#what-you-see">Features</a>
+  ·
+  <a href="#private-by-design">Privacy</a>
+  ·
+  <a href="#install">Install</a>
 </p>
 
-Tachi watches your local Claude Code and Codex work, keeps a pulse on active sessions, and turns background tool state into a focused ambient presence. You get a small signal in the menu bar, a richer panel when you need context, and a companion that feels alive during long coding runs.
+Tachi is a small macOS menu bar app that shows your live AI-coding sessions and token spend — Claude Code, Codex, OpenCode, and more. It reads the local files those tools already write, so there is no account to create, no API key to paste, and nothing leaves your Mac.
 
-It is for people who live inside coding agents and want awareness without another dashboard.
+It is for people who live inside coding agents and want a quick pulse on what is running, without opening yet another dashboard.
 
 <p align="center">
-  <img src="docs/assets/tachi-panel.png" width="380" alt="Tachi menu bar panel showing live Claude Code and Codex usage cards">
+  <img src="docs/assets/tachi-panel.png" width="360" alt="Tachi menu bar panel with a live Claude Code usage card and a Codex quota card">
 </p>
 
-## Why Tachi
+## Supported tools
 
-The name is short, friendly, and easy to remember. It sounds like a little machine companion that stays close to your desk, notices the state of your work, and waits without getting in the way.
+Tachi picks up active sessions from the tools you already run, no setup:
 
-That is the product we want: an electronic pet for the AI era. Tachi does not write code for you. It keeps watch while your coding agents work, shows when sessions are active, and gives the background motion of Claude Code and Codex a face you can recognize.
-
-## Why It Exists
-
-AI coding tools create a lot of invisible motion. Sessions start, drift, pause, finish, and disappear into logs. Tachi gives that motion a home.
-
-It does not ask you to manage another workspace. It sits in the menu bar, reads the standard local traces from the tools you already use, and shows the state of your work with a low-friction interface.
-
-<p align="center">
-  <img src="docs/assets/tachi-local-flow.svg" alt="Claude Code and Codex local session data flowing into Tachi">
-</p>
-
-## What You Get
-
-| Experience | What it feels like |
+| Tool | Read from |
 | --- | --- |
-| Live session awareness | Claude Code and Codex activity appears without setup screens or manual import. |
-| Menu bar signal | A compact status readout changes as work becomes active. |
-| Companion panel | Open the panel when you want session context, token motion, and theme state. |
-| Cinematic themes | The eclipse theme gives long coding runs a visual mood instead of a utility-table look. |
-| Local-first monitoring | Tachi reads standard traces from your Mac. Your coding state stays close to the tools that created it. |
+| Claude Code | `~/.claude` session transcripts |
+| Codex | `~/.codex` sessions + quota |
+| OpenCode | local session database |
+| Claude Design | the Claude desktop app |
+| Pencil | running app |
 
-## Built Around Mood
+## What You See
 
-Tachi borrows from terminal glow, machine-room glass, and late-night coding rooms. The mark is a compact blue companion with a single lens, polished shell, and soft mechanical detail. It should feel like a small agent sitting at the edge of your workspace.
-
-The first theme still centers on a real eclipse motion: the light disappears as the moon covers the sun, and the stone form becomes the anchor of the scene.
+- **Live sessions in the menu bar.** A compact readout in the menu bar, and a click-away panel listing what is running, waiting, or idle across every supported tool.
+- **Real Claude Code usage.** Today / this week / this month cost and tokens, broken down per model (Opus, Sonnet, Haiku, …). It is computed locally from your own transcripts — the same approach as [`ccusage`](https://github.com/ryoppippi/ccusage) — so the numbers are yours, not an estimate, and no key is involved.
+- **Codex quota at a glance.** Your 5-hour and weekly windows with percent left and reset times.
+- **A desktop companion.** A small pet floats on your second monitor and reacts to how hard you are working — the more sessions running in parallel, the livelier it gets. Hover it to peek at the active task list; drag it anywhere. Four themes, each with its own companion.
 
 <p align="center">
-  <img src="docs/assets/tachi-companion.png" width="340" alt="Tachi desktop companion bubble showing active Claude Code sessions above the Laughing Man pet">
+  <img src="docs/assets/tachi-companion.png" width="320" alt="The Tachi desktop companion: a glass bubble of active sessions above the pet">
 </p>
 
-## Download & Install
+## Private by Design
 
-Grab the latest DMG from GitHub:
+<p align="center">
+  <img src="docs/assets/tachi-local-flow.svg" width="620" alt="Claude Code and Codex local traces both flow into Tachi, staying on your Mac">
+</p>
 
-[Download the latest release](https://github.com/seasonsolt/e-acc/releases/latest)
+Tachi is local-first, on purpose:
 
-1. Open `Tachi-<version>.dmg` and drag **Tachi.app** onto the **Applications** folder.
-2. Clear the download quarantine once (see below), then launch Tachi from Applications — it lives in the menu bar.
+- It reads only the standard session files the tools already keep on disk. Nothing is uploaded, and there is no telemetry.
+- No account and no API key are needed for session tracking or usage — it is all derived from local data.
+- The local link the app uses is bound to loopback, so it is not reachable from your network.
+- Open source, free, and a native Swift app. Requires macOS 14 (Sonoma) or later.
+
+## Install
+
+Grab the latest DMG:
+
+**[⬇ Download the latest release](https://github.com/seasonsolt/e-acc/releases/latest)**
+
+1. Open `Tachi-<version>.dmg` and drag **Tachi.app** onto **Applications**.
+2. Clear the download quarantine once (below), then launch Tachi — it lives in the menu bar.
 
 ### First launch: "Apple cannot verify Tachi"
 
-Tachi is an open-source, **ad-hoc-signed** build — there is no paid Apple Developer ID yet — so macOS Gatekeeper blocks it on first launch with *"Apple cannot verify 'Tachi' is free of malware."* On macOS 15 (Sequoia) that dialog no longer offers an **Open** button, so use one of these one-time fixes:
-
-**Terminal (recommended, one command):**
+Tachi is ad-hoc signed (there is no paid Apple Developer ID yet), so macOS blocks it the first time with *"Apple cannot verify 'Tachi' is free of malware."* On macOS 15 (Sequoia) that dialog no longer has an **Open** button, so use one of these one-time fixes:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Tachi.app
 ```
 
-Then double-click Tachi in Applications — it opens normally from then on.
+Then double-click Tachi — it opens normally from then on. (Or: try to open it once, then **System Settings → Privacy & Security → Open Anyway**.)
 
-**Or via System Settings:** try to open Tachi once, then go to **System Settings → Privacy & Security**, scroll to the message about Tachi, and click **Open Anyway**.
-
-This is expected for any unsigned app; it is not specific to Tachi. A fully frictionless install needs Developer ID signing + Apple notarization, which is on the roadmap.
+This is expected for any unsigned app. A fully frictionless install needs Developer ID signing and notarization, which is on the roadmap.
 
 ## Status
 
-Tachi is in early release.
-
-The app already tracks standard local Claude Code and Codex sessions and ships with setup screens removed. The next milestone is a signed macOS release with the Tachi name, icon, and cleaner install path.
+Early release, in active use. Session tracking and the Claude/Codex usage cards work today; the current build is unsigned. Next up is a signed, notarized release for a one-click install.
 
 ## For Builders
 
-This repository also contains the screen experience and supporting CLI pieces. The product-facing macOS app lives in `eacc-panel`, now branded as Tachi.
-
-Use the repository docs when you need implementation details. Start with Tachi when you want to understand the product.
+This is a monorepo. The macOS app is in [`eacc-panel`](eacc-panel) (Swift); a companion web screen and CLI live in [`eacc-screen`](eacc-screen). Start with `eacc-panel` to understand the product; see the in-repo docs for implementation details.
