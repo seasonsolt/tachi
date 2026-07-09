@@ -483,6 +483,15 @@ final class ViewModel {
         sessions.contains(where: { $0.status == .working })
     }
 
+    // Concurrent working sessions accelerate the companion's motion (e.g. the
+    // Cyber Signal outer ring spins faster). 1.0 = calm baseline; capped so a
+    // busy machine reads as energetic, not a blur.
+    var companionMotionTempo: Double {
+        let count = workingSessionCount
+        guard count > 0 else { return 1.0 }
+        return min(1.0 + 0.55 * Double(count), 4.0)
+    }
+
     var companionHeadline: String {
         switch companionMood {
         case .feasting:

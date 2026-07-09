@@ -162,8 +162,12 @@ struct OrigamiUnicornPetView: View {
     let accent: Color
     var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
+    var motionTempo: Double = 1.0
 
     @State private var rotationStartDate = Date()
+    // Captured when motion (re)starts so the sway frequency reflects the task
+    // tempo without a mid-swing phase jump when the count changes.
+    @State private var activeTempo: Double = 1.0
 
     private let paperHighlight = Color(red: 0.98, green: 0.99, blue: 1.0)
     private let paperMain = Color(red: 0.68, green: 0.72, blue: 0.78)
@@ -233,10 +237,12 @@ struct OrigamiUnicornPetView: View {
         .frame(width: 108, height: 108)
         .onAppear {
             rotationStartDate = .now
+            activeTempo = motionTempo
         }
         .onChange(of: hasMotion) { _, enabled in
             if enabled {
                 rotationStartDate = .now
+                activeTempo = motionTempo
             }
         }
     }
@@ -295,7 +301,7 @@ struct OrigamiUnicornPetView: View {
         guard hasMotion else { return 0 }
 
         let elapsed = max(0, date.timeIntervalSince(rotationStartDate))
-        return sin(elapsed / 3.2) * 3.0
+        return sin(elapsed / 3.2 * min(max(activeTempo, 1.0), 3.0)) * 3.0
     }
 
     private func drawOrigamiUnicorn(_ context: inout GraphicsContext, _ size: CGSize) {
@@ -534,6 +540,7 @@ struct MatrixPetView: View {
     let accent: Color
     var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
+    var motionTempo: Double = 1.0
 
     @State private var isFloating = false
     @State private var isGlowing = false
@@ -567,7 +574,7 @@ struct MatrixPetView: View {
             .frame(width: 108, height: 108)
             .offset(y: isFloating ? -3 * motionScale : 3 * motionScale)
         }
-        .animation(hasMotion ? .easeInOut(duration: 1.8).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isFloating)
+        .animation(hasMotion ? .easeInOut(duration: 1.8 / min(max(motionTempo, 1.0), 3.0)).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isFloating)
         .onAppear {
             isFloating = hasMotion
             isGlowing = hasMotion
@@ -618,13 +625,16 @@ struct MatrixPetView: View {
     }
 
     private var rainTempo: Double {
+        let moodFactor: Double
         switch mood {
-        case .feasting: return 1.0
-        case .alert: return 0.85
-        case .expecting: return 0.65
-        case .dozing: return 0.45
-        case .sleeping: return 0.3
+        case .feasting: moodFactor = 1.0
+        case .alert: moodFactor = 0.85
+        case .expecting: moodFactor = 0.65
+        case .dozing: moodFactor = 0.45
+        case .sleeping: moodFactor = 0.3
         }
+        // Concurrent working sessions drive the rain faster.
+        return moodFactor * motionTempo
     }
 
     private func drawMatrixCode(_ context: inout GraphicsContext, _ size: CGSize, time: TimeInterval) {
@@ -752,6 +762,7 @@ struct MonolithPetView: View {
     let accent: Color
     var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
+    var motionTempo: Double = 1.0
 
     @State private var isBreathing = false
 
@@ -881,7 +892,7 @@ struct MonolithPetView: View {
             }
         }
         .frame(width: 108, height: 108)
-        .animation(hasMotion ? .easeInOut(duration: 4.0).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isBreathing)
+        .animation(hasMotion ? .easeInOut(duration: 4.0 / min(max(motionTempo, 1.0), 3.0)).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isBreathing)
         .onAppear {
             isBreathing = hasMotion
         }

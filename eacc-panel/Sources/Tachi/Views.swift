@@ -820,7 +820,8 @@ struct CompanionCard: View {
                     accent: vm.companionPetAccent,
                     themeColors: panelColors,
                     hasMotion: vm.companionHasMotion,
-                    motionScale: 0.18
+                    motionScale: 0.18,
+                    motionTempo: vm.companionMotionTempo
                 )
                 .frame(width: 108, height: 108)
                 .scaleEffect(0.56)
@@ -852,7 +853,8 @@ struct CompanionCard: View {
                 accent: vm.companionPetAccent,
                 themeColors: panelColors,
                 hasMotion: vm.companionHasMotion,
-                motionScale: 0.18
+                motionScale: 0.18,
+                motionTempo: vm.companionMotionTempo
             )
             .frame(width: 108, height: 108)
             .scaleEffect(0.82)
@@ -978,19 +980,22 @@ struct CompanionPetView: View {
     let themeColors: EACCThemeColors
     var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
+    // Animation speed multiplier driven by the number of concurrent working
+    // sessions (1.0 = calm baseline).
+    var motionTempo: Double = 1.0
 
     var body: some View {
         switch persona {
         case .defaultOrb:
-            DefaultCompanionPetView(mood: mood, accent: accent, themeColors: themeColors, hasMotion: hasMotion, motionScale: motionScale)
+            DefaultCompanionPetView(mood: mood, accent: accent, themeColors: themeColors, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
         case .cyberSignal:
-            CyberSignalPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
+            CyberSignalPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
         case .matrixAgent:
-            MatrixPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
+            MatrixPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
         case .amberEye:
-            OrigamiUnicornPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
+            OrigamiUnicornPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
         case .voidMonolith:
-            MonolithPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale)
+            MonolithPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
         }
     }
 }
@@ -1001,6 +1006,7 @@ private struct DefaultCompanionPetView: View {
     let themeColors: EACCThemeColors
     var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
+    var motionTempo: Double = 1.0
 
     @State private var isFloating = false
     @State private var isOrbiting = false
@@ -1057,8 +1063,10 @@ private struct DefaultCompanionPetView: View {
         }
         .frame(width: 108, height: 108)
         .offset(y: isFloating ? -3 * motionScale : 3 * motionScale)
-        .animation(hasMotion ? .easeInOut(duration: 1.8).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isFloating)
-        .animation(hasMotion ? .linear(duration: 4.8).repeatForever(autoreverses: false) : .easeInOut(duration: 0.2), value: isOrbiting)
+        // Durations scale with the concurrent-task tempo; they re-apply whenever
+        // motion (re)starts, so a busier machine bobs and orbits faster.
+        .animation(hasMotion ? .easeInOut(duration: 1.8 / floatTempo).repeatForever(autoreverses: true) : .easeInOut(duration: 0.2), value: isFloating)
+        .animation(hasMotion ? .linear(duration: 4.8 / motionTempo).repeatForever(autoreverses: false) : .easeInOut(duration: 0.2), value: isOrbiting)
         .onAppear {
             isFloating = hasMotion
             isOrbiting = hasMotion
@@ -1068,6 +1076,8 @@ private struct DefaultCompanionPetView: View {
             isOrbiting = enabled
         }
     }
+
+    private var floatTempo: Double { min(max(motionTempo, 1.0), 3.0) }
 
     @ViewBuilder
     private var eye: some View {
@@ -1135,10 +1145,15 @@ private struct CyberSignalPetView: View {
     let accent: Color
     var hasMotion: Bool = true
     var motionScale: CGFloat = 1.0
+    var motionTempo: Double = 1.0
 
     @State private var isFloating = false
-    @State private var isRingRotating = false
-    @State private var rotationStartDate = Date()
+    // Seamless variable-speed ring: hold the frozen angle and the current
+    // angular speed so a tempo change continues smoothly instead of snapping
+    // back to 0°.
+    @State private var ringBaseDegrees: Double = 0
+    @State private var ringEpoch = Date()
+    @State private var ringDegPerSec: Double = 0
 
     private let teal = Color(red: 0, green: 85.0 / 255.0, blue: 119.0 / 255.0)
 
@@ -1231,21 +1246,15 @@ private struct CyberSignalPetView: View {
                     .aspectRatio(contentMode: .fit)
             }
 
-            // Layer 2: Rotating pre-rendered text ring
-            Image(nsImage: Self.ringTextImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .rotationEffect(
-                    .degrees(
-                        hasMotion && isRingRotating ? -360 : 0
-                    )
-                )
-                .animation(
-                    hasMotion
-                        ? .linear(duration: CyberSignalMotion.revolutionDuration).repeatForever(autoreverses: false)
-                        : .easeInOut(duration: 0.2),
-                    value: isRingRotating
-                )
+            // Layer 2: Rotating text ring. A TimelineView drives the angle from
+            // accumulated phase so its speed can follow the concurrent task
+            // count without snapping. Only this Image re-evaluates per frame.
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !hasMotion)) { timeline in
+                Image(nsImage: Self.ringTextImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .rotationEffect(.degrees(ringAngle(at: timeline.date)))
+            }
 
             // Layer 3: Static face (Canvas, redraws only on mood change)
             Canvas { context, size in
@@ -1255,29 +1264,39 @@ private struct CyberSignalPetView: View {
         .frame(width: 108, height: 108)
         .offset(y: isFloating ? -3 * motionScale : 3 * motionScale)
         .onAppear {
-            rotationStartDate = .now
-            isRingRotating = hasMotion
-            withAnimation(
-                hasMotion
-                    ? .easeInOut(duration: 2.2).repeatForever(autoreverses: true)
-                    : .easeInOut(duration: 0.2)
-            ) {
-                isFloating = hasMotion
-            }
+            resetRingSpeed()
+            withAnimation(floatAnimation) { isFloating = hasMotion }
         }
-        .onChange(of: hasMotion) { _, enabled in
-            if enabled {
-                rotationStartDate = .now
-            }
-            isRingRotating = enabled
-            withAnimation(
-                enabled
-                    ? .easeInOut(duration: 2.2).repeatForever(autoreverses: true)
-                    : .easeInOut(duration: 0.2)
-            ) {
-                isFloating = enabled
-            }
+        .onChange(of: hasMotion) { _, _ in
+            resetRingSpeed()
+            withAnimation(floatAnimation) { isFloating = hasMotion }
         }
+        .onChange(of: motionTempo) { _, _ in
+            // Freeze the angle reached so far, then continue at the new speed.
+            let now = Date()
+            ringBaseDegrees = ringAngle(at: now)
+            ringEpoch = now
+            ringDegPerSec = CyberSignalMotion.degreesPerSecond(hasMotion: hasMotion, tempo: motionTempo)
+        }
+    }
+
+    private func ringAngle(at date: Date) -> Double {
+        ringBaseDegrees + ringDegPerSec * date.timeIntervalSince(ringEpoch)
+    }
+
+    private func resetRingSpeed() {
+        let now = Date()
+        ringBaseDegrees = ringAngle(at: now)
+        ringEpoch = now
+        ringDegPerSec = CyberSignalMotion.degreesPerSecond(hasMotion: hasMotion, tempo: motionTempo)
+    }
+
+    private var floatAnimation: Animation {
+        // The gentle bob picks up tempo too, but bounded so it stays subtle.
+        let duration = 2.2 / min(max(motionTempo, 1.0), 3.0)
+        return hasMotion
+            ? .easeInOut(duration: duration).repeatForever(autoreverses: true)
+            : .easeInOut(duration: 0.2)
     }
 
     // All coordinates use the same 400×400 space as the ring SVG viewBox.
