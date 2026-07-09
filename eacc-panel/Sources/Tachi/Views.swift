@@ -629,21 +629,13 @@ struct ContentView: View {
                     .font(skin.mono(12, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(panelColors.textSecondary)
-                Spacer()
-                Text("\(vm.menuSessions.count) WATCHING")
-                    .font(skin.mono(9, weight: .bold))
-                    .tracking(1.0)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(panelColors.accent.opacity(0.10))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .strokeBorder(panelColors.accent.opacity(0.25), lineWidth: 1)
-                    )
-                    .foregroundStyle(panelColors.accent)
+                Spacer(minLength: 8)
+                // Session counts live here now (moved out of the companion card).
+                HStack(spacing: 10) {
+                    sessionCountChip(vm.workingSessionCount, "live", panelColors.textPrimary)
+                    sessionCountChip(vm.waitingSessionCount, "waiting", panelColors.accent)
+                    sessionCountChip(vm.warmSessionCount, "warm", auroraPurple)
+                }
             }
 
             ForEach(vm.menuSessions) { session in
@@ -652,6 +644,17 @@ struct ContentView: View {
         }
         .padding(16)
         .ritualDataCard(themeColors: panelColors, emphasis: panelColors.accent, radius: 18)
+    }
+
+    private func sessionCountChip(_ value: Int, _ label: String, _ tint: Color) -> some View {
+        HStack(spacing: 4) {
+            Text("\(value)")
+                .font(skin.mono(12, weight: .bold).monospacedDigit())
+                .foregroundStyle(tint)
+            Text(label)
+                .font(skin.mono(9, weight: .medium))
+                .foregroundStyle(skin.textMuted)
+        }
     }
 
     private var providersSection: some View {
@@ -734,27 +737,8 @@ struct CompanionCard: View {
                 }
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             }
-
-            if vm.selectedTheme == .voidTheme {
-                // Odyssey (5A): flat three-column readout split by hairlines.
-                HStack(spacing: 0) {
-                    voidStatColumn(value: vm.workingSessionCount, label: "LIVE", divider: true)
-                    voidStatColumn(value: vm.waitingSessionCount, label: "WAITING", divider: true)
-                    voidStatColumn(value: vm.warmSessionCount, label: "WARM", divider: false)
-                }
-                .padding(.top, 12)
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Color.black.opacity(0.08))
-                        .frame(height: 1)
-                }
-            } else {
-                HStack(spacing: 8) {
-                    statTile(value: vm.workingSessionCount, label: "live", tint: panelColors.textPrimary)
-                    statTile(value: vm.waitingSessionCount, label: "waiting", tint: panelColors.accent)
-                    statTile(value: vm.warmSessionCount, label: "warm", tint: auroraPurple)
-                }
-            }
+            // Session counts moved to the "AI CODING SESSIONS" header so the
+            // menu shows them once, next to the list they summarize.
         }
         .padding(18)
         .background(
@@ -867,47 +851,6 @@ struct CompanionCard: View {
         )
     }
 
-    private func voidStatColumn(value: Int, label: String, divider: Bool) -> some View {
-        VStack(spacing: 3) {
-            Text("\(value)")
-                .font(skin.mono(20, weight: .regular).monospacedDigit())
-                .foregroundStyle(panelColors.textPrimary)
-            Text(label)
-                .font(skin.display(10, weight: .medium))
-                .tracking(2)
-                .foregroundStyle(skin.textMuted)
-        }
-        .frame(maxWidth: .infinity)
-        .overlay(alignment: .trailing) {
-            if divider {
-                Rectangle()
-                    .fill(Color.black.opacity(0.08))
-                    .frame(width: 1)
-            }
-        }
-    }
-
-    private func statTile(value: Int, label: String, tint: Color) -> some View {
-        VStack(spacing: 2) {
-            Text("\(value)")
-                .font(skin.display(18, weight: .bold).monospacedDigit())
-                .foregroundStyle(tint)
-            Text(label)
-                .font(skin.mono(10, weight: .semibold))
-                .tracking(0.8)
-                .foregroundStyle(skin.textMuted)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(tint.opacity(0.07))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .strokeBorder(tint.opacity(0.18), lineWidth: 1)
-        )
-    }
 }
 
 struct CompanionPersonaMenu: View {
