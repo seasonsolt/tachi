@@ -138,6 +138,7 @@ final class ViewModel {
     var items: [AccountWithUsage] = []
     var sessions: [CodingSession] = []
     var codexRateLimits: CodexRateLimitSnapshot?
+    var claudeUsage: ClaudeUsageSnapshot?
     var claudeStats: ClaudeStats?
     var isLoading = true
     var lastUpdated: Date?
