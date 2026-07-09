@@ -64,17 +64,43 @@ final class FloatingPetWindowPlacementTests: XCTestCase {
         XCTAssertEqual(collapsedAgain.origin.y, draggedFrame.origin.y)
     }
 
-    func testPetDragUsesSwiftUIGestureCoordinates() {
-        let startFrame = CGRect(x: 240, y: 260, width: 168, height: 172)
-
+    func testPetDragFollowsAbsoluteCursorDelta() {
+        // Window at origin (240,260); cursor moved +42 right, +18 up (screen
+        // coords are y-up, matching setFrameOrigin), so the window follows the
+        // cursor 1:1 — the same delta, no shrink-back.
         let dragged = FloatingPetWindowPlacement.draggedFrame(
-            startFrame: startFrame,
-            translation: CGSize(width: 42, height: 18)
+            anchorOrigin: CGPoint(x: 240, y: 260),
+            anchorMouse: CGPoint(x: 900, y: 500),
+            currentMouse: CGPoint(x: 942, y: 518),
+            size: CGSize(width: 168, height: 172)
         )
 
         XCTAssertEqual(dragged.origin.x, 282)
-        XCTAssertEqual(dragged.origin.y, 242)
-        XCTAssertEqual(dragged.size.width, startFrame.size.width)
-        XCTAssertEqual(dragged.size.height, startFrame.size.height)
+        XCTAssertEqual(dragged.origin.y, 278)
+        XCTAssertEqual(dragged.size.width, 168)
+        XCTAssertEqual(dragged.size.height, 172)
+    }
+
+    func testPetDragIsStableWhenCursorHoldsStillAsWindowMoves() {
+        // Regression for the oscillation: re-evaluating the drag with the SAME
+        // cursor position must return the SAME origin, no matter where the
+        // window currently is. (The old translation-based math moved the window
+        // a little every frame even when the cursor was stationary.)
+        let anchorOrigin = CGPoint(x: 240, y: 260)
+        let anchorMouse = CGPoint(x: 900, y: 500)
+        let heldMouse = CGPoint(x: 960, y: 500)
+
+        let first = FloatingPetWindowPlacement.draggedFrame(
+            anchorOrigin: anchorOrigin, anchorMouse: anchorMouse,
+            currentMouse: heldMouse, size: CGSize(width: 168, height: 172)
+        )
+        let second = FloatingPetWindowPlacement.draggedFrame(
+            anchorOrigin: anchorOrigin, anchorMouse: anchorMouse,
+            currentMouse: heldMouse, size: CGSize(width: 168, height: 172)
+        )
+
+        XCTAssertEqual(first.origin.x, 300)
+        XCTAssertEqual(second.origin.x, first.origin.x)
+        XCTAssertEqual(second.origin.y, first.origin.y)
     }
 }
