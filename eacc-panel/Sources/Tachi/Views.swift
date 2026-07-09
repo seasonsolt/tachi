@@ -586,9 +586,6 @@ struct ContentView: View {
                 if let snapshot = vm.codexRateLimits {
                     codexUsageSection(snapshot)
                 }
-                if !vm.nonClaudeRecipeSources.isEmpty {
-                    recipeSourcesSection
-                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
@@ -729,32 +726,6 @@ struct ContentView: View {
     private func codexUsageSection(_ snapshot: CodexRateLimitSnapshot) -> some View {
         CodexQuotaCard(snapshot: snapshot, themeColors: panelColors)
     }
-
-    // MARK: - Recipe Sources
-
-    private var recipeSourcesSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(panelColors.accent)
-                Text("COLLECTORS")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(panelColors.textSecondary)
-                Spacer()
-                Text("\(vm.nonClaudeRecipeSources.filter { $0.data.connected }.count) live")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(panelColors.accent.opacity(0.7))
-            }
-            .padding(.horizontal, 4)
-
-            ForEach(vm.nonClaudeRecipeSources) { source in
-                RecipeSourceCard(name: source.name, data: source.data, themeColors: panelColors)
-            }
-        }
-        .ritualSection(themeColors: panelColors, accent: panelColors.accent)
-    }
-
 
     private var providersSection: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -1464,97 +1435,6 @@ private struct CyberSignalPetView: View {
 
 // MARK: - Provider Card (Unified)
 
-// MARK: - Recipe Source Card
-
-struct RecipeSourceCard: View {
-    let name: String
-    let data: EACCSourceData
-    let themeColors: EACCThemeColors
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Header: name + status
-            HStack {
-                Circle()
-                    .fill(data.connected ? Color.green : Color.gray)
-                    .frame(width: 6, height: 6)
-                Text(name)
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(themeColors.textPrimary)
-                Spacer()
-            }
-
-            if data.connected || data.totalTokens > 0 {
-                let hasToday = data.todayCostUSD > 0 || data.todayTokens > 0
-
-                if hasToday {
-                    // Line 1: TODAY (hero) — only when today data exists
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("TODAY")
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .foregroundStyle(themeColors.accent.opacity(0.7))
-                        Spacer()
-                        Text(formatCost(data.todayCostUSD))
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
-                            .foregroundStyle(themeColors.accent)
-                        Text("/ \(formatCount(data.todayTokens))")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(themeColors.textSecondary)
-                    }
-                }
-
-                // Summary row: month (if available) + total
-                let hasMonth = data.monthCostUSD > 0 || data.monthTokens > 0
-                HStack(spacing: 0) {
-                    if hasMonth {
-                        periodItem("MONTH", formatCost(data.monthCostUSD), formatCount(data.monthTokens))
-                        Spacer()
-                    }
-                    // Total — hero style when no today data
-                    if hasToday || hasMonth {
-                        periodItem("TOTAL", formatCost(data.costUSD), formatCount(data.totalTokens))
-                    } else {
-                        // Total is the only data — show it big
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("TOTAL")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundStyle(themeColors.accent.opacity(0.7))
-                            Spacer()
-                            Text(formatCost(data.costUSD))
-                                .font(.system(size: 16, weight: .bold, design: .monospaced))
-                                .foregroundStyle(themeColors.accent)
-                            Text("/ \(formatCount(data.totalTokens))")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(themeColors.textSecondary)
-                        }
-                    }
-                }
-            } else {
-                Text("Waiting for data...")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(themeColors.textMuted)
-            }
-        }
-        .padding(10)
-        .ritualDataCard(themeColors: themeColors, radius: 12)
-    }
-
-    private func periodItem(_ label: String, _ cost: String, _ tokens: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundStyle(themeColors.textMuted)
-            HStack(spacing: 3) {
-                Text(cost)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(themeColors.textSecondary)
-                Text(tokens)
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(themeColors.textMuted)
-            }
-        }
-    }
-}
 
 struct ProviderCard: View {
     let provider: ProviderSummary

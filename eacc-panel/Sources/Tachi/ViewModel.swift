@@ -221,16 +221,6 @@ final class ViewModel {
         }
     }
 
-    // Local Claude Code token usage comes through the built-in "claude-code"
-    // collector; surface it as its own prominent card, separate from the rest.
-    var claudeSource: RecipeSourceInfo? {
-        recipeSources.first { $0.id == "claude-code" }
-    }
-
-    var nonClaudeRecipeSources: [RecipeSourceInfo] {
-        recipeSources.filter { $0.id != "claude-code" }
-    }
-
     var providers: [ProviderSummary] {
         var result: [ProviderSummary] = []
 
