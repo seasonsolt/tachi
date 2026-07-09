@@ -384,7 +384,8 @@ struct DesktopPetView: View {
                     accent: vm.companionPetAccent,
                     themeColors: vm.themeColors,
                     hasMotion: vm.companionHasMotion,
-                    motionScale: 0.12
+                    motionScale: 0.12,
+                    motionTempo: vm.companionMotionTempo
                 )
                 .scaleEffect(companionCelebrationScale)
                 .rotationEffect(.degrees(companionCelebrationRotation))
