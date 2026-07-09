@@ -172,13 +172,19 @@ struct FloatingPetWindowPlacement {
         )
     }
 
-    static func draggedFrame(startFrame: CGRect, translation: CGSize) -> CGRect {
+    // Drag by the delta of the ABSOLUTE cursor position (screen coordinates),
+    // not by SwiftUI's DragGesture.translation. Translation is measured in the
+    // pet view's own coordinate space, which moves with the window as we drag
+    // it — so following the cursor shrinks the translation back toward zero and
+    // the window shivers/oscillates. Anchoring to the absolute mouse removes
+    // that feedback loop entirely.
+    static func draggedFrame(anchorOrigin: CGPoint, anchorMouse: CGPoint, currentMouse: CGPoint, size: CGSize) -> CGRect {
         CGRect(
             origin: CGPoint(
-                x: startFrame.minX + translation.width,
-                y: startFrame.minY - translation.height
+                x: anchorOrigin.x + (currentMouse.x - anchorMouse.x),
+                y: anchorOrigin.y + (currentMouse.y - anchorMouse.y)
             ),
-            size: startFrame.size
+            size: size
         )
     }
 
@@ -197,7 +203,8 @@ final class FloatingPetWindowController {
     static let shared = FloatingPetWindowController()
 
     private var panel: NSPanel?
-    private var dragStartFrame: NSRect?
+    private var dragAnchorMouse: NSPoint?
+    private var dragAnchorOrigin: NSPoint?
 
     func show(vm: ViewModel) {
         let initialSize = DesktopPetView.panelSize(for: vm, showingPreview: false)
@@ -222,7 +229,9 @@ final class FloatingPetWindowController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        panel.isMovableByWindowBackground = true
+        // We drive dragging ourselves via the pet's gesture; AppKit's own
+        // background drag would move the same window in parallel and fight it.
+        panel.isMovableByWindowBackground = false
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.isReleasedWhenClosed = false
@@ -237,11 +246,12 @@ final class FloatingPetWindowController {
         let view = DesktopPetView(vm: vm) { [weak self, weak panel] size in
             guard let self, let panel else { return }
             self.applySize(size, to: panel)
-        } onPanelDragChange: { [weak self, weak panel] translation in
+        } onPanelDragChange: { [weak self, weak panel] in
             guard let self, let panel else { return }
-            self.applyDrag(translation, to: panel)
+            self.applyDrag(to: panel)
         } onPanelDragEnd: { [weak self] in
-            self?.dragStartFrame = nil
+            self?.dragAnchorMouse = nil
+            self?.dragAnchorOrigin = nil
         }
         if let hosting = panel.contentView as? NSHostingView<DesktopPetView> {
             hosting.rootView = view
@@ -275,15 +285,19 @@ final class FloatingPetWindowController {
         panel.setFrame(targetFrame, display: true)
     }
 
-    private func applyDrag(_ translation: CGSize, to panel: NSPanel) {
-        if dragStartFrame == nil {
-            dragStartFrame = panel.frame
+    private func applyDrag(to panel: NSPanel) {
+        let mouse = NSEvent.mouseLocation
+        if dragAnchorMouse == nil {
+            dragAnchorMouse = mouse
+            dragAnchorOrigin = panel.frame.origin
         }
-        guard let dragStartFrame else { return }
+        guard let dragAnchorMouse, let dragAnchorOrigin else { return }
 
         let targetFrame = FloatingPetWindowPlacement.draggedFrame(
-            startFrame: dragStartFrame,
-            translation: translation
+            anchorOrigin: dragAnchorOrigin,
+            anchorMouse: dragAnchorMouse,
+            currentMouse: mouse,
+            size: panel.frame.size
         )
         panel.setFrameOrigin(targetFrame.origin)
     }
@@ -300,7 +314,7 @@ struct DesktopPetView: View {
 
     let vm: ViewModel
     var onPanelSizeChange: ((CGSize) -> Void)? = nil
-    var onPanelDragChange: ((CGSize) -> Void)? = nil
+    var onPanelDragChange: (() -> Void)? = nil
     var onPanelDragEnd: (() -> Void)? = nil
     // One hover region for the whole panel (pet + bubble + the gap between
     // them). Two separate tracking areas left a dead zone that collapsed the
@@ -381,12 +395,15 @@ struct DesktopPetView: View {
                 .frame(width: 124, height: 124)
                 .contentShape(Rectangle())
                 .gesture(
-                    DragGesture(minimumDistance: 1)
-                        .onChanged { value in
+                    DragGesture(minimumDistance: 2)
+                        .onChanged { _ in
                             if !isDraggingCompanion {
                                 beginCompanionDrag()
                             }
-                            onPanelDragChange?(value.translation)
+                            // Movement is driven from the absolute cursor
+                            // position in the controller, not this gesture's
+                            // (window-relative) translation.
+                            onPanelDragChange?()
                         }
                         .onEnded { _ in
                             isDraggingCompanion = false
