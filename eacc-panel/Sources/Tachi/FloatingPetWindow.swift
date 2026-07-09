@@ -656,7 +656,10 @@ struct DesktopPetView: View {
         )
         .shadow(color: panelColors.accent.opacity(style.isOpaque ? 0 : 0.18), radius: 40, y: 12)
         .shadow(color: .black.opacity(style.isOpaque ? 0.28 : 0.32), radius: 26, y: 14)
-        .fixedSize(horizontal: false, vertical: true)
+        // NOTE: no .fixedSize here — with the scrolling session list inside, a
+        // vertical fixedSize fights the ScrollView's frame and drives a layout
+        // cycle (bubble balloons to all rows, panel oscillates). The content is
+        // already a definite height (bounded scroll viewport), so it isn't needed.
     }
 
     private static let bubbleTailDepth: CGFloat = 12
