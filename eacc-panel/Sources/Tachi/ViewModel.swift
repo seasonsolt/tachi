@@ -272,10 +272,6 @@ final class ViewModel {
         sessions.filter { $0.tool == .codex }.count
     }
 
-    var warmSessionCount: Int {
-        sessions.filter { $0.pulse == .hot || $0.pulse == .warm }.count
-    }
-
     var dominantSession: CodingSession? {
         sessions.sorted { lhs, rhs in
             if lhs.pulse != rhs.pulse { return lhs.pulse.rawValue > rhs.pulse.rawValue }
@@ -285,16 +281,6 @@ final class ViewModel {
 
     var companionTaskPreviewSessions: [CodingSession] {
         activeSessions.sorted { lhs, rhs in
-            if lhs.status != rhs.status {
-                return sessionPriority(lhs.status) < sessionPriority(rhs.status)
-            }
-            if lhs.pulse != rhs.pulse { return lhs.pulse.rawValue > rhs.pulse.rawValue }
-            return lhs.lastActivity > rhs.lastActivity
-        }
-    }
-
-    var menuSessions: [CodingSession] {
-        sessions.sorted { lhs, rhs in
             if lhs.status != rhs.status {
                 return sessionPriority(lhs.status) < sessionPriority(rhs.status)
             }
