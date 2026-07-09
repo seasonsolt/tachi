@@ -316,11 +316,19 @@ private extension View {
 
 // MARK: - Content View
 
+private struct MenuContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct ContentView: View {
     @Bindable var vm: ViewModel
 
     private let panelWidth: CGFloat = 400
     private let scrollMaxHeight: CGFloat = 560
+    @State private var measuredContentHeight: CGFloat = 0
 
     private var panelColors: EACCThemeColors {
         vm.panelThemeColors
@@ -562,8 +570,14 @@ struct ContentView: View {
     }
 
     private var scrollContent: some View {
+        // Measure the natural content height and clamp the ScrollView to
+        // min(content, scrollMaxHeight). A plain `.frame(maxHeight:) +
+        // .fixedSize(vertical:)` fights the ScrollView once content exceeds the
+        // cap — fixedSize forces full content height, so the menu balloons and
+        // the MenuBarExtra window oscillates. Measuring gives a definite,
+        // capped, scrollable height with no layout cycle.
         ScrollView {
-            LazyVStack(spacing: 16) {
+            VStack(spacing: 16) {
                 companionSection
                 if let usage = vm.claudeUsage,
                    usage.month.costUSD > 0 || !usage.month.models.isEmpty {
@@ -578,10 +592,17 @@ struct ContentView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(key: MenuContentHeightKey.self, value: geo.size.height)
+                }
+            )
         }
         .frame(maxWidth: .infinity)
-        .frame(maxHeight: scrollMaxHeight)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(height: measuredContentHeight <= 0
+            ? nil
+            : min(measuredContentHeight, scrollMaxHeight))
+        .onPreferenceChange(MenuContentHeightKey.self) { measuredContentHeight = $0 }
     }
 
     private var companionSection: some View {
