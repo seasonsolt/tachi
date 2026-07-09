@@ -3,3 +3,8 @@ EACCMonitor.app/
 Monolith.app/
 .swiftpm/
 .DS_Store
+
+# Release build artifacts
+*.dmg
+*.dmg.sha256
+*.zip
