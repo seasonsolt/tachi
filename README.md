@@ -56,6 +56,10 @@ Tachi borrows from terminal glow, machine-room glass, and late-night coding room
 
 The first theme still centers on a real eclipse motion: the light disappears as the moon covers the sun, and the stone form becomes the anchor of the scene.
 
+<p align="center">
+  <img src="docs/assets/tachi-companion.png" width="340" alt="Tachi desktop companion bubble showing active Claude Code sessions above the Laughing Man pet">
+</p>
+
 ## Download & Install
 
 Grab the latest DMG from GitHub:
