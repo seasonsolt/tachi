@@ -25,6 +25,11 @@ final class WebSocketServer: @unchecked Sendable {
         wsOptions.autoReplyPing = true
 
         let params = NWParameters.tcp
+        // Bind to the loopback interface only. The intended client is the local
+        // eacc-screen SPA on the same machine; without this the listener binds
+        // every interface (0.0.0.0/::) and exposes session paths, prompts, and
+        // usage figures to anyone on the same LAN.
+        params.requiredInterfaceType = .loopback
         params.defaultProtocolStack.applicationProtocols.insert(wsOptions, at: 0)
 
         do {

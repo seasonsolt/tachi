@@ -442,7 +442,10 @@ export function startServer(port: number, options?: StartServerOptions): { close
     }
   });
 
-  const server = serve({ fetch: app.fetch, port }, () => {
+  // Bind to loopback only. Without an explicit hostname the server listens on
+  // every interface (0.0.0.0/::), exposing the API and /ws — which stream
+  // session cwd/prompt/usage data — to anyone on the same LAN.
+  const server = serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }, () => {
     // Server started.
   });
 
