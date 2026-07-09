@@ -929,6 +929,10 @@ struct CompanionPersonaMenu: View {
                 Text(vm.companionPersonaMode.badge)
                     .font(skin.mono(isProminent ? 11 : 10, weight: .bold))
                     .tracking(isProminent ? 1.0 : 0.8)
+                    // Names like "PET LAUGHING MAN" are longer than the old codes;
+                    // shrink to fit rather than overflow the compact header.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Image(systemName: "chevron.down")
                     .font(.system(size: isProminent ? 8 : 7, weight: .bold))
                     .foregroundStyle(skin.textMuted)

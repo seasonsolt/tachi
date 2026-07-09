@@ -44,10 +44,11 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
         switch self {
         case .automatic: return "自动 Auto (follows theme)"
         case .defaultOrb: return "光球 Orb"
-        case .cyberSignal: return "赛博信号 Cyber Signal"
-        case .matrixAgent: return "母体代码 Matrix Code"
+        // Source homages keep their original names, unstyled.
+        case .cyberSignal: return "Laughing Man"
+        case .matrixAgent: return "Digital Rain"
         case .amberEye: return "折纸 Folded Signal"
-        case .voidMonolith: return "石碑 Monolith"
+        case .voidMonolith: return "Monolith"
         }
     }
 
@@ -55,8 +56,8 @@ enum CompanionPersonaMode: String, CaseIterable, Equatable {
         switch self {
         case .automatic: return "PET AUTO"
         case .defaultOrb: return "PET ORB"
-        case .cyberSignal: return "PET CYBER"
-        case .matrixAgent: return "PET MATRIX"
+        case .cyberSignal: return "PET LAUGHING MAN"
+        case .matrixAgent: return "PET DIGITAL RAIN"
         case .amberEye: return "PET UN"
         case .voidMonolith: return "PET MONOLITH"
         }

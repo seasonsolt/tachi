@@ -611,11 +611,12 @@ struct DesktopPetView: View {
                     .font(skin.display(13, weight: style.headerUppercase ? .medium : .semibold))
                     .tracking(style.headerTracking)
                     .foregroundStyle(panelColors.textPrimary)
+                    .lineLimit(1)
                     .shadow(
                         color: style.matrixEffects ? panelColors.accent.opacity(0.45) : .clear,
                         radius: style.matrixEffects ? 6 : 0
                     )
-                Spacer()
+                Spacer(minLength: 4)
                 CompanionPersonaMenu(
                     vm: vm,
                     accent: panelColors.accent
