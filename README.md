@@ -21,7 +21,7 @@ Tachi watches your local Claude Code and Codex work, keeps a pulse on active ses
 It is for people who live inside coding agents and want awareness without another dashboard.
 
 <p align="center">
-  <img src="docs/assets/tachi-panel-preview.svg" alt="Tachi menu bar panel preview with live Claude Code and Codex session cards">
+  <img src="docs/assets/tachi-panel.png" width="380" alt="Tachi menu bar panel showing live Claude Code and Codex usage cards">
 </p>
 
 ## Why Tachi
