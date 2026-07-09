@@ -54,7 +54,8 @@ async function main() {
 
   const { close } = startServer(port, { marketMode, marketHubUrl });
 
-  const url = `http://localhost:${port}`;
+  // Match the loopback bind (127.0.0.1) so localhost→::1 resolution can't miss.
+  const url = `http://127.0.0.1:${port}`;
   console.log(`  \x1b[2mServing at\x1b[0m \x1b[36m${url}\x1b[0m\n`);
 
   if (!noOpen) {
