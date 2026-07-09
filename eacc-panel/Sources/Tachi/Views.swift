@@ -565,10 +565,13 @@ struct ContentView: View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 companionSection
+                if let claude = vm.claudeSource {
+                    claudeUsageSection(claude)
+                }
                 if let snapshot = vm.codexRateLimits {
                     codexUsageSection(snapshot)
                 }
-                if !vm.recipeSources.isEmpty {
+                if !vm.nonClaudeRecipeSources.isEmpty {
                     recipeSourcesSection
                 }
             }
@@ -582,6 +585,26 @@ struct ContentView: View {
 
     private var companionSection: some View {
         CompanionCard(vm: vm)
+    }
+
+    // MARK: - Claude Usage
+
+    private func claudeUsageSection(_ source: ViewModel.RecipeSourceInfo) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(panelColors.accent)
+                Text("CLAUDE USAGE")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(panelColors.textSecondary)
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+
+            RecipeSourceCard(name: source.name, data: source.data, themeColors: panelColors)
+        }
+        .ritualSection(themeColors: panelColors, accent: panelColors.accent)
     }
 
     // MARK: - Codex Usage
@@ -602,13 +625,13 @@ struct ContentView: View {
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundStyle(panelColors.textSecondary)
                 Spacer()
-                Text("\(vm.recipeSources.filter { $0.data.connected }.count) live")
+                Text("\(vm.nonClaudeRecipeSources.filter { $0.data.connected }.count) live")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(panelColors.accent.opacity(0.7))
             }
             .padding(.horizontal, 4)
 
-            ForEach(vm.recipeSources) { source in
+            ForEach(vm.nonClaudeRecipeSources) { source in
                 RecipeSourceCard(name: source.name, data: source.data, themeColors: panelColors)
             }
         }

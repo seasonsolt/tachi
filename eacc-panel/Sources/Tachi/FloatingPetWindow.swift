@@ -584,14 +584,22 @@ struct DesktopPetView: View {
         )
     }
 
+    // Real card height: chip row (~20) + two-line title (~32) + meta row (26)
+    // + internal spacing. Underestimating clips the bubble at the panel edge.
+    private static let bubbleRowHeight: CGFloat = 96
+    private static let bubbleRowSpacing: CGFloat = 10
+    private static var bubbleViewportHeight: CGFloat {
+        let n = CGFloat(ViewModel.companionTaskVisibleRowCap)
+        return n * bubbleRowHeight + (n - 1) * bubbleRowSpacing
+    }
+
     private static func estimatedBubbleHeight(for vm: ViewModel) -> CGFloat {
-        let taskCount = max(1, vm.companionTaskVisibleSessions.count)
-        // Real card height: chip row (~20) + two-line title (~32) + meta row (26)
-        // + internal spacing. Underestimating clips the bubble at the panel edge.
-        let itemHeight: CGFloat = 96
-        let itemSpacing: CGFloat = CGFloat(max(0, taskCount - 1)) * 10
+        // Past the row cap the list scrolls, so the panel height is fixed at the
+        // viewport rather than growing with every extra session.
+        let rows = min(max(1, vm.companionTaskVisibleSessions.count), ViewModel.companionTaskVisibleRowCap)
+        let itemSpacing: CGFloat = CGFloat(max(0, rows - 1)) * bubbleRowSpacing
         let footerHeight: CGFloat = vm.companionTaskFooter == nil ? 0 : 26
-        return 66 + bubbleTailDepth + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
+        return 66 + bubbleTailDepth + (CGFloat(rows) * bubbleRowHeight) + itemSpacing + footerHeight
     }
 
     private var taskBubble: some View {
@@ -623,11 +631,7 @@ struct DesktopPetView: View {
                 )
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(vm.companionTaskVisibleSessions) { session in
-                    taskPreviewItem(session, panelColors: panelColors, style: style)
-                }
-            }
+            sessionList(panelColors: panelColors, style: style)
 
             if let footer = vm.companionTaskFooter {
                 Text(footer)
@@ -702,6 +706,24 @@ struct DesktopPetView: View {
             )
         }
         .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private func sessionList(panelColors: EACCThemeColors, style: BubbleSkinStyle) -> some View {
+        let sessions = vm.companionTaskVisibleSessions
+        let rows = VStack(alignment: .leading, spacing: Self.bubbleRowSpacing) {
+            ForEach(sessions) { session in
+                taskPreviewItem(session, panelColors: panelColors, style: style)
+            }
+        }
+        if sessions.count > ViewModel.companionTaskVisibleRowCap {
+            // More than the cap: scroll inside a fixed viewport instead of
+            // growing the panel off-screen.
+            ScrollView(.vertical, showsIndicators: true) { rows }
+                .frame(height: Self.bubbleViewportHeight)
+        } else {
+            rows
+        }
     }
 
     private func taskPreviewItem(
