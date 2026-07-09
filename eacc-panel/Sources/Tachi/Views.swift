@@ -6,7 +6,6 @@ let redAccent = Color(red: 1.0, green: 0.28, blue: 0.28)
 let purpleAccent = Color(red: 0.58, green: 0.38, blue: 1.0)
 let matrixGreen = Color(red: 0, green: 0.9, blue: 0.4)
 
-private let auroraPurple = Color(red: 167.0 / 255.0, green: 139.0 / 255.0, blue: 250.0 / 255.0)
 private let auroraGreen = Color(red: 52.0 / 255.0, green: 211.0 / 255.0, blue: 153.0 / 255.0)
 private let auroraAmber = Color(red: 245.0 / 255.0, green: 158.0 / 255.0, blue: 11.0 / 255.0)
 private let auroraRed = Color(red: 248.0 / 255.0, green: 113.0 / 255.0, blue: 113.0 / 255.0)
@@ -569,9 +568,6 @@ struct ContentView: View {
                 if let snapshot = vm.codexRateLimits {
                     codexUsageSection(snapshot)
                 }
-                if !vm.menuSessions.isEmpty {
-                    sessionsSection
-                }
                 if !vm.recipeSources.isEmpty {
                     recipeSourcesSection
                 }
@@ -619,43 +615,6 @@ struct ContentView: View {
         .ritualSection(themeColors: panelColors, accent: panelColors.accent)
     }
 
-    private var sessionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "waveform.path")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(skin.accentEdge)
-                Text("AI CODING SESSIONS")
-                    .font(skin.mono(12, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(panelColors.textSecondary)
-                Spacer(minLength: 8)
-                // Session counts live here now (moved out of the companion card).
-                HStack(spacing: 10) {
-                    sessionCountChip(vm.workingSessionCount, "live", panelColors.textPrimary)
-                    sessionCountChip(vm.waitingSessionCount, "waiting", panelColors.accent)
-                    sessionCountChip(vm.warmSessionCount, "warm", auroraPurple)
-                }
-            }
-
-            ForEach(vm.menuSessions) { session in
-                SessionRow(session: session, themeColors: panelColors)
-            }
-        }
-        .padding(16)
-        .ritualDataCard(themeColors: panelColors, emphasis: panelColors.accent, radius: 18)
-    }
-
-    private func sessionCountChip(_ value: Int, _ label: String, _ tint: Color) -> some View {
-        HStack(spacing: 4) {
-            Text("\(value)")
-                .font(skin.mono(12, weight: .bold).monospacedDigit())
-                .foregroundStyle(tint)
-            Text(label)
-                .font(skin.mono(9, weight: .medium))
-                .foregroundStyle(skin.textMuted)
-        }
-    }
 
     private var providersSection: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -2124,115 +2083,6 @@ struct CodexQuotaCard: View {
         formatter.locale = Locale.autoupdatingCurrent
         formatter.dateFormat = "EEE M/d HH:mm"
         return formatter.string(from: date)
-    }
-}
-
-// MARK: - Session Row
-
-struct SessionRow: View {
-    let session: CodingSession
-    let themeColors: EACCThemeColors
-
-    private var skin: EACCThemeColors { themeColors }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 6) {
-                    Text(session.projectName)
-                        .font(skin.mono(12, weight: .bold))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .foregroundStyle(themeColors.textPrimary)
-
-                    Text(statusLabel)
-                        .font(skin.mono(10, weight: .semibold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(statusChipColor.opacity(0.12))
-                        )
-                        .foregroundStyle(statusChipColor)
-                        .lineLimit(1)
-                }
-
-                Text(agentStatusLine)
-                    .font(skin.mono(11, weight: .medium))
-                    .foregroundStyle(themeColors.textSecondary)
-                    .lineLimit(1)
-            }
-            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-
-            Button {
-                Task { @MainActor in
-                    SessionLauncher.open(session)
-                }
-            } label: {
-                Image(systemName: "arrow.up.forward")
-                    .font(.system(size: 13, weight: .bold))
-                    .frame(width: 32, height: 32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(statusColor.opacity(0.12))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .strokeBorder(statusColor.opacity(0.28), lineWidth: 1)
-                    )
-                    .foregroundStyle(statusColor)
-            }
-            .buttonStyle(.plain)
-            .help("Open \(session.tool.rawValue)")
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(themeColors.accent.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(themeColors.accent.opacity(0.12), lineWidth: 1)
-        )
-        .overlay(alignment: .leading) {
-            Rectangle()
-                .fill(skin.accentEdge)
-                .frame(width: 3)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    private var agentStatusLine: String {
-        let detail = session.status == .waitingForInput ? "waiting for input" : session.signal.compactLabel
-        return "\(session.tool.rawValue) · \(detail)"
-    }
-
-    private var statusLabel: String {
-        switch session.status {
-        case .working: return "working"
-        case .waitingForInput: return "waiting"
-        case .completed: return "done"
-        case .idle: return "warm"
-        }
-    }
-
-    private var statusColor: Color {
-        switch session.pulse {
-        case .hot: return themeColors.accent
-        case .warm: return themeColors.accent.opacity(0.7)
-        case .listening: return themeColors.accent.opacity(0.5)
-        case .drowsy: return purpleAccent.opacity(0.7)
-        case .sleeping: return .gray
-        }
-    }
-
-    private var statusChipColor: Color {
-        switch session.status {
-        case .working: return themeColors.accent
-        case .waitingForInput: return auroraAmber
-        case .completed: return auroraGreen
-        case .idle: return themeColors.textMuted
-        }
     }
 }
 
