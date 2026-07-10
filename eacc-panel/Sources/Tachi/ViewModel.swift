@@ -22,6 +22,56 @@ enum CompanionPersona: Equatable {
             return Color(red: 0.24, green: 0.24, blue: 0.26)
         }
     }
+
+    // The menu bar face is the pet's second face. Frames may animate, but
+    // every frame of a persona must render at the same width — width jitter,
+    // not motion, is what steals attention. Braille and ASCII frames satisfy
+    // this by construction; anything needing font fallback (kana) does not.
+    func menuFace(mood: CompanionMood, frame: Int) -> String {
+        switch self {
+        case .matrixAgent:
+            let table = Self.rainFrames(for: mood)
+            return table[frame % table.count]
+        case .voidMonolith:
+            return Self.monolithFace(for: mood)
+        case .defaultOrb, .cyberSignal, .amberEye:
+            return mood.menuFace(frame: frame)
+        }
+    }
+
+    /// Widest face this persona can show — used to reserve menu bar width.
+    var menuFaceWidthSample: String {
+        switch self {
+        case .matrixAgent: return "⣿⣿"
+        case .voidMonolith: return "▮"
+        case .defaultOrb, .cyberSignal, .amberEye: return "O_O"
+        }
+    }
+
+    // Braille rain: dots fall one row per tick, the two cells phase-offset.
+    // Density follows mood; asleep, the rain settles on the ground.
+    private static func rainFrames(for mood: CompanionMood) -> [String] {
+        switch mood {
+        case .feasting:
+            return ["⠡⢂", "⢂⠌", "⠌⡐", "⡐⠡"]
+        case .alert:
+            return ["⠁⠄", "⠂⡀", "⠄⠁", "⡀⠂"]
+        case .expecting:
+            return ["⠐⠂", "⠂⠐"]
+        case .dozing:
+            return ["⡀⢀", "⢀⡀"]
+        case .sleeping:
+            return ["⢀⡀"]
+        }
+    }
+
+    // Awake the monolith is solid stone; drowsy and asleep it hollows out.
+    private static func monolithFace(for mood: CompanionMood) -> String {
+        switch mood {
+        case .feasting, .alert, .expecting: return "▮"
+        case .dozing, .sleeping: return "▯"
+        }
+    }
 }
 
 enum CompanionPersonaMode: String, CaseIterable, Equatable {
@@ -523,18 +573,35 @@ final class ViewModel {
         return Int((weightedSum / totalWeight).rounded())
     }
 
-    var menuBarText: String {
-        let activeCount = activeSessions.count
+    // The face lives in its own fixed-width slot (see TachiApp), so animated
+    // frames can never push the numbers around.
+    var menuBarFace: String {
         let faceFrame = companionHasMotion ? menuAnimationFrame : 0
-        let face = companionMood.menuFace(frame: faceFrame)
-        if activeCount > 0 {
-            return "\(face) \(weightedUtil)% [\(activeCount)]"
+        return companionPersona.menuFace(mood: companionMood, frame: faceFrame)
+    }
+
+    // Progressive disclosure: idle shows only the face; utilization and the
+    // session count join in only when they carry information, so the menu
+    // bar never parks on a permanent "0%".
+    var menuBarSuffix: String {
+        var parts: [String] = []
+        if weightedUtil > 0 {
+            parts.append("\(weightedUtil)%")
         }
-        return "\(face) \(weightedUtil)%"
+        let activeCount = activeSessions.count
+        if activeCount > 0 {
+            parts.append("·\(activeCount)")
+        }
+        return parts.joined(separator: " ")
+    }
+
+    var menuBarText: String {
+        let suffix = menuBarSuffix
+        return suffix.isEmpty ? menuBarFace : "\(menuBarFace) \(suffix)"
     }
 
     var menuBarWidthTemplate: String {
-        "O_O 100% [88]"
+        "\(companionPersona.menuFaceWidthSample) 100% ·88"
     }
 
     @MainActor

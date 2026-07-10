@@ -113,6 +113,7 @@ final class SessionProviderTests: XCTestCase {
         XCTAssertEqual(vm.companionMood, .expecting)
         XCTAssertFalse(vm.companionHasMotion)
 
+        // Without motion the face must not change between animation frames.
         vm.menuAnimationFrame = 0
         let calmMenuBarText = vm.menuBarText
         vm.menuAnimationFrame = 1
