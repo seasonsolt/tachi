@@ -154,6 +154,80 @@ struct EACCThemeColors {
     }
 }
 
+// MARK: - Contrast Grounding
+// Frameless grounding, not a backdrop plate: a soft dark radial scrim sits
+// behind every pet so bright artwork stays readable over light desktops and
+// the void panel. Against dark backgrounds it is effectively invisible, which
+// is what preserves the "floating directly on the desktop" illusion.
+
+struct PetContrastScrim: View {
+    let persona: CompanionPersona
+    let mood: CompanionMood
+
+    private struct Tuning {
+        var strength: Double
+        var scaleX: CGFloat = 1.0
+        var scaleY: CGFloat = 1.0
+        var yOffset: CGFloat = 0
+    }
+
+    var body: some View {
+        let tuning = Self.tuning(for: persona)
+        let peak = tuning.strength * moodFactor
+
+        Circle()
+            .fill(
+                RadialGradient(
+                    stops: [
+                        .init(color: Color.black.opacity(peak), location: 0.0),
+                        .init(color: Color.black.opacity(peak * 0.65), location: 0.45),
+                        .init(color: .clear, location: 1.0)
+                    ],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: 52
+                )
+            )
+            .frame(width: 104, height: 104)
+            .scaleEffect(x: tuning.scaleX, y: tuning.scaleY)
+            .offset(y: tuning.yOffset)
+            .blur(radius: 4)
+    }
+
+    // The scrim breathes with the pet: a feasting pet carries full grounding,
+    // a sleeping one only a trace, matching each pet's own opacity ramps.
+    private var moodFactor: Double {
+        switch mood {
+        case .feasting: return 1.0
+        case .alert: return 0.9
+        case .expecting: return 0.75
+        case .dozing: return 0.55
+        case .sleeping: return 0.4
+        }
+    }
+
+    private static func tuning(for persona: CompanionPersona) -> Tuning {
+        switch persona {
+        case .defaultOrb:
+            return Tuning(strength: 0.20)
+        case .cyberSignal:
+            // Carries its own white disc; the scrim only defines the disc edge.
+            return Tuning(strength: 0.16)
+        case .matrixAgent:
+            // Pure green sits near 1.4:1 on white — the rain needs the most
+            // ground, and wide enough to reach the corners of its canvas.
+            return Tuning(strength: 0.34, scaleX: 1.3, scaleY: 1.3)
+        case .amberEye:
+            // Wide, low oval under the standing unicorn.
+            return Tuning(strength: 0.22, scaleX: 1.05, scaleY: 0.88, yOffset: 4)
+        case .voidMonolith:
+            // Grounds the eclipse and slab body only — pulled up so it fades
+            // out at the slab base and stays clear of shadow and reflection.
+            return Tuning(strength: 0.16, scaleX: 0.85, scaleY: 0.95, yOffset: -12)
+        }
+    }
+}
+
 // MARK: - Folded Signal Pet View
 // Keep it cold and faceted, with only a little amber city light on the folds.
 
@@ -549,6 +623,10 @@ struct MatrixPetView: View {
     private static let glyphs = ["0", "1", "7", "3", "マ", "ト", "リ", "ク", "ス", "電", "脈", "碼"]
     private static let columnCount = 10
     private static let trailLength = 9
+    // Hand-scattered start phases. Any formulaic sequence (linear, golden
+    // ratio) keeps a constant stride between columns, so frozen heads line up
+    // into diagonals; this table has no stride to find.
+    private static let columnPhases: [Double] = [0.07, 0.58, 0.33, 0.91, 0.18, 0.72, 0.02, 0.46, 0.83, 0.27]
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 18.0)) { timeline in
@@ -647,14 +725,15 @@ struct MatrixPetView: View {
         for column in 0..<Self.columnCount {
             let drift = CGFloat(sin(time * 0.55 + Double(column) * 0.7)) * 2.4
             let x = stepX * CGFloat(column + 1) + drift
-            let speed = 28.0 + Double(column % 4) * 6.0
-            let seed = Double(column) * 0.37
-            let travel = time * speed + seed * 40
+            let speed = 26.0 + Double((column * 5) % 7) * 3.5
             let cycleSpan = Double(height + 28)
+            let travel = time * speed + Self.columnPhases[column % Self.columnPhases.count] * cycleSpan
             let cycle = Int(floor(travel / cycleSpan))
             let headY = CGFloat(travel.truncatingRemainder(dividingBy: cycleSpan) - 20)
+            // Trail lengths alternate 6–9 per column for extra variety.
+            let trailCount = Self.trailLength - ((column * 3 + 1) % 4)
 
-            for trail in 0..<Self.trailLength {
+            for trail in 0..<trailCount {
                 let y = headY - CGFloat(trail) * stepY
                 guard y > -16, y < height + 10 else { continue }
 
@@ -667,6 +746,17 @@ struct MatrixPetView: View {
                 let color: Color = trail == 0
                     ? .white.opacity(min(0.78, alpha + 0.10))
                     : green.opacity(alpha * 0.72)
+
+                // Contrast halo: every glyph sits on its own blurred dark copy.
+                // The ambient scrim alone cannot carry pure green (or the white
+                // heads) against a white desktop.
+                var halo = context.resolve(Text(glyph).font(font))
+                let haloStrength = trail == 0 ? 0.9 : 0.75
+                halo.shading = .color(Color.black.opacity(min(0.85, alpha * haloStrength)))
+                context.drawLayer { layer in
+                    layer.addFilter(.blur(radius: 1.1))
+                    layer.draw(halo, at: CGPoint(x: x, y: y + 0.4), anchor: .center)
+                }
 
                 var bloom = context.resolve(Text(glyph).font(font))
                 bloom.shading = .color(green.opacity(glowAlpha))
@@ -789,6 +879,14 @@ struct MonolithPetView: View {
             ZStack {
                 // --- Eclipse above the slab ---
                 ZStack {
+                    // Contrast backing: the photosphere is pure white and needs
+                    // dark ground on light desktops. Follows the surviving light
+                    // so nothing lingers at totality. Grounding, not a viewport.
+                    Circle()
+                        .fill(Color.black.opacity(0.26 * visibleLight))
+                        .frame(width: 42, height: 42)
+                        .blur(radius: 11)
+
                     // Outer halo — large diffuse warm glow
                     Circle()
                         .fill(coronaColor.opacity(coronaHaloOpacity * 0.5))
@@ -876,10 +974,12 @@ struct MonolithPetView: View {
                     .offset(y: stoneLift)
 
                 // --- Reflection ---
+                // Softer than the slab: on light backgrounds a crisp mirrored
+                // rectangle reads as a gray block fighting the oval shadow.
                 stoneCore
                     .scaleEffect(x: 1.0, y: -0.42)
                     .opacity(reflectionOpacity)
-                    .blur(radius: 1.6)
+                    .blur(radius: 2.8)
                     .mask(
                         LinearGradient(
                             colors: [.black.opacity(0.85), .clear],
@@ -968,11 +1068,11 @@ struct MonolithPetView: View {
 
     private var reflectionOpacity: Double {
         switch mood {
-        case .feasting: return 0.16
-        case .alert: return 0.14
-        case .expecting: return 0.12
-        case .dozing: return 0.1
-        case .sleeping: return 0.08
+        case .feasting: return 0.10
+        case .alert: return 0.09
+        case .expecting: return 0.07
+        case .dozing: return 0.06
+        case .sleeping: return 0.05
         }
     }
 
