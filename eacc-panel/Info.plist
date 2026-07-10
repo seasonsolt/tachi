@@ -2,27 +2,27 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>Tachi</string>
-    <key>CFBundleDisplayName</key>
-    <string>Tachi</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.seasonsolt.tachi</string>
-	<key>CFBundleVersion</key>
-	<string>1.2.1</string>
+	<key>ATSApplicationFontsPath</key>
+	<string>Fonts</string>
+	<key>CFBundleDisplayName</key>
+	<string>Tachi</string>
+	<key>CFBundleExecutable</key>
+	<string>Tachi</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.seasonsolt.tachi</string>
+	<key>CFBundleName</key>
+	<string>Tachi</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.2.1</string>
-    <key>CFBundleExecutable</key>
-    <string>Tachi</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>NSPrincipalClass</key>
-    <string>NSApplication</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>ATSApplicationFontsPath</key>
-    <string>Fonts</string>
-    <key>LSUIElement</key>
-    <true/>
+	<string>1.3.0</string>
+	<key>CFBundleVersion</key>
+	<string>1.3.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
 </dict>
 </plist>
