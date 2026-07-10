@@ -67,7 +67,22 @@ struct TachiApp: App {
             ZStack(alignment: .leading) {
                 Text(vm.menuBarWidthTemplate)
                     .hidden()
-                Text(vm.isLoading && vm.items.isEmpty && vm.sessions.isEmpty ? "\u{23f3}" : vm.menuBarText)
+                if vm.isLoading && vm.items.isEmpty && vm.sessions.isEmpty {
+                    Text("\u{23f3}")
+                } else {
+                    HStack(spacing: 4) {
+                        // The face gets a slot sized to its widest frame, so
+                        // animation can never nudge the numbers beside it.
+                        ZStack {
+                            Text(vm.companionPersona.menuFaceWidthSample)
+                                .hidden()
+                            Text(vm.menuBarFace)
+                        }
+                        if !vm.menuBarSuffix.isEmpty {
+                            Text(vm.menuBarSuffix)
+                        }
+                    }
+                }
             }
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .fixedSize()
