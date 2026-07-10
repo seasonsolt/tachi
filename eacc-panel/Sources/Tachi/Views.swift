@@ -1002,17 +1002,23 @@ struct CompanionPetView: View {
     var motionTempo: Double = 1.0
 
     var body: some View {
-        switch persona {
-        case .defaultOrb:
-            DefaultCompanionPetView(mood: mood, accent: accent, themeColors: themeColors, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
-        case .cyberSignal:
-            CyberSignalPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
-        case .matrixAgent:
-            MatrixPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
-        case .amberEye:
-            OrigamiUnicornPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
-        case .voidMonolith:
-            MonolithPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
+        ZStack {
+            // Contrast grounding shared by every persona and both surfaces
+            // (floating window and panel) — see PetContrastScrim.
+            PetContrastScrim(persona: persona, mood: mood)
+
+            switch persona {
+            case .defaultOrb:
+                DefaultCompanionPetView(mood: mood, accent: accent, themeColors: themeColors, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
+            case .cyberSignal:
+                CyberSignalPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
+            case .matrixAgent:
+                MatrixPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
+            case .amberEye:
+                OrigamiUnicornPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
+            case .voidMonolith:
+                MonolithPetView(mood: mood, accent: accent, hasMotion: hasMotion, motionScale: motionScale, motionTempo: motionTempo)
+            }
         }
     }
 }
