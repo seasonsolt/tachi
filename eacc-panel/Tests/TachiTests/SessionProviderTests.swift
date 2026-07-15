@@ -69,6 +69,9 @@ final class SessionProviderTests: XCTestCase {
         XCTAssertEqual(info.startedAt, 200000)
         XCTAssertTrue(info.alive)
         XCTAssertEqual(info.tool, "pencil")
+        XCTAssertEqual(info.status, "idle")
+        XCTAssertEqual(info.signal, "quiet")
+        XCTAssertEqual(info.lastActivityAt, 200000)
         XCTAssertEqual(info.taskTitle, "Pencil Desktop")
         XCTAssertEqual(info.taskSummary, "Connected agents: codexCLI")
     }
@@ -90,6 +93,62 @@ final class SessionProviderTests: XCTestCase {
         let info = EACCSessionInfo(session: session)
 
         XCTAssertEqual(info.tool, "claude_design")
+        XCTAssertEqual(info.status, "working")
+        XCTAssertEqual(info.signal, "booting")
+    }
+
+    func testCompanionTaskMetaUsesActualSessionStatus() {
+        let vm = ViewModel()
+        let session = CodingSession(
+            id: "idle-codex",
+            tool: .codex,
+            projectPath: "/tmp/tachi",
+            slug: "idle-task",
+            taskTitle: "Idle task",
+            taskSummary: nil,
+            status: .idle,
+            lastActivity: Date(timeIntervalSince1970: 200),
+            signal: .quiet,
+            pulse: .drowsy
+        )
+
+        XCTAssertEqual(vm.companionTaskMeta(for: session), "Codex · idle")
+    }
+
+    func testCompanionTaskPreviewRemovesCompletedSessionsAfterFiveMinutes() {
+        let vm = ViewModel()
+        let now = Date(timeIntervalSince1970: 1_000)
+        vm.sessions = [
+            makeSession(id: "idle", status: .idle, signal: .quiet, lastActivity: now.addingTimeInterval(-1_000)),
+            makeSession(id: "recent-done", status: .completed, signal: .completed, lastActivity: now.addingTimeInterval(-299)),
+            makeSession(id: "inferred-done", status: .completed, signal: .quiet, lastActivity: now.addingTimeInterval(-599)),
+            makeSession(id: "expired-done", status: .completed, signal: .completed, lastActivity: now.addingTimeInterval(-301)),
+            makeSession(id: "expired-inferred", status: .completed, signal: .quiet, lastActivity: now.addingTimeInterval(-601))
+        ]
+
+        XCTAssertEqual(
+            vm.recentCompanionSessions(now: now).map(\.id),
+            ["idle", "recent-done", "inferred-done"]
+        )
+    }
+
+    func testCompanionTaskRetentionStartsWhenCompletionIsObserved() {
+        let vm = ViewModel()
+        let observedAt = Date(timeIntervalSince1970: 1_000)
+        let completed = makeSession(
+            id: "closed-claude",
+            status: .completed,
+            signal: .completed,
+            lastActivity: observedAt.addingTimeInterval(-1_000)
+        )
+        vm.sessions = [completed]
+        vm.recordCompletedSessionObservations(current: [completed], now: observedAt)
+
+        XCTAssertEqual(
+            vm.recentCompanionSessions(now: observedAt.addingTimeInterval(299)).map(\.id),
+            ["closed-claude"]
+        )
+        XCTAssertTrue(vm.recentCompanionSessions(now: observedAt.addingTimeInterval(301)).isEmpty)
     }
 
     func testWaitingCompanionRemainsVisibleButStopsMotion() {
@@ -118,6 +177,26 @@ final class SessionProviderTests: XCTestCase {
         let calmMenuBarText = vm.menuBarText
         vm.menuAnimationFrame = 1
         XCTAssertEqual(vm.menuBarText, calmMenuBarText)
+    }
+
+    private func makeSession(
+        id: String,
+        status: SessionStatus,
+        signal: SessionSignal,
+        lastActivity: Date
+    ) -> CodingSession {
+        CodingSession(
+            id: id,
+            tool: .codex,
+            projectPath: "/tmp/tachi",
+            slug: id,
+            taskTitle: id,
+            taskSummary: nil,
+            status: status,
+            lastActivity: lastActivity,
+            signal: signal,
+            pulse: status == .completed ? .sleeping : .drowsy
+        )
     }
 
     func testPencilProviderAggregatesMainProcessAndConnectedAgents() throws {

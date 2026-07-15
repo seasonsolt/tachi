@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../stores/store';
 import { THEMES } from '@eacc/shared';
-import type { SessionInfo, SessionTool } from '@eacc/shared';
+import type { SessionInfo, SessionStatus, SessionTool } from '@eacc/shared';
+import { isSessionCompleted, isSessionVisible, sessionStateLabel } from './session-state';
 
 interface SessionRow {
   id: string;
@@ -9,6 +10,8 @@ interface SessionRow {
   projectName: string;
   trail: string;
   startedAt: number;
+  alive: boolean;
+  status?: SessionStatus;
   tool?: SessionTool;
   taskLabel?: string;
 }
@@ -108,14 +111,28 @@ export function Sessions() {
   const t = THEMES[theme];
   const [hovered, setHovered] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const completedSessionObservedAt = useRef(new Map<string, number>());
 
   useEffect(() => {
-    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
+    const interval = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(interval);
   }, []);
 
   const sessionRows = useMemo<SessionRow[]>(() => {
-    return [...sessions]
+    const currentKeys = new Set<string>();
+    const rows = [...sessions]
+      .filter((session) => {
+        const key = `${session.tool ?? 'session'}:${session.sessionId}`;
+        currentKeys.add(key);
+        if (!isSessionCompleted(session)) {
+          completedSessionObservedAt.current.delete(key);
+          return true;
+        }
+
+        const observedAt = completedSessionObservedAt.current.get(key) ?? now;
+        completedSessionObservedAt.current.set(key, observedAt);
+        return isSessionVisible(session, now, observedAt);
+      })
       .sort((a, b) => b.startedAt - a.startedAt)
       .map((session) => {
         const pathInfo = compactPath(session.cwd);
@@ -125,17 +142,27 @@ export function Sessions() {
           projectName: pathInfo.projectName,
           trail: pathInfo.trail,
           startedAt: session.startedAt,
+          alive: session.alive,
+          status: session.status,
           tool: session.tool,
           taskLabel: taskLabelForSession(session),
         };
       });
-  }, [sessions]);
+
+    for (const key of completedSessionObservedAt.current.keys()) {
+      if (!currentKeys.has(key)) completedSessionObservedAt.current.delete(key);
+    }
+    return rows;
+  }, [sessions, now]);
 
   const visibleCount = hovered ? sessionRows.length : Math.min(sessionRows.length, 4);
   const visibleSessions = sessionRows.slice(0, visibleCount);
   const hiddenCount = sessionRows.length - visibleSessions.length;
+  const openCount = sessionRows.filter((session) => session.status
+    ? session.status !== 'completed'
+    : session.alive).length;
 
-  if (mode !== 'cli' || sessions.length === 0) return null;
+  if (mode !== 'cli' || sessionRows.length === 0) return null;
 
   return (
     <div
@@ -156,7 +183,7 @@ export function Sessions() {
         <span style={styles.count}>
           {sessionRows.length}
         </span>
-        <span style={styles.sessionMeta}>live</span>
+        <span style={styles.sessionMeta}>{openCount} open</span>
       </div>
 
       <div style={styles.expanded}>
@@ -175,6 +202,7 @@ export function Sessions() {
               <span style={styles.sessionTrail}>{session.trail}</span>
             </div>
             <div style={styles.metaBlock}>
+              <span style={styles.sessionState}>{sessionStateLabel(session)}</span>
               <span style={styles.sessionDuration}>{formatDuration(session.startedAt, now)}</span>
             </div>
           </div>
@@ -319,6 +347,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap' as const,
+  },
+  sessionState: {
+    color: 'var(--text-secondary)',
+    fontSize: 9,
+    letterSpacing: '0.8px',
+    textTransform: 'uppercase',
   },
   overflowRow: {
     marginTop: 2,

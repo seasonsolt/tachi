@@ -46,6 +46,9 @@ struct EACCSessionInfo: Codable {
     let startedAt: Int
     let alive: Bool
     let tool: String?
+    let status: String?
+    let signal: String?
+    let lastActivityAt: Int?
     let taskTitle: String?
     let taskSummary: String?
 }
@@ -59,6 +62,9 @@ extension EACCSessionInfo {
             startedAt: Int(session.lastActivity.timeIntervalSince1970 * 1000),
             alive: session.status != .completed,
             tool: session.tool.wireName,
+            status: session.status.wireName,
+            signal: session.signal.wireName,
+            lastActivityAt: Int(session.lastActivity.timeIntervalSince1970 * 1000),
             taskTitle: session.taskTitle,
             taskSummary: session.taskSummary
         )
