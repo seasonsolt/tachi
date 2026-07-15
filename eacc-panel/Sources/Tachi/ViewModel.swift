@@ -331,7 +331,7 @@ final class ViewModel {
     }
 
     var companionTaskPreviewSessions: [CodingSession] {
-        activeSessions.sorted { lhs, rhs in
+        sessions.sorted { lhs, rhs in
             if lhs.status != rhs.status {
                 return sessionPriority(lhs.status) < sessionPriority(rhs.status)
             }
@@ -344,7 +344,7 @@ final class ViewModel {
         companionTaskPreviewSessions.first
     }
 
-    // All active sessions are shown; the bubble scrolls past the first few
+    // All recent sessions are shown; the bubble scrolls past the first few
     // rather than truncating to a "+N more" footer.
     var companionTaskVisibleSessions: [CodingSession] {
         companionTaskPreviewSessions
@@ -362,12 +362,19 @@ final class ViewModel {
     }
 
     var companionTaskHeader: String {
-        let activeCount = activeSessions.count
-        if activeCount > 1 {
-            return "\(activeCount) active sessions"
+        let openCount = sessions.filter { $0.status != .completed }.count
+        let completedCount = sessions.count - openCount
+        if openCount > 0 && completedCount > 0 {
+            return "\(openCount) open · \(completedCount) done"
         }
-        if activeCount == 1 {
+        if openCount > 1 {
+            return "\(openCount) open sessions"
+        }
+        if openCount == 1 {
             return "Current task"
+        }
+        if completedCount > 0 {
+            return completedCount == 1 ? "1 completed session" : "\(completedCount) completed sessions"
         }
         return "No active task"
     }
@@ -379,7 +386,7 @@ final class ViewModel {
             }
             return session.projectName
         }
-        return "Hover again after a live coding session wakes up."
+        return "Hover again after a coding session wakes up."
     }
 
     var companionTaskContext: String {
@@ -421,8 +428,7 @@ final class ViewModel {
     }
 
     func companionTaskMeta(for session: CodingSession) -> String {
-        let detail = session.status == .completed ? "done" : "watching"
-        return "\(session.tool.rawValue) · \(detail)"
+        session.statusMeta
     }
 
     private func compactTaskPreviewText(_ raw: String?) -> String? {

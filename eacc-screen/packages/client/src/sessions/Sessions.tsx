@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../stores/store';
 import { THEMES } from '@eacc/shared';
-import type { SessionInfo, SessionTool } from '@eacc/shared';
+import type { SessionInfo, SessionStatus, SessionTool } from '@eacc/shared';
+import { sessionStateLabel } from './session-state';
 
 interface SessionRow {
   id: string;
@@ -9,6 +10,8 @@ interface SessionRow {
   projectName: string;
   trail: string;
   startedAt: number;
+  alive: boolean;
+  status?: SessionStatus;
   tool?: SessionTool;
   taskLabel?: string;
 }
@@ -125,6 +128,8 @@ export function Sessions() {
           projectName: pathInfo.projectName,
           trail: pathInfo.trail,
           startedAt: session.startedAt,
+          alive: session.alive,
+          status: session.status,
           tool: session.tool,
           taskLabel: taskLabelForSession(session),
         };
@@ -134,6 +139,9 @@ export function Sessions() {
   const visibleCount = hovered ? sessionRows.length : Math.min(sessionRows.length, 4);
   const visibleSessions = sessionRows.slice(0, visibleCount);
   const hiddenCount = sessionRows.length - visibleSessions.length;
+  const openCount = sessionRows.filter((session) => session.status
+    ? session.status !== 'completed'
+    : session.alive).length;
 
   if (mode !== 'cli' || sessions.length === 0) return null;
 
@@ -156,7 +164,7 @@ export function Sessions() {
         <span style={styles.count}>
           {sessionRows.length}
         </span>
-        <span style={styles.sessionMeta}>live</span>
+        <span style={styles.sessionMeta}>{openCount} open</span>
       </div>
 
       <div style={styles.expanded}>
@@ -175,6 +183,7 @@ export function Sessions() {
               <span style={styles.sessionTrail}>{session.trail}</span>
             </div>
             <div style={styles.metaBlock}>
+              <span style={styles.sessionState}>{sessionStateLabel(session)}</span>
               <span style={styles.sessionDuration}>{formatDuration(session.startedAt, now)}</span>
             </div>
           </div>
@@ -319,6 +328,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap' as const,
+  },
+  sessionState: {
+    color: 'var(--text-secondary)',
+    fontSize: 9,
+    letterSpacing: '0.8px',
+    textTransform: 'uppercase',
   },
   overflowRow: {
     marginTop: 2,

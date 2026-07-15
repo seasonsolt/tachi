@@ -34,6 +34,10 @@ struct CodingSession: Identifiable, Sendable {
         primaryTaskText ?? projectName
     }
 
+    var statusMeta: String {
+        "\(tool.rawValue) · \(status.label.lowercased())"
+    }
+
     private func isMeaningfulTaskText(_ raw: String?) -> Bool {
         guard let raw else { return false }
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -146,6 +150,15 @@ enum SessionStatus: Sendable, Equatable {
         case .completed: return "Done"
         }
     }
+
+    var wireName: String {
+        switch self {
+        case .working: return "working"
+        case .waitingForInput: return "waiting_for_input"
+        case .idle: return "idle"
+        case .completed: return "completed"
+        }
+    }
 }
 
 enum SessionSignal: Sendable, Equatable {
@@ -178,6 +191,18 @@ enum SessionSignal: Sendable, Equatable {
         case .awaitingUser: return "waiting"
         case .quiet: return "warm"
         case .completed: return "done"
+        }
+    }
+
+    var wireName: String {
+        switch self {
+        case .booting: return "booting"
+        case .reasoning: return "reasoning"
+        case .tooling: return "tooling"
+        case .responding: return "responding"
+        case .awaitingUser: return "awaiting_user"
+        case .quiet: return "quiet"
+        case .completed: return "completed"
         }
     }
 }

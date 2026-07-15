@@ -41,6 +41,9 @@ describe('readClaudeProjectSessions', () => {
       startedAt: 200_000,
       alive: true,
       tool: 'claude_design',
+      status: 'working',
+      signal: 'booting',
+      lastActivityAt: 200_000,
       taskTitle: 'design-taskbar-popup',
       taskSummary: 'Design the taskbar popup',
     });
@@ -95,7 +98,31 @@ describe('readClaudeProjectSessions', () => {
 
     const byId = new Map(sessions.map((s) => [s.sessionId, s]));
     expect(byId.get('open-1')?.alive).toBe(true);
+    expect(byId.get('open-1')?.status).toBe('working');
     expect(byId.get('closed-1')?.alive).toBe(false);
+    expect(byId.get('closed-1')?.status).toBe('completed');
+    expect(byId.get('closed-1')?.signal).toBe('completed');
+  });
+
+  it('marks a recent assistant reply as waiting for input', () => {
+    const projectsDir = makeTempDir();
+    const projectDir = join(projectsDir, '-tmp-tachi-design');
+    mkdirSync(projectDir, { recursive: true });
+
+    const sessionPath = join(projectDir, 'design-waiting.jsonl');
+    writeFileSync(
+      sessionPath,
+      '{"timestamp":"1970-01-01T00:03:20Z","type":"assistant","entrypoint":"claude-desktop","cwd":"/tmp/tachi-design","message":"Ready"}\n',
+    );
+    utimesSync(sessionPath, new Date(200_000), new Date(200_000));
+
+    const sessions = readClaudeProjectSessions(projectsDir, 225_000, new Set());
+
+    expect(sessions[0]).toMatchObject({
+      status: 'waiting_for_input',
+      signal: 'awaiting_user',
+      alive: true,
+    });
   });
 
   it('skips tool results and meta lines when picking the task summary', () => {

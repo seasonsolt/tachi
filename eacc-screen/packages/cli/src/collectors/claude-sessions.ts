@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
-import type { SessionInfo, SessionTool } from '@eacc/shared';
+import type { SessionInfo, SessionSignal, SessionStatus, SessionTool } from '@eacc/shared';
 
 const CLAUDE_SESSIONS_DIR = join(homedir(), '.claude', 'sessions');
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects');
@@ -17,6 +17,11 @@ interface OpenCodeProcess {
 
 interface OpenCodeMessage {
   role?: string;
+  finish?: string;
+  time?: {
+    created?: unknown;
+    completed?: unknown;
+  };
   summary?: unknown;
   content?: unknown;
   message?: unknown;
@@ -40,6 +45,7 @@ interface ClaudeProjectEntry {
   content?: unknown;
   toolUseResult?: unknown;
   isMeta?: unknown;
+  data?: unknown;
 }
 
 function isAlive(pid: number): boolean {
@@ -125,6 +131,8 @@ function readClaudeSessions(): SessionInfo[] {
             startedAt: data.startedAt,
             alive: isAlive(data.pid),
             tool: 'claude_code',
+            status: 'idle',
+            signal: 'quiet',
           });
         }
       } catch {
@@ -182,6 +190,18 @@ export function readClaudeProjectSessions(
         const isDesign = isDesktop && !registeredSessionIds.has(sessionId);
         const tool: SessionTool = isDesign ? 'claude_design' : 'claude_code';
         const projectName = sanitizeTaskText(cwd.split('/').filter(Boolean).at(-1));
+        const processAlive = aliveSessionIds.has(sessionId);
+        let signal = claudeSessionSignal(recentEntries, startedAt, nowMs);
+        let status = sessionStatusForSignal(signal, startedAt, nowMs);
+
+        if (tool === 'claude_code') {
+          if (!processAlive) {
+            status = 'completed';
+            signal = 'completed';
+          } else if (status === 'completed') {
+            status = 'idle';
+          }
+        }
 
         sessions.push({
           pid: 0,
@@ -190,9 +210,12 @@ export function readClaudeProjectSessions(
           startedAt,
           // Claude Code registers a live pid in ~/.claude/sessions; a missing
           // registration means the conversation is over. Design sessions have
-          // no local process to check.
-          alive: tool === 'claude_design' || aliveSessionIds.has(sessionId),
+          // no local process to check, so their status follows transcript age.
+          alive: status !== 'completed',
           tool,
+          status,
+          signal,
+          lastActivityAt: startedAt,
           taskTitle: sanitizeTaskText(slug) ?? projectName,
           taskSummary: claudeProjectTaskSummary(recentEntries, sanitizeTaskText(slug) ?? projectName),
         });
@@ -232,13 +255,17 @@ function readOpenCodeSessions(): SessionInfo[] {
     if (!record) continue;
 
     const messages = messagesBySession.get(record.sessionId) ?? [];
+    const trace = openCodeSessionTrace(messages[0], record.startedAt, Date.now());
     const session: SessionInfo = {
       pid: process.pid,
       sessionId: record.sessionId,
       cwd: record.cwd,
       startedAt: record.startedAt,
-      alive: true,
+      alive: trace.status !== 'completed',
       tool: 'open_code',
+      status: trace.status,
+      signal: trace.signal,
+      lastActivityAt: trace.lastActivityAt,
       taskTitle: record.taskTitle,
       taskSummary: openCodeTaskSummary(messages, record.taskTitle),
     };
@@ -250,6 +277,89 @@ function readOpenCodeSessions(): SessionInfo[] {
   }
 
   return Array.from(sessionsById.values());
+}
+
+function claudeSessionSignal(
+  recentEntries: ClaudeProjectEntry[],
+  fallbackAt: number,
+  nowMs: number,
+): SessionSignal {
+  for (const entry of recentEntries) {
+    const timestamp = parseTimestampMs(entry.timestamp) ?? fallbackAt;
+    switch (entry.type) {
+      case 'assistant':
+        return nowMs - timestamp < 18_000 ? 'responding' : 'awaiting_user';
+      case 'user':
+        return 'booting';
+      case 'progress': {
+        const data = entry.data && typeof entry.data === 'object'
+          ? entry.data as Record<string, unknown>
+          : undefined;
+        return data?.type === 'hook_progress' ? 'tooling' : 'reasoning';
+      }
+      default:
+        continue;
+    }
+  }
+  return 'quiet';
+}
+
+function openCodeSessionTrace(
+  latestMessage: OpenCodeMessage | undefined,
+  fallbackAt: number,
+  nowMs: number,
+): { status: SessionStatus; signal: SessionSignal; lastActivityAt: number } {
+  if (!latestMessage) {
+    return {
+      status: sessionStatusForSignal('quiet', fallbackAt, nowMs),
+      signal: 'quiet',
+      lastActivityAt: fallbackAt,
+    };
+  }
+
+  const completedAt = parseMillis(latestMessage.time?.completed);
+  const createdAt = parseMillis(latestMessage.time?.created);
+  const lastActivityAt = completedAt ?? createdAt ?? fallbackAt;
+  let signal: SessionSignal;
+
+  if (latestMessage.role === 'user') {
+    signal = 'booting';
+  } else if (latestMessage.role === 'assistant') {
+    if (completedAt === undefined) signal = 'responding';
+    else if (latestMessage.finish === 'tool-calls') signal = 'tooling';
+    else signal = nowMs - lastActivityAt < 18_000 ? 'responding' : 'awaiting_user';
+  } else {
+    signal = 'quiet';
+  }
+
+  return {
+    status: sessionStatusForSignal(signal, lastActivityAt, nowMs),
+    signal,
+    lastActivityAt,
+  };
+}
+
+function sessionStatusForSignal(signal: SessionSignal, timestamp: number, nowMs: number): SessionStatus {
+  const ageMs = Math.max(0, nowMs - timestamp);
+  switch (signal) {
+    case 'booting':
+    case 'reasoning':
+    case 'tooling':
+      return ageMs < 90_000 ? 'working' : (ageMs < 300_000 ? 'idle' : 'completed');
+    case 'responding':
+      return ageMs < 20_000 ? 'working' : (ageMs < 300_000 ? 'waiting_for_input' : 'completed');
+    case 'awaiting_user':
+      return ageMs < 600_000 ? 'waiting_for_input' : 'idle';
+    case 'quiet':
+      return ageMs < 300_000 ? 'idle' : 'completed';
+    case 'completed':
+      return 'completed';
+  }
+}
+
+function parseMillis(raw: unknown): number | undefined {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return undefined;
+  return raw;
 }
 
 function readRecentClaudeProjectEntries(path: string, limit: number, maxBytes = 131_072): ClaudeProjectEntry[] {
