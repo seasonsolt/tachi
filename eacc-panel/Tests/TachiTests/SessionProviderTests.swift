@@ -115,15 +115,40 @@ final class SessionProviderTests: XCTestCase {
         XCTAssertEqual(vm.companionTaskMeta(for: session), "Codex · idle")
     }
 
-    func testCompanionTaskPreviewIncludesIdleAndCompletedSessions() {
+    func testCompanionTaskPreviewRemovesCompletedSessionsAfterFiveMinutes() {
         let vm = ViewModel()
+        let now = Date(timeIntervalSince1970: 1_000)
         vm.sessions = [
-            makeSession(id: "idle", status: .idle, signal: .quiet),
-            makeSession(id: "done", status: .completed, signal: .completed)
+            makeSession(id: "idle", status: .idle, signal: .quiet, lastActivity: now.addingTimeInterval(-1_000)),
+            makeSession(id: "recent-done", status: .completed, signal: .completed, lastActivity: now.addingTimeInterval(-299)),
+            makeSession(id: "inferred-done", status: .completed, signal: .quiet, lastActivity: now.addingTimeInterval(-599)),
+            makeSession(id: "expired-done", status: .completed, signal: .completed, lastActivity: now.addingTimeInterval(-301)),
+            makeSession(id: "expired-inferred", status: .completed, signal: .quiet, lastActivity: now.addingTimeInterval(-601))
         ]
 
-        XCTAssertEqual(vm.companionTaskVisibleSessions.map(\.id), ["idle", "done"])
-        XCTAssertEqual(vm.companionTaskHeader, "1 open · 1 done")
+        XCTAssertEqual(
+            vm.recentCompanionSessions(now: now).map(\.id),
+            ["idle", "recent-done", "inferred-done"]
+        )
+    }
+
+    func testCompanionTaskRetentionStartsWhenCompletionIsObserved() {
+        let vm = ViewModel()
+        let observedAt = Date(timeIntervalSince1970: 1_000)
+        let completed = makeSession(
+            id: "closed-claude",
+            status: .completed,
+            signal: .completed,
+            lastActivity: observedAt.addingTimeInterval(-1_000)
+        )
+        vm.sessions = [completed]
+        vm.recordCompletedSessionObservations(current: [completed], now: observedAt)
+
+        XCTAssertEqual(
+            vm.recentCompanionSessions(now: observedAt.addingTimeInterval(299)).map(\.id),
+            ["closed-claude"]
+        )
+        XCTAssertTrue(vm.recentCompanionSessions(now: observedAt.addingTimeInterval(301)).isEmpty)
     }
 
     func testWaitingCompanionRemainsVisibleButStopsMotion() {
@@ -157,7 +182,8 @@ final class SessionProviderTests: XCTestCase {
     private func makeSession(
         id: String,
         status: SessionStatus,
-        signal: SessionSignal
+        signal: SessionSignal,
+        lastActivity: Date
     ) -> CodingSession {
         CodingSession(
             id: id,
@@ -167,7 +193,7 @@ final class SessionProviderTests: XCTestCase {
             taskTitle: id,
             taskSummary: nil,
             status: status,
-            lastActivity: Date(timeIntervalSince1970: id == "idle" ? 201 : 200),
+            lastActivity: lastActivity,
             signal: signal,
             pulse: status == .completed ? .sleeping : .drowsy
         )
