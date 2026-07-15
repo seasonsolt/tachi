@@ -840,17 +840,11 @@ struct DesktopPetView: View {
     }
 
     private func sessionStatusLabel(_ session: CodingSession) -> String {
-        switch session.status {
-        case .working: return "working"
-        case .waitingForInput: return "waiting"
-        case .completed: return "done"
-        case .idle: return "open"
-        }
+        session.status.label.lowercased()
     }
 
     private func sessionMetaLine(_ session: CodingSession) -> String {
-        let detail = session.status == .completed ? "done" : "watching"
-        return "\(session.tool.rawValue) · \(detail)"
+        session.statusMeta
     }
 }
 

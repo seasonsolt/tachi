@@ -68,6 +68,17 @@ export interface ClaudeCodeStats {
 
 export type SessionTool = 'claude_code' | 'claude_design' | 'codex' | 'open_code' | 'pencil';
 
+export type SessionStatus = 'working' | 'waiting_for_input' | 'idle' | 'completed';
+
+export type SessionSignal =
+  | 'booting'
+  | 'reasoning'
+  | 'tooling'
+  | 'responding'
+  | 'awaiting_user'
+  | 'quiet'
+  | 'completed';
+
 export interface SessionInfo {
   pid: number;
   sessionId: string;
@@ -75,6 +86,9 @@ export interface SessionInfo {
   startedAt: number;
   alive: boolean;
   tool?: SessionTool;
+  status?: SessionStatus;
+  signal?: SessionSignal;
+  lastActivityAt?: number;
   taskTitle?: string;
   taskSummary?: string;
 }

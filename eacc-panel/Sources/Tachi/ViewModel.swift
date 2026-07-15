@@ -331,7 +331,16 @@ final class ViewModel {
     }
 
     var companionTaskPreviewSessions: [CodingSession] {
-        activeSessions.sorted { lhs, rhs in
+        recentCompanionSessions(now: Date())
+    }
+
+    func recentCompanionSessions(now: Date) -> [CodingSession] {
+        sessions.filter { session in
+            guard session.status == .completed else { return true }
+            let completedAt = completedSessionObservedAt[completionTrackingKey(for: session)]
+                ?? inferredCompletionDate(for: session)
+            return now.timeIntervalSince(completedAt) <= Self.completedSessionRetention
+        }.sorted { lhs, rhs in
             if lhs.status != rhs.status {
                 return sessionPriority(lhs.status) < sessionPriority(rhs.status)
             }
@@ -344,7 +353,7 @@ final class ViewModel {
         companionTaskPreviewSessions.first
     }
 
-    // All active sessions are shown; the bubble scrolls past the first few
+    // All recent sessions are shown; the bubble scrolls past the first few
     // rather than truncating to a "+N more" footer.
     var companionTaskVisibleSessions: [CodingSession] {
         companionTaskPreviewSessions
@@ -352,6 +361,8 @@ final class ViewModel {
 
     // Rows visible in the bubble before it starts scrolling.
     static let companionTaskVisibleRowCap = 3
+    static let completedSessionRetention: TimeInterval = 5 * 60
+    static let completedSessionInferenceDelay: TimeInterval = 5 * 60
 
     var companionTaskOverflowCount: Int {
         max(0, companionTaskPreviewSessions.count - Self.companionTaskVisibleRowCap)
@@ -362,12 +373,20 @@ final class ViewModel {
     }
 
     var companionTaskHeader: String {
-        let activeCount = activeSessions.count
-        if activeCount > 1 {
-            return "\(activeCount) active sessions"
+        let visibleSessions = companionTaskPreviewSessions
+        let openCount = visibleSessions.filter { $0.status != .completed }.count
+        let completedCount = visibleSessions.count - openCount
+        if openCount > 0 && completedCount > 0 {
+            return "\(openCount) open · \(completedCount) done"
         }
-        if activeCount == 1 {
+        if openCount > 1 {
+            return "\(openCount) open sessions"
+        }
+        if openCount == 1 {
             return "Current task"
+        }
+        if completedCount > 0 {
+            return completedCount == 1 ? "1 completed session" : "\(completedCount) completed sessions"
         }
         return "No active task"
     }
@@ -379,7 +398,7 @@ final class ViewModel {
             }
             return session.projectName
         }
-        return "Hover again after a live coding session wakes up."
+        return "Hover again after a coding session wakes up."
     }
 
     var companionTaskContext: String {
@@ -421,8 +440,7 @@ final class ViewModel {
     }
 
     func companionTaskMeta(for session: CodingSession) -> String {
-        let detail = session.status == .completed ? "done" : "watching"
-        return "\(session.tool.rawValue) · \(detail)"
+        session.statusMeta
     }
 
     private func compactTaskPreviewText(_ raw: String?) -> String? {
@@ -722,9 +740,11 @@ final class ViewModel {
     }
 
     private var seenCompletedSessionKeys: Set<String> = []
+    private var completedSessionObservedAt: [String: Date] = [:]
 
     @MainActor
     private func handleCompletedTasks(previous: [CodingSession], current: [CodingSession]) {
+        recordCompletedSessionObservations(current: current, now: Date())
         let currentCompletedKeys = Set(
             current
                 .filter { $0.status == .completed }
@@ -754,6 +774,32 @@ final class ViewModel {
             return
         }
         triggerCompanionCelebration(for: latestCompletion, totalCount: newlyCompleted.count)
+    }
+
+    func recordCompletedSessionObservations(current: [CodingSession], now: Date) {
+        let currentKeys = Set(current.map(completionTrackingKey(for:)))
+        completedSessionObservedAt = completedSessionObservedAt.filter { currentKeys.contains($0.key) }
+
+        for session in current {
+            let key = completionTrackingKey(for: session)
+            if session.status == .completed {
+                if completedSessionObservedAt[key] == nil {
+                    completedSessionObservedAt[key] = now
+                }
+            } else {
+                completedSessionObservedAt.removeValue(forKey: key)
+            }
+        }
+    }
+
+    private func completionTrackingKey(for session: CodingSession) -> String {
+        "\(session.tool.wireName):\(session.id)"
+    }
+
+    private func inferredCompletionDate(for session: CodingSession) -> Date {
+        session.signal == .completed
+            ? session.lastActivity
+            : session.lastActivity.addingTimeInterval(Self.completedSessionInferenceDelay)
     }
 
     private func completionKey(for session: CodingSession) -> String {
