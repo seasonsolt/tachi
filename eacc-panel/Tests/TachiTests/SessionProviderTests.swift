@@ -69,6 +69,9 @@ final class SessionProviderTests: XCTestCase {
         XCTAssertEqual(info.startedAt, 200000)
         XCTAssertTrue(info.alive)
         XCTAssertEqual(info.tool, "pencil")
+        XCTAssertEqual(info.status, "idle")
+        XCTAssertEqual(info.signal, "quiet")
+        XCTAssertEqual(info.lastActivityAt, 200000)
         XCTAssertEqual(info.taskTitle, "Pencil Desktop")
         XCTAssertEqual(info.taskSummary, "Connected agents: codexCLI")
     }
@@ -90,6 +93,37 @@ final class SessionProviderTests: XCTestCase {
         let info = EACCSessionInfo(session: session)
 
         XCTAssertEqual(info.tool, "claude_design")
+        XCTAssertEqual(info.status, "working")
+        XCTAssertEqual(info.signal, "booting")
+    }
+
+    func testCompanionTaskMetaUsesActualSessionStatus() {
+        let vm = ViewModel()
+        let session = CodingSession(
+            id: "idle-codex",
+            tool: .codex,
+            projectPath: "/tmp/tachi",
+            slug: "idle-task",
+            taskTitle: "Idle task",
+            taskSummary: nil,
+            status: .idle,
+            lastActivity: Date(timeIntervalSince1970: 200),
+            signal: .quiet,
+            pulse: .drowsy
+        )
+
+        XCTAssertEqual(vm.companionTaskMeta(for: session), "Codex · idle")
+    }
+
+    func testCompanionTaskPreviewIncludesIdleAndCompletedSessions() {
+        let vm = ViewModel()
+        vm.sessions = [
+            makeSession(id: "idle", status: .idle, signal: .quiet),
+            makeSession(id: "done", status: .completed, signal: .completed)
+        ]
+
+        XCTAssertEqual(vm.companionTaskVisibleSessions.map(\.id), ["idle", "done"])
+        XCTAssertEqual(vm.companionTaskHeader, "1 open · 1 done")
     }
 
     func testWaitingCompanionRemainsVisibleButStopsMotion() {
@@ -118,6 +152,25 @@ final class SessionProviderTests: XCTestCase {
         let calmMenuBarText = vm.menuBarText
         vm.menuAnimationFrame = 1
         XCTAssertEqual(vm.menuBarText, calmMenuBarText)
+    }
+
+    private func makeSession(
+        id: String,
+        status: SessionStatus,
+        signal: SessionSignal
+    ) -> CodingSession {
+        CodingSession(
+            id: id,
+            tool: .codex,
+            projectPath: "/tmp/tachi",
+            slug: id,
+            taskTitle: id,
+            taskSummary: nil,
+            status: status,
+            lastActivity: Date(timeIntervalSince1970: id == "idle" ? 201 : 200),
+            signal: signal,
+            pulse: status == .completed ? .sleeping : .drowsy
+        )
     }
 
     func testPencilProviderAggregatesMainProcessAndConnectedAgents() throws {
