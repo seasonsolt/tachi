@@ -313,6 +313,9 @@ struct DesktopPetView: View {
     private static let verticalPadding: CGFloat = 12
 
     let vm: ViewModel
+#if DEBUG
+    var forcePreviewVisible = false
+#endif
     var onPanelSizeChange: ((CGSize) -> Void)? = nil
     var onPanelDragChange: (() -> Void)? = nil
     var onPanelDragEnd: (() -> Void)? = nil
@@ -334,8 +337,18 @@ struct DesktopPetView: View {
     @State private var isDraggingCompanion = false
     @State private var previewDismissTask: Task<Void, Never>? = nil
 
+    private var isPreviewForced: Bool {
+#if DEBUG
+        forcePreviewVisible
+#else
+        false
+#endif
+    }
+
     private var isShowingPreview: Bool {
-        isPreviewVisible && vm.shouldShowCompanionTaskPreview && !isDraggingCompanion
+        (isPreviewForced || isPreviewVisible)
+            && vm.shouldShowCompanionTaskPreview
+            && !isDraggingCompanion
     }
 
     private var estimatedBubbleHeight: CGFloat {
@@ -366,9 +379,9 @@ struct DesktopPetView: View {
         ZStack(alignment: .bottomTrailing) {
             if isShowingPreview {
                 taskBubble
-                    .offset(x: -8, y: -Self.previewOffsetY + (isBubbleVisible ? 0 : 8))
-                    .opacity(isBubbleVisible ? 1 : 0)
-                    .blur(radius: isBubbleVisible ? 0 : 4)
+                    .offset(x: -8, y: -Self.previewOffsetY + (isPreviewForced || isBubbleVisible ? 0 : 8))
+                    .opacity(isPreviewForced || isBubbleVisible ? 1 : 0)
+                    .blur(radius: isPreviewForced || isBubbleVisible ? 0 : 4)
                     .animation(.easeOut(duration: 0.2), value: isBubbleVisible)
             }
 
@@ -419,6 +432,7 @@ struct DesktopPetView: View {
         .background(Color.clear)
         .contentShape(Rectangle())
         .onHover { hovering in
+            guard !isPreviewForced else { return }
             isHoveringPanel = hovering
             guard !isDraggingCompanion else { return }
             if hovering {

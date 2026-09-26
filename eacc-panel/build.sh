@@ -2,10 +2,19 @@
 set -e
 cd "$(dirname "$0")"
 
-echo "Building Tachi..."
-swift build -c release 2>&1
+CONFIGURATION="${1:-release}"
+case "$CONFIGURATION" in
+    debug|release) ;;
+    *)
+        echo "build configuration must be debug or release" >&2
+        exit 2
+        ;;
+esac
 
-EXEC=".build/release/Tachi"
+echo "Building Tachi..."
+swift build -c "$CONFIGURATION" 2>&1
+
+EXEC=".build/$CONFIGURATION/Tachi"
 APP_BUNDLE="Tachi.app"
 APP_DIR="$APP_BUNDLE/Contents/MacOS"
 APP_RESOURCES="$APP_BUNDLE/Contents/Resources"

@@ -5,58 +5,80 @@ struct TachiApp: App {
     private let vm = ViewModel()
 
     // WebSocket sidecar for eacc-screen
-    private let wsServer = WebSocketServer(port: 3666)
-    private let statsWatcher = StatsWatcher()
-    private let sessionsWatcher = SessionsWatcher()
-    private let themeWatcher = ThemeWatcher()
-    private let claudeUsageMonitor = ClaudeUsageMonitor()
-    private let bridge: EACCBridge
-
-    private let recipeRuntime = RecipeRuntime()
+    private var wsServer: WebSocketServer?
+    private var statsWatcher: StatsWatcher?
+    private var sessionsWatcher: SessionsWatcher?
+    private var themeWatcher: ThemeWatcher?
+    private var claudeUsageMonitor: ClaudeUsageMonitor?
+    private var bridge: EACCBridge?
+    private var recipeRuntime: RecipeRuntime?
 
     init() {
-        NotificationManager.shared.requestAuthorization()
+        let videoDemoMode = VideoDemoMode.parse(arguments: ProcessInfo.processInfo.arguments)
+        if let videoDemoMode {
+            vm.applyVideoDemo(videoDemoMode)
+        } else {
+            NotificationManager.shared.requestAuthorization()
+            let wsServer = WebSocketServer(port: 3666)
+            let statsWatcher = StatsWatcher()
+            let sessionsWatcher = SessionsWatcher()
+            let themeWatcher = ThemeWatcher()
+            let claudeUsageMonitor = ClaudeUsageMonitor()
+            let recipeRuntime = RecipeRuntime()
+            let bridge = EACCBridge(
+                wsServer: wsServer,
+                statsWatcher: statsWatcher,
+                sessionsWatcher: sessionsWatcher,
+                themeWatcher: themeWatcher
+            )
 
-        // Wire up the EACC bridge (includes theme watcher)
-        bridge = EACCBridge(
-            wsServer: wsServer,
-            statsWatcher: statsWatcher,
-            sessionsWatcher: sessionsWatcher,
-            themeWatcher: themeWatcher
-        )
+            self.wsServer = wsServer
+            self.statsWatcher = statsWatcher
+            self.sessionsWatcher = sessionsWatcher
+            self.themeWatcher = themeWatcher
+            self.claudeUsageMonitor = claudeUsageMonitor
+            self.recipeRuntime = recipeRuntime
+            self.bridge = bridge
 
-        // Connect ViewModel ↔ Bridge for theme sync
-        vm.bridge = bridge
-        bridge.onThemeChanged = { [vm] theme in
-            vm.handleExternalThemeChange(theme)
+            // Connect ViewModel ↔ Bridge for theme sync.
+            vm.bridge = bridge
+            bridge.onThemeChanged = { [vm] theme in
+                vm.handleExternalThemeChange(theme)
+            }
+            bridge.onClaudeCodeChanged = { [vm] data in
+                vm.upsertSource(id: "claude-code", name: "Claude Code", data: data)
+            }
+
+            // Connect RecipeRuntime to ViewModel + Bridge.
+            vm.recipeRuntime = recipeRuntime
+            bridge.recipeRuntime = recipeRuntime
+
+            // Native Claude Code token-usage collector (reads ~/.claude/projects
+            // transcripts). Delivered on main by the monitor.
+            claudeUsageMonitor.onUpdate = { [vm] snapshot in
+                vm.claudeUsage = snapshot
+            }
+
+            // Install default recipes if first run
+            RecipeStore.installDefaults()
+
+            bridge.start()
+            wsServer.start()
+            statsWatcher.start()
+            sessionsWatcher.start()
+            themeWatcher.start()
+            recipeRuntime.start()
+            claudeUsageMonitor.start()
         }
-        bridge.onClaudeCodeChanged = { [vm] data in
-            vm.upsertSource(id: "claude-code", name: "Claude Code", data: data)
-        }
-
-        // Connect RecipeRuntime to ViewModel + Bridge
-        vm.recipeRuntime = recipeRuntime
-        bridge.recipeRuntime = recipeRuntime
-
-        // Native Claude Code token-usage collector (reads ~/.claude/projects
-        // transcripts). Delivered on main by the monitor.
-        claudeUsageMonitor.onUpdate = { [vm] snapshot in
-            vm.claudeUsage = snapshot
-        }
-
-        // Install default recipes if first run
-        RecipeStore.installDefaults()
-
-        bridge.start()
-        wsServer.start()
-        statsWatcher.start()
-        sessionsWatcher.start()
-        themeWatcher.start()
-        recipeRuntime.start()
-        claudeUsageMonitor.start()
 
         Task { @MainActor [vm] in
             FloatingPetWindowController.shared.show(vm: vm)
+#if DEBUG
+            if videoDemoMode != nil {
+                try? await Task.sleep(for: .milliseconds(500))
+                VideoDemoWindowController.shared.show(vm: vm)
+            }
+#endif
         }
     }
 

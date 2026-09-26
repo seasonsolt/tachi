@@ -26,8 +26,9 @@ stop_app() {
 }
 
 build_app() {
+  local configuration="${1:-release}"
   cd "$PANEL_DIR"
-  ./build.sh
+  ./build.sh "$configuration"
 }
 
 app_binary() {
@@ -36,11 +37,18 @@ app_binary() {
 
 write_launch_agent() {
   local binary="$1"
+  shift
   mkdir -p "$(dirname "$LAUNCH_AGENT_PLIST")"
   rm -f "$LAUNCH_AGENT_PLIST"
   plutil -create xml1 "$LAUNCH_AGENT_PLIST"
   plutil -insert Label -string "$LAUNCH_AGENT_LABEL" "$LAUNCH_AGENT_PLIST"
-  plutil -insert ProgramArguments -json "[\"$binary\"]" "$LAUNCH_AGENT_PLIST"
+  plutil -insert ProgramArguments -array "$LAUNCH_AGENT_PLIST"
+  plutil -insert ProgramArguments.0 -string "$binary" "$LAUNCH_AGENT_PLIST"
+  local index=1
+  for argument in "$@"; do
+    plutil -insert "ProgramArguments.$index" -string "$argument" "$LAUNCH_AGENT_PLIST"
+    index=$((index + 1))
+  done
   plutil -insert RunAtLoad -bool true "$LAUNCH_AGENT_PLIST"
   plutil -insert StandardOutPath -string "$LAUNCH_AGENT_STDOUT" "$LAUNCH_AGENT_PLIST"
   plutil -insert StandardErrorPath -string "$LAUNCH_AGENT_STDERR" "$LAUNCH_AGENT_PLIST"
@@ -49,7 +57,8 @@ write_launch_agent() {
 
 start_app() {
   local binary="$1"
-  write_launch_agent "$binary"
+  shift
+  write_launch_agent "$binary" "$@"
   launchctl bootstrap "$USER_DOMAIN" "$LAUNCH_AGENT_PLIST"
   launchctl kickstart -k "$USER_DOMAIN/$LAUNCH_AGENT_LABEL"
 }
@@ -89,8 +98,22 @@ case "$MODE" in
     start_app "$(app_binary)"
     verify_app
     ;;
+  --video-demo|video-demo)
+    DEMO_STAGE="${2:-}"
+    case "$DEMO_STAGE" in
+      overview|one|three) ;;
+      *)
+        echo "video demo stage must be overview, one, or three" >&2
+        exit 2
+        ;;
+    esac
+    stop_app
+    build_app debug
+    start_app "$(app_binary)" --video-demo "$DEMO_STAGE"
+    verify_app
+    ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--video-demo [overview|one|three]]" >&2
     exit 2
     ;;
 esac

@@ -187,6 +187,7 @@ enum CompanionMood: Equatable {
 final class ViewModel {
     var items: [AccountWithUsage] = []
     var sessions: [CodingSession] = []
+    private(set) var videoDemoMode: VideoDemoMode?
     var codexRateLimits: CodexRateLimitSnapshot?
     var claudeUsage: ClaudeUsageSnapshot?
     var claudeStats: ClaudeStats?
@@ -267,6 +268,7 @@ final class ViewModel {
             return stored > 0 ? stored : 30
         }
         set {
+            guard videoDemoMode == nil else { return }
             UserDefaults.standard.set(newValue, forKey: "refreshInterval")
         }
     }
@@ -634,6 +636,16 @@ final class ViewModel {
     }
 
     @MainActor
+    func applyVideoDemo(_ mode: VideoDemoMode, now: Date = Date()) {
+        videoDemoMode = mode
+        sessions = mode.sessions(now: now)
+        companionPersonaMode = .cyberSignal
+        selectedTheme = .cyber
+        isLoading = false
+        lastUpdated = now
+    }
+
+    @MainActor
     func advanceMenuAnimation() {
         menuAnimationFrame = (menuAnimationFrame + 1) % 240
     }
@@ -641,6 +653,10 @@ final class ViewModel {
     @MainActor
     func setCompanionPersonaMode(_ mode: CompanionPersonaMode) {
         companionPersonaMode = mode
+        guard videoDemoMode == nil else {
+            selectedTheme = mode.linkedTheme
+            return
+        }
         UserDefaults.standard.set(mode.rawValue, forKey: Self.companionPersonaModeKey)
         setTheme(mode.linkedTheme)
     }
@@ -651,6 +667,7 @@ final class ViewModel {
     @MainActor
     func setTheme(_ theme: EACCThemeName) {
         selectedTheme = theme
+        guard videoDemoMode == nil else { return }
         UserDefaults.standard.set(theme.rawValue, forKey: Self.themeKey)
         // Sync to file + WebSocket clients
         bridge?.setTheme(theme.rawValue)
@@ -659,6 +676,7 @@ final class ViewModel {
     /// Called by EACCBridge when theme changes externally (file watcher or WebSocket client)
     @MainActor
     func handleExternalThemeChange(_ themeName: String) {
+        guard videoDemoMode == nil else { return }
         guard let theme = EACCThemeName(rawValue: themeName),
               theme != selectedTheme
         else { return }
@@ -704,6 +722,12 @@ final class ViewModel {
 
     @MainActor
     private func refreshSessionsAndCodexQuota() async {
+        if let videoDemoMode {
+            sessions = videoDemoMode.sessions(now: Date())
+            codexRateLimits = nil
+            return
+        }
+
         let previousSessions = sessions
         async let updatedSessionsTask = Task.detached {
             SessionMonitor.shared.scanSessions()
