@@ -6,6 +6,7 @@ intent: workflow
 ctaType: newsletter
 updatedAt: 2026-04-16
 monetizationMode: ads, affiliate, newsletter
+status: launch-batch
 description: A recurring review loop for agents, content routes, and revenue sources so solo operators can see what is actually compounding.
 keywords: agent ops ledger, weekly review, ai business operations
 related: /hub/agent-operations, /workflow/research-brief-to-spec, /ritual

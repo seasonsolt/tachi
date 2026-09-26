@@ -11,6 +11,7 @@ export interface ContentRouteRecord {
   updatedAt: string;
   cluster: string;
   monetizationMode: string[];
+  status?: string;
   cta?: {
     type: string;
     href: string;
@@ -25,6 +26,12 @@ export interface RouteManifest {
   domain: string;
   deferredDomains: string[];
   contentRoutes: ContentRouteRecord[];
+  ritualRoutes?: Array<{
+    path: string;
+    strategy: string;
+    target?: string;
+  }>;
+  analytics?: Record<string, string>;
 }
 
 export interface RevenueLedgerWeek {
@@ -45,7 +52,7 @@ export interface RevenueLedger {
 
 export type AnalyticsEvent =
   | {
-      type: 'pageview';
+      type: 'page_view' | 'pageview';
       timestamp: string;
       route: string;
       cluster: string;
@@ -53,7 +60,7 @@ export type AnalyticsEvent =
       userAgent?: string;
     }
   | {
-      type: 'outbound_cta';
+      type: 'cta_click' | 'outbound_cta';
       timestamp: string;
       route: string;
       cluster: string;
@@ -63,7 +70,7 @@ export type AnalyticsEvent =
       userAgent?: string;
     }
   | {
-      type: 'newsletter_capture';
+      type: 'newsletter_signup' | 'newsletter_capture';
       timestamp: string;
       route: string;
       cluster: string;
@@ -152,12 +159,26 @@ export function buildOpsReport(routeManifest: RouteManifest | null, ledger: Reve
     routeSummaries.set(route.path, { pageviews: 0, outboundCtaClicks: 0, newsletterCaptures: 0 });
   }
 
+  const preservedRouteSummaries = new Map<string, { pageviews: number }>();
+  for (const route of routeManifest?.ritualRoutes ?? []) {
+    if (!route.path.includes('*')) {
+      preservedRouteSummaries.set(route.path, { pageviews: 0 });
+    }
+  }
+
   for (const event of events) {
-    const summary = routeSummaries.get(event.route) ?? { pageviews: 0, outboundCtaClicks: 0, newsletterCaptures: 0 };
-    if (event.type === 'pageview') summary.pageviews += 1;
-    if (event.type === 'outbound_cta') summary.outboundCtaClicks += 1;
-    if (event.type === 'newsletter_capture') summary.newsletterCaptures += 1;
-    routeSummaries.set(event.route, summary);
+    const summary = routeSummaries.get(event.route);
+    if (summary) {
+      if (event.type === 'pageview' || event.type === 'page_view') summary.pageviews += 1;
+      if (event.type === 'outbound_cta' || event.type === 'cta_click') summary.outboundCtaClicks += 1;
+      if (event.type === 'newsletter_capture' || event.type === 'newsletter_signup') summary.newsletterCaptures += 1;
+      routeSummaries.set(event.route, summary);
+    }
+
+    const preserved = preservedRouteSummaries.get(event.route);
+    if (preserved && (event.type === 'pageview' || event.type === 'page_view')) {
+      preserved.pageviews += 1;
+    }
   }
 
   const clusterCounts = new Map<string, { published: number; pageviews: number; outboundCtaClicks: number; newsletterCaptures: number }>();
@@ -179,6 +200,7 @@ export function buildOpsReport(routeManifest: RouteManifest | null, ledger: Reve
     deferredDomains: routeManifest?.deferredDomains ?? [],
     publishedPages: routeManifest?.contentRoutes.length ?? 0,
     routes: Array.from(routeSummaries.entries()).map(([route, summary]) => ({ route, ...summary })),
+    preservedRoutes: Array.from(preservedRouteSummaries.entries()).map(([route, summary]) => ({ route, ...summary })),
     clusters: Array.from(clusterCounts.entries()).map(([cluster, summary]) => ({ cluster, ...summary })),
     revenue: {
       monthlyRunRateUsd: ['ads', 'affiliate', 'sponsorship', 'other'].reduce((total, key) => total + sumLedgerWeeks(ledger, key as keyof RevenueLedgerWeek), 0),

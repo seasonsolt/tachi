@@ -1,17 +1,18 @@
 ---
 slug: home
 title: e/acc AI builder playbooks for solo operators
+description: The content-led homepage for e-acc.ai, surfacing workflow playbooks, comparisons, and the ritual lab.
 cluster: core-entry
 intent: homepage
 ctaType: newsletter
 updatedAt: 2026-04-16
-monetizationMode: newsletter+affiliate+ads
+monetizationMode: newsletter, affiliate, ads
 pageType: home
 primaryRoute: /
 status: launch-batch
 featuredHubSlugs:
   - ai-coding-workflows
-  - ai-agent-operations
+  - agent-operations
 featuredWorkflowSlugs:
   - ship-an-ai-code-review-loop
   - build-a-context-passing-debug-stack

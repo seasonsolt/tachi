@@ -42,6 +42,9 @@ const manifest: RouteManifest = {
       sourceFile: 'content/workflows/test.md',
     },
   ],
+  ritualRoutes: [
+    { path: '/ritual', strategy: 'spa-shell' },
+  ],
 };
 
 describe('content-site helpers', () => {
@@ -66,9 +69,10 @@ describe('content-site helpers', () => {
       deferredDomains: ['e-accs.com'],
       weeks: [{ weekStart: '2026-04-14', ads: 4, affiliate: 10, sponsorship: 0, other: 2 }],
     }, [
-      { type: 'pageview', timestamp: '2026-04-16T00:00:00.000Z', route: '/workflow/test-route', cluster: 'agent-operations', kind: 'workflow' },
-      { type: 'outbound_cta', timestamp: '2026-04-16T00:05:00.000Z', route: '/workflow/test-route', cluster: 'agent-operations', kind: 'workflow', href: 'https://example.com', ctaType: 'affiliate' },
-      { type: 'newsletter_capture', timestamp: '2026-04-16T00:10:00.000Z', route: '/workflow/test-route', cluster: 'agent-operations', kind: 'workflow', emailHash: hashEmail('builder@example.com') },
+      { type: 'page_view', timestamp: '2026-04-16T00:00:00.000Z', route: '/workflow/test-route', cluster: 'agent-operations', kind: 'workflow' },
+      { type: 'cta_click', timestamp: '2026-04-16T00:05:00.000Z', route: '/workflow/test-route', cluster: 'agent-operations', kind: 'workflow', href: 'https://example.com', ctaType: 'affiliate' },
+      { type: 'newsletter_signup', timestamp: '2026-04-16T00:10:00.000Z', route: '/workflow/test-route', cluster: 'agent-operations', kind: 'workflow', emailHash: hashEmail('builder@example.com') },
+      { type: 'page_view', timestamp: '2026-04-16T00:20:00.000Z', route: '/ritual', cluster: 'ritual-lab', kind: 'lab' },
     ]);
 
     expect(hashEmail('Builder@example.com')).toBe(hashEmail('builder@example.com'));
@@ -78,6 +82,10 @@ describe('content-site helpers', () => {
       pageviews: 1,
       outboundCtaClicks: 1,
       newsletterCaptures: 1,
+    });
+    expect(report.preservedRoutes).toContainEqual({
+      route: '/ritual',
+      pageviews: 1,
     });
   });
 });

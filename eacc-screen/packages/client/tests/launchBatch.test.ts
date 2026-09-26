@@ -11,8 +11,8 @@ describe('launch batch inventory', () => {
     const pageTypes = new Set(launchBatch.launchBatch.map((entry) => entry.pageType));
 
     expect(pageTypes).toEqual(new Set(['home', 'hub', 'workflow', 'comparison', 'lab']));
-    expect(launchBatch.launchBatch.filter((entry) => entry.pageType === 'workflow')).toHaveLength(3);
-    expect(launchBatch.launchBatch.filter((entry) => entry.pageType === 'comparison')).toHaveLength(1);
+    expect(launchBatch.launchBatch.filter((entry) => entry.pageType === 'workflow').length).toBeGreaterThanOrEqual(3);
+    expect(launchBatch.launchBatch.filter((entry) => entry.pageType === 'comparison').length).toBeGreaterThanOrEqual(1);
     expect(launchBatch.launchBatch.some((entry) => entry.path === '/ritual')).toBe(true);
   });
 

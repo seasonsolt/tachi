@@ -1,4 +1,14 @@
-const LIST_FIELDS = new Set(['monetizationMode', 'related', 'keywords']);
+const LIST_FIELDS = new Set([
+  'monetizationMode',
+  'related',
+  'keywords',
+  'featuredHubSlugs',
+  'featuredWorkflowSlugs',
+  'featuredComparisonSlugs',
+  'relatedHubSlugs',
+  'relatedComparisonSlugs',
+  'relatedWorkflowSlugs',
+]);
 
 export function escapeHtml(value) {
   return String(value)
@@ -36,7 +46,8 @@ export function parseFrontmatter(raw) {
   const body = normalized.slice(end + delimiter.length).trim();
   const meta = {};
 
-  for (const line of head) {
+  for (let index = 0; index < head.length; index += 1) {
+    const line = head[index];
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
     const separator = trimmed.indexOf(':');
@@ -45,7 +56,16 @@ export function parseFrontmatter(raw) {
     const rawValue = trimmed.slice(separator + 1).trim();
     if (!key) continue;
 
-    if (LIST_FIELDS.has(key)) {
+    if (!rawValue) {
+      const items = [];
+      while (index + 1 < head.length) {
+        const nextLine = head[index + 1].trim();
+        if (!nextLine.startsWith('- ')) break;
+        items.push(nextLine.slice(2).trim());
+        index += 1;
+      }
+      meta[key] = items;
+    } else if (LIST_FIELDS.has(key)) {
       meta[key] = splitList(rawValue);
     } else if (rawValue === 'true' || rawValue === 'false') {
       meta[key] = rawValue === 'true';

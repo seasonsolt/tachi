@@ -16,12 +16,16 @@ content/
     ritual-lab.md
   hubs/
     ai-coding-workflows.md
-    ai-agent-operations.md
+    agent-operations.md
   workflows/
-    ship-an-ai-code-review-loop.md
+    claude-code-ship-kit.md
     build-a-context-passing-debug-stack.md
+    research-brief-to-spec.md
     run-a-weekly-agent-ops-audit.md
+    ship-an-ai-code-review-loop.md
+    weekly-agent-ops-ledger.md
   comparisons/
+    claude-code-vs-cursor-for-shipping.md
     claude-code-vs-cursor-for-solo-repo-ships.md
 ops/
   90-day-cadence.md
@@ -35,11 +39,12 @@ Every content source file should expose these required fields so route generatio
 | --- | --- | --- |
 | `slug` | yes | Route-safe unique identifier |
 | `title` | yes | Public page title |
+| `description` | yes | SEO/social summary used by build and manifest output |
 | `cluster` | yes | Hub/topic owner or `core-entry` / `ritual-lab` |
 | `intent` | yes | `homepage`, `hub`, `workflow`, `comparison`, or `lab` |
 | `ctaType` | yes | `newsletter`, `affiliate`, `internal-lab`, or another first-party CTA family |
 | `updatedAt` | yes | ISO date for freshness and audits |
-| `monetizationMode` | yes | Must show revenue mix beyond raw pageviews |
+| `monetizationMode` | yes | Ordered list of channels. Single-line comma lists and YAML bullet lists are both accepted by the parser. |
 
 Recommended optional fields: `primaryRoute`, `summary`, `featuredWorkflowSlugs`, `relatedHubSlugs`, `relatedComparisonSlugs`, `status`, `estimatedReadMinutes`, `owner`.
 
@@ -108,12 +113,17 @@ Required modules:
 2. Clear return path to the content homepage.
 3. Optional CTA back into the newsletter or featured workflow set.
 
+Implementation note:
+- `/ritual` is served by the preserved client SPA shell.
+- `content/pages/ritual-lab.md` is supporting editorial copy, not the canonical runtime artifact.
+- Ritual traffic is reported separately under preserved route metrics rather than being mixed into content-route publishing totals.
+
 ## Monetization rules
 - Ads cannot be the only monetization element on any workflow or comparison page.
-- Workflow pages should default to `affiliate+newsletter+ads` or `newsletter+ads`.
-- Comparison pages should default to `affiliate+ads+newsletter` with a trust note explaining recommendation criteria.
+- Workflow pages should default to `affiliate, newsletter, ads` or `newsletter, ads`.
+- Comparison pages should default to `affiliate, ads, newsletter` with a trust note explaining recommendation criteria.
 - Homepage and hub pages should bias toward email capture first, ads second.
-- Event instrumentation should be able to attribute `pageview`, `cta_click`, `newsletter_submit`, and `revenue_source` by slug.
+- Event instrumentation should be able to attribute `page_view`, `cta_click`, `newsletter_signup`, and `revenue_recorded` by slug.
 
 ## Internal-linking rules
 - Every workflow links back to one hub and forward to one comparison page.
@@ -122,7 +132,7 @@ Required modules:
 - The launch batch must provide at least: 1 home, 2 hubs, 3 workflows, 1 comparison, and 1 ritual/lab page.
 
 ## Evidence hooks for implementation + verification
-1. The eventual route manifest should be derivable from `content/launch-batch.json` plus the markdown frontmatter.
+1. The route manifest must match `content/launch-batch.json` plus markdown frontmatter exactly for every non-ritual launch route.
 2. Non-JS crawlability proof should be collected for `/`, one `/hub/:slug`, one `/workflow/:slug`, and one `/compare/:slug`.
 3. The weekly revenue ledger must be able to answer revenue mix and progress toward the `$50/month` north-star.
 4. `e-accs.com` should appear only in deferred/backlog notes, never as an active launch route.

@@ -1,15 +1,16 @@
 ---
 slug: run-a-weekly-agent-ops-audit
 title: Run a weekly agent ops audit without hiring an ops team
-cluster: ai-agent-operations
+description: A weekly audit workflow for prompts, spend, experiments, and operating discipline in an AI stack.
+cluster: agent-operations
 intent: workflow
 ctaType: newsletter
 updatedAt: 2026-04-16
-monetizationMode: newsletter+affiliate+ads
+monetizationMode: newsletter, affiliate, ads
 pageType: workflow
 primaryRoute: /workflow/run-a-weekly-agent-ops-audit
 relatedHubSlugs:
-  - ai-agent-operations
+  - agent-operations
 relatedComparisonSlugs:
   - claude-code-vs-cursor-for-solo-repo-ships
 status: launch-batch

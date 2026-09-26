@@ -32,7 +32,7 @@ Expected verification goals:
 
 ### 4. Analytics / CTA proof
 Expected evidence to capture after implementation:
-- One pageview event tied to a content slug.
+- One `page_view` event tied to a content slug.
 - One outbound CTA click event tied to a workflow or comparison slug.
 - One newsletter capture event.
 - One sample weekly ledger update that records revenue-source mix.

@@ -35,6 +35,7 @@ const collectionConfig = [
   { dir: 'workflows', kind: 'workflow', routePrefix: '/workflow' },
   { dir: 'comparisons', kind: 'comparison', routePrefix: '/compare' },
 ];
+const launchBatchConfig = JSON.parse(readFileSync(join(contentRoot, 'launch-batch.json'), 'utf8'));
 
 function ensureDir(targetPath) {
   mkdirSync(dirname(targetPath), { recursive: true });
@@ -74,6 +75,11 @@ function loadCollection(config) {
     const route = normalizePath(`${config.routePrefix}/${meta.slug}`);
     const artifact = route === '/' ? 'index.html' : `${route.slice(1)}/index.html`;
     const html = markdownToHtml(body);
+    const derivedRelated = [
+      ...(Array.isArray(meta.relatedHubSlugs) ? meta.relatedHubSlugs.map((slug) => normalizePath(`/hub/${slug}`)) : []),
+      ...(Array.isArray(meta.relatedWorkflowSlugs) ? meta.relatedWorkflowSlugs.map((slug) => normalizePath(`/workflow/${slug}`)) : []),
+      ...(Array.isArray(meta.relatedComparisonSlugs) ? meta.relatedComparisonSlugs.map((slug) => normalizePath(`/compare/${slug}`)) : []),
+    ];
 
     return {
       kind: config.kind,
@@ -94,10 +100,47 @@ function loadCollection(config) {
       updatedAt: meta.updatedAt,
       monetizationMode: meta.monetizationMode,
       keywords: Array.isArray(meta.keywords) ? meta.keywords : [],
-      related: Array.isArray(meta.related) ? meta.related : [],
+      related: Array.isArray(meta.related) ? meta.related : derivedRelated,
       hero: meta.hero || meta.description,
+      status: meta.status || 'launch-batch',
     };
   });
+}
+
+function loadPageSource(fileName, kind, route, artifact) {
+  const filePath = join(contentRoot, 'pages', fileName);
+  const raw = readFileSync(filePath, 'utf8');
+  const { meta, body } = parseFrontmatter(raw);
+
+  for (const key of requiredMeta) {
+    invariant(meta[key], `${relative(projectRoot, filePath)} is missing frontmatter field "${key}"`);
+  }
+
+  invariant(Array.isArray(meta.monetizationMode) && meta.monetizationMode.length > 0, `${relative(projectRoot, filePath)} must define at least one monetizationMode`);
+
+  return {
+    kind,
+    route,
+    artifact,
+    body,
+    html: markdownToHtml(body),
+    sourceFile: relative(projectRoot, filePath),
+    slug: meta.slug,
+    title: meta.title,
+    description: meta.description,
+    cluster: meta.cluster,
+    intent: meta.intent,
+    ctaType: meta.ctaType,
+    ctaLabel: meta.ctaLabel || 'Open recommended tool',
+    ctaHref: meta.ctaHref || null,
+    ctaNote: meta.ctaNote || '',
+    updatedAt: meta.updatedAt,
+    monetizationMode: meta.monetizationMode,
+    keywords: Array.isArray(meta.keywords) ? meta.keywords : [],
+    related: Array.isArray(meta.related) ? meta.related : [],
+    hero: meta.hero || meta.description,
+    status: meta.status || 'launch-batch',
+  };
 }
 
 function sumRevenue(entries) {
@@ -389,6 +432,7 @@ function renderHubPage(entry, workflows, comparisons) {
 }
 
 const ledger = JSON.parse(readFileSync(join(contentRoot, 'ops', 'weekly-revenue-ledger.json'), 'utf8'));
+const homePage = loadPageSource('home.md', 'home', '/', 'index.html');
 const hubs = loadCollection(collectionConfig[0]);
 const workflows = loadCollection(collectionConfig[1]);
 const comparisons = loadCollection(collectionConfig[2]);
@@ -439,13 +483,13 @@ const dashboard = {
 };
 
 const homeContent = renderDocument({
-  title: siteTitle,
-  description: siteDescription,
+  title: homePage.title,
+  description: homePage.description,
   currentRoute: '/',
   content: `<section class="hero">
     <div class="eyebrow">phase 1 · ${phaseOneDomain} only</div>
-    <h1>Crawlable AI builder playbooks, not another dead-end splash screen.</h1>
-    <p>${escapeHtml(siteDescription)} Keep the ritual experience on <a href="/ritual">/ritual</a>, move the monetizable surface to static HTML, and make every workflow page capable of earning via ads, affiliate CTA clicks, and newsletter capture.</p>
+    <h1>${escapeHtml(homePage.title)}</h1>
+    <p>${escapeHtml(homePage.description)} Keep the ritual experience on <a href="/ritual">/ritual</a>, move the monetizable surface to static HTML, and make every workflow page capable of earning via ads, affiliate CTA clicks, and newsletter capture.</p>
     <div class="hero-actions">
       <a class="button is-primary" href="/hub/ai-coding-workflows">Explore coding workflows</a>
       <a class="button" href="/hub/agent-operations">See agent ops hub</a>
@@ -459,9 +503,12 @@ const homeContent = renderDocument({
     </div>
   </section>
   <section class="section">
+    ${homePage.html}
+  </section>
+  <section class="section">
     <div class="section-heading">
       <h2>Launch information architecture</h2>
-      <p>Homepage + 2 hubs + 3 workflow pages + 1 comparison + ritual preservation.</p>
+      <p>Homepage + ${hubs.length} hubs + ${workflows.length} workflow pages + ${comparisons.length} comparison pages + ritual preservation.</p>
     </div>
     <div class="route-grid">
       ${[
@@ -494,7 +541,7 @@ const homeContent = renderDocument({
   <section class="section">
     <div class="section-heading">
       <h2>Measurement and revenue ops</h2>
-      <p>Server-rendered pageviews, tracked outbound redirects, newsletter captures, and a weekly revenue ledger.</p>
+      <p>Server-rendered page views, tracked CTA clicks, newsletter signups, and a weekly revenue ledger.</p>
     </div>
     <div class="card-grid">
       <article class="report-card">
@@ -543,24 +590,13 @@ const routeManifest = {
   domain: phaseOneDomain,
   deferredDomains: [deferredDomain],
   contentRoutes: [
-    {
-      kind: 'home',
-      path: '/',
-      title: siteTitle,
-      description: siteDescription,
-      artifact: 'index.html',
-      updatedAt: generatedAt.slice(0, 10),
-      monetizationMode: ['ads', 'affiliate', 'newsletter'],
-      cluster: 'root',
-      related: ['/ritual'],
-      sourceFile: 'generated:home',
-    },
+    homePage,
     ...hubs,
     ...workflows,
     ...comparisons,
   ].map((entry) => ({
     kind: entry.kind,
-    path: entry.route,
+    path: entry.route ?? entry.path ?? '/',
     title: entry.title,
     description: entry.description,
     artifact: entry.artifact,
@@ -570,6 +606,7 @@ const routeManifest = {
     cta: entry.ctaHref ? { type: entry.ctaType, href: entry.ctaHref, label: entry.ctaLabel } : null,
     related: entry.related,
     sourceFile: entry.sourceFile,
+    status: entry.status,
   })),
   ritualRoutes: [
     { path: '/ritual', strategy: 'spa-shell' },
@@ -578,12 +615,37 @@ const routeManifest = {
     { path: '/lab/*', strategy: 'redirect', target: '/ritual' },
   ],
   analytics: {
-    pageview: 'server-side on HTML route serve',
-    outboundCta: '/out?route=<encoded-route>',
-    newsletterCapture: 'POST /newsletter',
+    page_view: 'server-side on HTML route serve',
+    cta_click: '/out?route=<encoded-route>',
+    newsletter_signup: 'POST /newsletter',
     report: '/api/ops/report',
   },
 };
+
+const declaredLaunchInventory = launchBatchConfig.launchBatch
+  .filter((entry) => entry.pageType !== 'lab')
+  .map((entry) => ({
+    path: entry.path,
+    pageType: entry.pageType,
+    source: entry.source,
+    cluster: entry.cluster,
+    status: entry.status,
+  }))
+  .sort((left, right) => left.path.localeCompare(right.path));
+const builtLaunchInventory = routeManifest.contentRoutes
+  .map((entry) => ({
+    path: entry.path,
+    pageType: entry.kind,
+    source: entry.sourceFile,
+    cluster: entry.cluster,
+    status: entry.status,
+  }))
+  .sort((left, right) => left.path.localeCompare(right.path));
+
+invariant(
+  JSON.stringify(declaredLaunchInventory) === JSON.stringify(builtLaunchInventory),
+  `launch-batch.json inventory does not match built content routes:\nexpected=${JSON.stringify(declaredLaunchInventory)}\nactual=${JSON.stringify(builtLaunchInventory)}`,
+);
 writeFile('route-manifest.json', `${JSON.stringify(routeManifest, null, 2)}\n`);
 writeFile('ops/dashboard.json', `${JSON.stringify(dashboard, null, 2)}\n`);
 writeFile('ops/weekly-revenue-ledger.json', `${JSON.stringify(ledger, null, 2)}\n`);

@@ -1,11 +1,12 @@
 ---
 slug: build-a-context-passing-debug-stack
 title: Build a context-passing debug stack for messy repo bugs
+description: How to build a context-passing debug stack that keeps AI coding sessions grounded across tools.
 cluster: ai-coding-workflows
 intent: workflow
 ctaType: affiliate
 updatedAt: 2026-04-16
-monetizationMode: affiliate+newsletter+ads
+monetizationMode: affiliate, newsletter, ads
 pageType: workflow
 primaryRoute: /workflow/build-a-context-passing-debug-stack
 relatedHubSlugs:

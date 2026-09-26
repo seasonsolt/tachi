@@ -9,6 +9,7 @@ ctaHref: https://claude.ai/download
 ctaNote: Use the first-party redirect endpoint so every outbound click is attributable to this route.
 updatedAt: 2026-04-16
 monetizationMode: ads, affiliate, newsletter
+status: launch-batch
 description: A weekly coding loop that turns prompt-heavy exploration into a build-review-publish system you can sustain as a solo operator.
 keywords: claude code workflow, ai coding workflow, solo builder
 related: /hub/ai-coding-workflows, /compare/claude-code-vs-cursor-for-shipping, /ritual

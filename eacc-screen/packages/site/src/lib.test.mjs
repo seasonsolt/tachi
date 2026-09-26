@@ -11,6 +11,18 @@ test('parseFrontmatter extracts required metadata and list fields', () => {
   assert.equal(body, '## Hello\n\nWorld');
 });
 
+test('parseFrontmatter extracts YAML-style bullet lists for featured/related slugs', () => {
+  const { meta } = parseFrontmatter(`---\nslug: sample\nfeaturedWorkflowSlugs:\n  - ship-an-ai-code-review-loop\n  - build-a-context-passing-debug-stack\nrelatedComparisonSlugs:\n  - claude-code-vs-cursor-for-solo-repo-ships\n---\nBody`);
+
+  assert.deepEqual(meta.featuredWorkflowSlugs, [
+    'ship-an-ai-code-review-loop',
+    'build-a-context-passing-debug-stack',
+  ]);
+  assert.deepEqual(meta.relatedComparisonSlugs, [
+    'claude-code-vs-cursor-for-solo-repo-ships',
+  ]);
+});
+
 test('markdownToHtml renders headings, lists, code fences, and links', () => {
   const html = markdownToHtml(`## Section\n\n- item one\n- item two\n\n1. first\n2. second\n\n> quoted\n\nVisit [site](/ritual).\n\n\`\`\`js\nconsole.log("ok")\n\`\`\``);
 

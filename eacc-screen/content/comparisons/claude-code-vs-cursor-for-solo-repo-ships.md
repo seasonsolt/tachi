@@ -1,11 +1,12 @@
 ---
 slug: claude-code-vs-cursor-for-solo-repo-ships
 title: Claude Code vs Cursor for solo repo shipping loops
+description: A practical comparison of Claude Code and Cursor for solo builders shipping from one repository.
 cluster: ai-coding-workflows
 intent: comparison
 ctaType: affiliate
 updatedAt: 2026-04-16
-monetizationMode: affiliate+ads+newsletter
+monetizationMode: affiliate, ads, newsletter
 pageType: comparison
 primaryRoute: /compare/claude-code-vs-cursor-for-solo-repo-ships
 relatedWorkflowSlugs:

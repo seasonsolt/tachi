@@ -1,6 +1,8 @@
 {
   "phase1Domain": "e-acc.ai",
-  "deferredDomains": ["e-accs.com"],
+  "deferredDomains": [
+    "e-accs.com"
+  ],
   "hoursPerWeek": "5-10",
   "quarterTargets": {
     "workflowPages": 8,
@@ -14,7 +16,7 @@
       "slug": "home",
       "source": "content/pages/home.md",
       "cluster": "core-entry",
-      "status": "launch"
+      "status": "launch-batch"
     },
     {
       "path": "/hub/ai-coding-workflows",
@@ -22,23 +24,23 @@
       "slug": "ai-coding-workflows",
       "source": "content/hubs/ai-coding-workflows.md",
       "cluster": "ai-coding-workflows",
-      "status": "launch"
+      "status": "launch-batch"
     },
     {
-      "path": "/hub/ai-agent-operations",
+      "path": "/hub/agent-operations",
       "pageType": "hub",
-      "slug": "ai-agent-operations",
-      "source": "content/hubs/ai-agent-operations.md",
-      "cluster": "ai-agent-operations",
-      "status": "launch"
+      "slug": "agent-operations",
+      "source": "content/hubs/agent-operations.md",
+      "cluster": "agent-operations",
+      "status": "launch-batch"
     },
     {
-      "path": "/workflow/ship-an-ai-code-review-loop",
+      "path": "/workflow/claude-code-ship-kit",
       "pageType": "workflow",
-      "slug": "ship-an-ai-code-review-loop",
-      "source": "content/workflows/ship-an-ai-code-review-loop.md",
+      "slug": "claude-code-ship-kit",
+      "source": "content/workflows/claude-code-ship-kit.md",
       "cluster": "ai-coding-workflows",
-      "status": "launch"
+      "status": "launch-batch"
     },
     {
       "path": "/workflow/build-a-context-passing-debug-stack",
@@ -46,15 +48,47 @@
       "slug": "build-a-context-passing-debug-stack",
       "source": "content/workflows/build-a-context-passing-debug-stack.md",
       "cluster": "ai-coding-workflows",
-      "status": "launch"
+      "status": "launch-batch"
+    },
+    {
+      "path": "/workflow/research-brief-to-spec",
+      "pageType": "workflow",
+      "slug": "research-brief-to-spec",
+      "source": "content/workflows/research-brief-to-spec.md",
+      "cluster": "agent-operations",
+      "status": "launch-batch"
     },
     {
       "path": "/workflow/run-a-weekly-agent-ops-audit",
       "pageType": "workflow",
       "slug": "run-a-weekly-agent-ops-audit",
       "source": "content/workflows/run-a-weekly-agent-ops-audit.md",
-      "cluster": "ai-agent-operations",
-      "status": "launch"
+      "cluster": "agent-operations",
+      "status": "launch-batch"
+    },
+    {
+      "path": "/workflow/ship-an-ai-code-review-loop",
+      "pageType": "workflow",
+      "slug": "ship-an-ai-code-review-loop",
+      "source": "content/workflows/ship-an-ai-code-review-loop.md",
+      "cluster": "ai-coding-workflows",
+      "status": "launch-batch"
+    },
+    {
+      "path": "/workflow/weekly-agent-ops-ledger",
+      "pageType": "workflow",
+      "slug": "weekly-agent-ops-ledger",
+      "source": "content/workflows/weekly-agent-ops-ledger.md",
+      "cluster": "agent-operations",
+      "status": "launch-batch"
+    },
+    {
+      "path": "/compare/claude-code-vs-cursor-for-shipping",
+      "pageType": "comparison",
+      "slug": "claude-code-vs-cursor-for-shipping",
+      "source": "content/comparisons/claude-code-vs-cursor-for-shipping.md",
+      "cluster": "ai-coding-workflows",
+      "status": "launch-batch"
     },
     {
       "path": "/compare/claude-code-vs-cursor-for-solo-repo-ships",
@@ -62,13 +96,13 @@
       "slug": "claude-code-vs-cursor-for-solo-repo-ships",
       "source": "content/comparisons/claude-code-vs-cursor-for-solo-repo-ships.md",
       "cluster": "ai-coding-workflows",
-      "status": "launch"
+      "status": "launch-batch"
     },
     {
       "path": "/ritual",
       "pageType": "lab",
       "slug": "ritual-lab",
-      "source": "content/pages/ritual-lab.md",
+      "source": "packages/client/dist/index.html",
       "cluster": "ritual-lab",
       "status": "preserved"
     }

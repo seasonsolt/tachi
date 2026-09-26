@@ -9,6 +9,7 @@ ctaHref: https://cursor.com/
 ctaNote: Comparison pages are secondary. They should support a workflow route rather than replace it.
 updatedAt: 2026-04-16
 monetizationMode: ads, affiliate, newsletter
+status: launch-batch
 description: A support comparison page that helps readers choose where each tool fits inside a workflow-led coding stack.
 keywords: claude code vs cursor, ai coding tools, coding assistant comparison
 related: /workflow/claude-code-ship-kit, /hub/ai-coding-workflows, /ritual

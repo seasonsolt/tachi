@@ -6,6 +6,7 @@ intent: tutorial-hub
 ctaType: newsletter
 updatedAt: 2026-04-16
 monetizationMode: ads, affiliate, newsletter
+status: launch-batch
 description: Operating systems, weekly reviews, and ledger habits for builders managing multiple agents without losing the plot.
 related: /workflow/weekly-agent-ops-ledger, /workflow/research-brief-to-spec, /ritual
 hero: Treat agents like an operating portfolio: tracked, reviewed, and tied to revenue rather than novelty.

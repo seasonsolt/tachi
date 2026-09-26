@@ -15,15 +15,27 @@ import { startSessionCollector } from './collectors/claude-sessions.js';
 import {
   buildOpsReport,
   createContentRouteMap,
-  hashEmail,
   isLabPath,
   isRitualPath,
   loadRevenueLedger,
   loadRouteManifest,
-  readAnalyticsEvents,
   resolveContentRoute,
-  writeAnalyticsEvent,
 } from './content-site.js';
+import { registerContentOpsRoutes } from './content-ops/routes.js';
+import {
+  DEFAULT_CONTENT_EVENT_LOG_FILE,
+  appendContentEvent,
+  appendNewsletterLead,
+  createNewsletterLeadCapture,
+  readContentEventLog,
+} from './content-ops/event-store.js';
+import { DEFAULT_REVENUE_LEDGER_FILE, readRevenueLedger as readRuntimeRevenueLedger } from './content-ops/revenue-ledger.js';
+import type { RevenueLedger as SiteRevenueLedger, AnalyticsEvent } from './content-site.js';
+import {
+  createCtaClickEvent,
+  createNewsletterSignupEvent,
+  createPageViewEvent,
+} from './content-ops/contracts.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -65,8 +77,7 @@ function buildTokenData(sources: {
 const THEME_DIR = join(homedir(), '.eacc');
 const THEME_FILE = join(THEME_DIR, 'theme.json');
 const LEGACY_THEME_FILE = join(homedir(), '.ritual-screen', 'theme.json');
-const CONTENT_ANALYTICS_FILE = join(THEME_DIR, 'site-analytics.ndjson');
-
+const PHASE_ONE_SITE_URL = 'https://e-acc.ai';
 function readThemeFile(): ThemeName | null {
   try {
     // Try new path first, fall back to legacy ~/.ritual-screen/
@@ -93,6 +104,104 @@ function writeThemeFile(theme: ThemeName): void {
   } catch {
     // Ignore write errors
   }
+}
+
+function mapRuntimeEventsToAnalytics(events: ReturnType<typeof readContentEventLog>): AnalyticsEvent[] {
+  const mapped: AnalyticsEvent[] = [];
+
+  for (const { event } of events) {
+    switch (event.name) {
+      case 'page_view':
+        mapped.push({
+          type: 'page_view' as const,
+          timestamp: event.occurredAt,
+          route: event.attribution.path,
+          cluster: event.attribution.cluster ?? 'unknown',
+          kind: event.attribution.pageType,
+          userAgent: event.userAgent,
+        });
+        break;
+      case 'cta_click':
+        mapped.push({
+          type: 'cta_click' as const,
+          timestamp: event.occurredAt,
+          route: event.attribution.path,
+          cluster: event.attribution.cluster ?? 'unknown',
+          kind: event.attribution.pageType,
+          href: event.destination,
+          ctaType: event.monetization,
+          userAgent: event.userAgent,
+        });
+        break;
+      case 'newsletter_signup':
+        mapped.push({
+          type: 'newsletter_signup' as const,
+          timestamp: event.occurredAt,
+          route: event.attribution.path,
+          cluster: event.attribution.cluster ?? 'unknown',
+          kind: event.attribution.pageType,
+          emailHash: event.emailHash,
+          userAgent: event.userAgent,
+        });
+        break;
+      default:
+        break;
+    }
+  }
+
+  return mapped;
+}
+
+function mapRuntimeLedgerToSiteLedger(): SiteRevenueLedger | null {
+  const runtimeLedger = readRuntimeRevenueLedger(DEFAULT_REVENUE_LEDGER_FILE);
+  if (!runtimeLedger.entries.length) return null;
+
+  return {
+    owner: 'content-ops',
+    phaseOneDomain: runtimeLedger.domain,
+    deferredDomains: [],
+    weeks: runtimeLedger.weeklySnapshots.map((snapshot) => ({
+      weekStart: snapshot.weekStart,
+      ads: snapshot.totalsBySource.ads,
+      affiliate: snapshot.totalsBySource.affiliate,
+      sponsorship: snapshot.totalsBySource.sponsorship,
+      other: snapshot.totalsBySource.other,
+    })),
+  };
+}
+
+type ContentPageKind = 'home' | 'hub' | 'workflow' | 'comparison' | 'lab';
+
+function buildRouteAttribution(input: {
+  path: string;
+  kind: ContentPageKind;
+  cluster: string;
+  title: string;
+  slug?: string;
+}) {
+  const derivedSlug = input.slug ?? input.path.split('/').filter(Boolean).at(-1);
+  return {
+    path: input.path,
+    pageType: input.kind,
+    slug: derivedSlug,
+    cluster: input.cluster,
+    title: input.title,
+    canonicalUrl: `${PHASE_ONE_SITE_URL}${input.path}`,
+  };
+}
+
+function trackContentPageView(input: {
+  path: string;
+  kind: ContentPageKind;
+  cluster: string;
+  title: string;
+  slug?: string;
+  userAgent?: string;
+}) {
+  appendContentEvent(createPageViewEvent({
+    attribution: buildRouteAttribution(input),
+    userAgent: input.userAgent,
+  }));
 }
 
 export function startServer(port: number): { close: () => void } {
@@ -190,7 +299,10 @@ export function startServer(port: number): { close: () => void } {
     await next();
     c.header('Access-Control-Allow-Origin', c.req.header('Origin') || '*');
     c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    c.header('Access-Control-Allow-Headers', 'Content-Type');
+    c.header(
+      'Access-Control-Allow-Headers',
+      c.req.header('Access-Control-Request-Headers') || 'Content-Type, Authorization, X-Content-Ops-Token',
+    );
   });
 
   app.options('*', (c) => {
@@ -256,8 +368,16 @@ export function startServer(port: number): { close: () => void } {
     return null;
   }
 
+  registerContentOpsRoutes(app);
+
   app.get('/api/ops/report', (c) => {
-    const report = buildOpsReport(routeManifest, revenueLedger, readAnalyticsEvents(CONTENT_ANALYTICS_FILE));
+    const runtimeLedger = mapRuntimeLedgerToSiteLedger();
+    const runtimeAnalytics = mapRuntimeEventsToAnalytics(readContentEventLog(DEFAULT_CONTENT_EVENT_LOG_FILE));
+    const report = buildOpsReport(
+      routeManifest,
+      runtimeLedger ?? revenueLedger,
+      runtimeAnalytics,
+    );
     return c.json(report);
   });
 
@@ -268,16 +388,20 @@ export function startServer(port: number): { close: () => void } {
     const contentRoute = resolveContentRoute(routeMap, route);
     if (!contentRoute?.cta?.href) return c.text('Unknown outbound CTA', 404);
 
-    writeAnalyticsEvent(CONTENT_ANALYTICS_FILE, {
-      type: 'outbound_cta',
-      timestamp: new Date().toISOString(),
-      route: contentRoute.path,
-      cluster: contentRoute.cluster,
-      kind: contentRoute.kind,
-      href: contentRoute.cta.href,
-      ctaType: contentRoute.cta.type,
-      userAgent: c.req.header('user-agent'),
-    });
+    appendContentEvent(createCtaClickEvent({
+      attribution: buildRouteAttribution({
+        path: contentRoute.path,
+        kind: contentRoute.kind as ContentPageKind,
+        cluster: contentRoute.cluster,
+        title: contentRoute.title,
+      }),
+      ctaId: `redirect:${contentRoute.path}`,
+      ctaLabel: contentRoute.cta.label,
+      destination: contentRoute.cta.href,
+      placement: 'inline',
+      monetization: contentRoute.cta.type === 'affiliate' ? 'affiliate' : 'internal',
+      userAgent: c.req.header('user-agent') ?? undefined,
+    }));
 
     return c.redirect(contentRoute.cta.href, 302);
   });
@@ -291,15 +415,27 @@ export function startServer(port: number): { close: () => void } {
     const contentRoute = resolveContentRoute(routeMap, route);
     if (!contentRoute) return c.text('Unknown content route', 404);
 
-    writeAnalyticsEvent(CONTENT_ANALYTICS_FILE, {
-      type: 'newsletter_capture',
-      timestamp: new Date().toISOString(),
-      route: contentRoute.path,
+    appendNewsletterLead(createNewsletterLeadCapture({
+      email,
+      formId: 'newsletter-form',
+      sourcePath: contentRoute.path,
       cluster: contentRoute.cluster,
-      kind: contentRoute.kind,
-      emailHash: hashEmail(email),
-      userAgent: c.req.header('user-agent'),
-    });
+      consent: true,
+      provider: 'first-party-form',
+    }));
+    appendContentEvent(createNewsletterSignupEvent({
+      attribution: buildRouteAttribution({
+        path: contentRoute.path,
+        kind: contentRoute.kind as ContentPageKind,
+        cluster: contentRoute.cluster,
+        title: contentRoute.title,
+      }),
+      formId: 'newsletter-form',
+      email,
+      consent: true,
+      provider: 'first-party-form',
+      userAgent: c.req.header('user-agent') ?? undefined,
+    }));
 
     return c.html(`<!DOCTYPE html>
 <html lang="en" style="color-scheme: dark">
@@ -329,18 +465,48 @@ export function startServer(port: number): { close: () => void } {
 
   app.get('/ritual', (c) => {
     const response = serveStaticFile(ritualStaticRoot, '/index.html');
-    if (response) return response;
+    if (response) {
+      trackContentPageView({
+        path: '/ritual',
+        kind: 'lab',
+        slug: 'ritual-lab',
+        cluster: 'ritual-lab',
+        title: 'Ritual screen',
+        userAgent: c.req.header('user-agent') ?? undefined,
+      });
+      return response;
+    }
     return c.text('Ritual shell not found', 404);
   });
 
   app.get('/ritual/*', (c) => {
     const ritualPath = c.req.path.replace(/^\/ritual/, '') || '/index.html';
     const fileResponse = serveStaticFile(ritualStaticRoot, ritualPath);
-    if (fileResponse) return fileResponse;
+    if (fileResponse) {
+      if (ritualPath === '/index.html') {
+        trackContentPageView({
+          path: '/ritual',
+          kind: 'lab',
+          slug: 'ritual-lab',
+          cluster: 'ritual-lab',
+          title: 'Ritual screen',
+          userAgent: c.req.header('user-agent') ?? undefined,
+        });
+      }
+      return fileResponse;
+    }
 
     const indexPath = join(ritualStaticRoot, 'index.html');
     if (existsSync(indexPath)) {
       const content = readFileSync(indexPath, 'utf-8');
+      trackContentPageView({
+        path: '/ritual',
+        kind: 'lab',
+        slug: 'ritual-lab',
+        cluster: 'ritual-lab',
+        title: 'Ritual screen',
+        userAgent: c.req.header('user-agent') ?? undefined,
+      });
       return c.html(content);
     }
 
@@ -352,13 +518,12 @@ export function startServer(port: number): { close: () => void } {
     if (contentRoute) {
       const response = serveStaticFile(siteStaticRoot, contentRoute.artifact);
       if (response) {
-        writeAnalyticsEvent(CONTENT_ANALYTICS_FILE, {
-          type: 'pageview',
-          timestamp: new Date().toISOString(),
-          route: contentRoute.path,
+        trackContentPageView({
+          path: contentRoute.path,
+          kind: contentRoute.kind as ContentPageKind,
           cluster: contentRoute.cluster,
-          kind: contentRoute.kind,
-          userAgent: c.req.header('user-agent'),
+          title: contentRoute.title,
+          userAgent: c.req.header('user-agent') ?? undefined,
         });
         return response;
       }

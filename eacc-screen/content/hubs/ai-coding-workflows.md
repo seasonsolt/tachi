@@ -1,11 +1,12 @@
 ---
 slug: ai-coding-workflows
 title: AI coding workflows for solo builders shipping every week
+description: A hub for repeatable AI coding workflows that help builders ship reliably on a small weekly cadence.
 cluster: ai-coding-workflows
 intent: hub
 ctaType: newsletter
 updatedAt: 2026-04-16
-monetizationMode: newsletter+ads
+monetizationMode: newsletter, ads
 pageType: hub
 primaryRoute: /hub/ai-coding-workflows
 featuredWorkflowSlugs:

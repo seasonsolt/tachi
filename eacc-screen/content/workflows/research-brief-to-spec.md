@@ -6,6 +6,7 @@ intent: workflow
 ctaType: newsletter
 updatedAt: 2026-04-16
 monetizationMode: ads, affiliate, newsletter
+status: launch-batch
 description: Turn messy discovery into a reusable spec that an implementation agent or builder can execute without re-litigating the goal.
 keywords: ai research workflow, implementation brief, spec writing
 related: /hub/agent-operations, /workflow/weekly-agent-ops-ledger, /ritual

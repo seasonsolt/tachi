@@ -1,6 +1,7 @@
 ---
 slug: ritual-lab
 title: Ritual lab — the original token altar
+description: An explanation and entrypoint for the preserved ritual lab experience inside the new content-led site.
 cluster: ritual-lab
 intent: lab
 ctaType: internal-lab

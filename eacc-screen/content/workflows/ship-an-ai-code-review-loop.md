@@ -1,11 +1,12 @@
 ---
 slug: ship-an-ai-code-review-loop
 title: Ship an AI code review loop that still respects repo context
+description: A workflow for shipping AI-assisted code review loops with clear checkpoints and verification.
 cluster: ai-coding-workflows
 intent: workflow
 ctaType: affiliate
 updatedAt: 2026-04-16
-monetizationMode: affiliate+newsletter+ads
+monetizationMode: affiliate, newsletter, ads
 pageType: workflow
 primaryRoute: /workflow/ship-an-ai-code-review-loop
 relatedHubSlugs:

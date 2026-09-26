@@ -298,10 +298,14 @@ function normalizeAttribution(input: ContentAttributionInput): ContentAttributio
   };
 }
 
-function createEventBase(
-  name: ContentEventName,
+type ContentEventBaseForName<TName extends ContentEventName> = Omit<ContentEventBase, 'name'> & {
+  name: TName;
+};
+
+function createEventBase<TName extends ContentEventName>(
+  name: TName,
   input: ContentEventContextInput,
-): ContentEventBase {
+): ContentEventBaseForName<TName> {
   return {
     eventId: input.eventId ?? createContentEventId(),
     name,
