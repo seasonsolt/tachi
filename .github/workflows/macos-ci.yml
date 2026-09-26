@@ -1,0 +1,52 @@
+name: macOS CI
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/macos-ci.yml'
+      - 'eacc-panel/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/macos-ci.yml'
+      - 'eacc-panel/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test Tachi
+    runs-on: macos-14
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: eacc-panel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+      - name: Assemble app bundle
+        env:
+          TACHI_INSTALL_APP: '0'
+        run: ./build.sh
+
+      - name: Verify app bundle
+        run: |
+          file Tachi.app/Contents/MacOS/Tachi
+          codesign --verify --deep --strict --verbose=2 Tachi.app

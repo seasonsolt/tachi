@@ -67,6 +67,48 @@ describe('readClaudeProjectSessions', () => {
     expect(sessions[0]?.tool).toBe('claude_code');
   });
 
+  it('keeps live sessions in the same project and uses Claude titles', () => {
+    const projectsDir = makeTempDir();
+    const projectDir = join(projectsDir, '-tmp-aiworkspace');
+    mkdirSync(projectDir, { recursive: true });
+
+    const fixtures = [
+      {
+        id: 'rules',
+        slug: 'gentle-munching-sunset',
+        title: 'TAPD 1065390 线索规则验证',
+        aiTitle: '验证线索规则页签与待分配功能',
+      },
+      {
+        id: 'operations',
+        slug: '',
+        title: 'Operations 前端功能和 UI 审查',
+        aiTitle: '检查线索生成规则页面功能和UI风格',
+      },
+    ];
+    for (const fixture of fixtures) {
+      const sessionPath = join(projectDir, `${fixture.id}.jsonl`);
+      writeFileSync(
+        sessionPath,
+        [
+          `{"timestamp":"1970-01-01T00:03:20Z","type":"user","entrypoint":"claude-desktop","cwd":"/tmp/aiworkspace","slug":"${fixture.slug}","message":"Work"}`,
+          `{"type":"custom-title","customTitle":"${fixture.title}"}`,
+          `{"type":"ai-title","aiTitle":"${fixture.aiTitle}"}`,
+        ].join('\n'),
+      );
+      utimesSync(sessionPath, new Date(200_000), new Date(200_000));
+    }
+
+    const liveIds = new Set(fixtures.map((fixture) => fixture.id));
+    const sessions = readClaudeProjectSessions(projectsDir, 220_000, liveIds, liveIds);
+    const titlesById = new Map(sessions.map((session) => [session.sessionId, session.taskTitle]));
+
+    expect(titlesById).toEqual(new Map([
+      ['rules', 'TAPD 1065390 线索规则验证'],
+      ['operations', 'Operations 前端功能和 UI 审查'],
+    ]));
+  });
+
   it('reads registered session ids from the Claude sessions directory', () => {
     const sessionsDir = makeTempDir();
     writeFileSync(

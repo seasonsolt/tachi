@@ -10,10 +10,17 @@ final class RecipeRuntime: @unchecked Sendable {
 
     /// Called when a recipe's data updates (supports multiple listeners)
     private var sourceUpdateHandlers: [(String, EACCSourceData) -> Void] = []
+    private var codexUsageUpdateHandlers: [(CodexUsageSnapshot) -> Void] = []
 
     func addSourceUpdateHandler(_ handler: @escaping (String, EACCSourceData) -> Void) {
         lock.lock()
         sourceUpdateHandlers.append(handler)
+        lock.unlock()
+    }
+
+    func addCodexUsageUpdateHandler(_ handler: @escaping (CodexUsageSnapshot) -> Void) {
+        lock.lock()
+        codexUsageUpdateHandlers.append(handler)
         lock.unlock()
     }
 
@@ -34,6 +41,15 @@ final class RecipeRuntime: @unchecked Sendable {
         lock.unlock()
         for handler in handlers {
             handler(id, data)
+        }
+    }
+
+    private func notifyCodexUsageUpdate(_ snapshot: CodexUsageSnapshot) {
+        lock.lock()
+        let handlers = codexUsageUpdateHandlers
+        lock.unlock()
+        for handler in handlers {
+            handler(snapshot)
         }
     }
 
@@ -99,7 +115,13 @@ final class RecipeRuntime: @unchecked Sendable {
     // MARK: - Private
 
     private func startCollector(for recipe: CollectorRecipe) {
-        let collector = RecipeCollector(recipe: recipe, queue: queue)
+        let collector = RecipeCollector(
+            recipe: recipe,
+            queue: queue,
+            onCodexUsageUpdate: { [weak self] snapshot in
+                self?.notifyCodexUsageUpdate(snapshot)
+            }
+        )
         lock.lock()
         // Stop existing collector for this ID if any
         activeCollectors[recipe.id]?.stop()
@@ -125,10 +147,16 @@ private final class RecipeCollector: @unchecked Sendable {
     private var fileSource: DispatchSourceFileSystemObject?
     private var fileDescriptor: Int32 = -1
     private let queue: DispatchQueue
+    private let onCodexUsageUpdate: (CodexUsageSnapshot) -> Void
 
-    init(recipe: CollectorRecipe, queue: DispatchQueue) {
+    init(
+        recipe: CollectorRecipe,
+        queue: DispatchQueue,
+        onCodexUsageUpdate: @escaping (CodexUsageSnapshot) -> Void
+    ) {
         self.recipe = recipe
         self.queue = queue
+        self.onCodexUsageUpdate = onCodexUsageUpdate
     }
 
     func start(onUpdate: @escaping (EACCSourceData) -> Void) {
@@ -436,128 +464,12 @@ private final class RecipeCollector: @unchecked Sendable {
             else { return }
             onUpdate(parsed)
         case "codex-sessions":
-            let data = Self.scanCodexSessions()
-            onUpdate(data)
+            let snapshot = CodexUsageAggregator.snapshot()
+            onCodexUsageUpdate(snapshot)
+            onUpdate(snapshot.sourceData)
         default:
             NSLog("[RecipeRuntime] Unknown parseScript: \(parseScript)")
         }
-    }
-
-    // MARK: - Codex session scanner
-
-    /// Scan all Codex session .jsonl files and sum up token usage.
-    /// Each session's last `total_token_usage` entry gives that session's total.
-    private static func scanCodexSessions() -> EACCSourceData {
-        let home = NSHomeDirectory()
-        let sessionsDir = home + "/.codex/sessions"
-        let archivedDir = home + "/.codex/archived_sessions"
-        let fm = FileManager.default
-        let cutoff = Date().addingTimeInterval(-90 * 24 * 60 * 60)
-        let maxFiles = 256
-
-        var files: [(path: String, modified: Date)] = []
-        if let enumerator = fm.enumerator(atPath: sessionsDir) {
-            while let file = enumerator.nextObject() as? String {
-                guard file.hasSuffix(".jsonl") else { continue }
-                let path = sessionsDir + "/" + file
-                guard let modified = modificationDate(at: path, fileManager: fm),
-                      modified >= cutoff
-                else { continue }
-                files.append((path: path, modified: modified))
-            }
-        }
-        if let archived = try? fm.contentsOfDirectory(atPath: archivedDir) {
-            for f in archived where f.hasSuffix(".jsonl") {
-                let path = archivedDir + "/" + f
-                guard let modified = modificationDate(at: path, fileManager: fm),
-                      modified >= cutoff
-                else { continue }
-                files.append((path: path, modified: modified))
-            }
-        }
-
-        let today = Self.todayString()
-        let month = String(today.prefix(7))
-
-        var totalTokens = 0, todayTokens = 0, monthTokens = 0
-        var totalInput = 0, totalOutput = 0
-
-        for file in files.sorted(by: { $0.modified > $1.modified }).prefix(maxFiles) {
-            guard let content = tailString(path: file.path, maxBytes: 262_144) else { continue }
-
-            var sessionDate: String?
-            var lastTotal = 0, lastInput = 0, lastOutput = 0
-
-            for line in content.split(separator: "\n") {
-                guard !line.isEmpty,
-                      let entry = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
-                else { continue }
-
-                // Get session date from first entry's timestamp
-                if sessionDate == nil, let ts = entry["timestamp"] as? String, ts.count >= 10 {
-                    sessionDate = String(ts.prefix(10))
-                }
-
-                // Look for total_token_usage in payload.info
-                if let payload = entry["payload"] as? [String: Any],
-                   let info = payload["info"] as? [String: Any],
-                   let usage = info["total_token_usage"] as? [String: Any] {
-                    lastTotal = (usage["total_tokens"] as? Int) ?? 0
-                    lastInput = (usage["input_tokens"] as? Int) ?? 0
-                    lastOutput = (usage["output_tokens"] as? Int) ?? 0
-                }
-            }
-
-            totalTokens += lastTotal
-            totalInput += lastInput
-            totalOutput += lastOutput
-            if let d = sessionDate {
-                if d == today { todayTokens += lastTotal }
-                if d.hasPrefix(month) { monthTokens += lastTotal }
-            }
-        }
-
-        // Estimate cost using OpenAI pricing (codex uses OpenAI models)
-        // Approximate: $2.50/1M input, $10/1M output for GPT-4.1
-        let costUSD = Double(totalInput) * 2.5 / 1_000_000.0 + Double(totalOutput) * 10.0 / 1_000_000.0
-        let todayCost = Double(todayTokens) * 5.0 / 1_000_000.0  // blended rate
-        let monthCost = Double(monthTokens) * 5.0 / 1_000_000.0
-
-        return EACCSourceData(
-            connected: true,
-            totalTokens: totalTokens,
-            todayTokens: todayTokens,
-            monthTokens: monthTokens,
-            costUSD: costUSD,
-            todayCostUSD: todayCost,
-            monthCostUSD: monthCost,
-            inputTokens: totalInput,
-            outputTokens: totalOutput,
-            lastUpdated: Int(Date().timeIntervalSince1970 * 1000)
-        )
-    }
-
-    private static func modificationDate(at path: String, fileManager: FileManager) -> Date? {
-        (try? fileManager.attributesOfItem(atPath: path))?[.modificationDate] as? Date
-    }
-
-    private static func tailString(path: String, maxBytes: UInt64) -> String? {
-        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
-        defer { handle.closeFile() }
-
-        let size = handle.seekToEndOfFile()
-        guard size > 0 else { return "" }
-
-        let readSize = min(size, maxBytes)
-        handle.seek(toFileOffset: size - readSize)
-        let data = handle.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)
-    }
-
-    private static func todayString() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: Date())
     }
 
     // MARK: - JSONPath-like extraction

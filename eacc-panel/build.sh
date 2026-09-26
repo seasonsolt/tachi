@@ -1,16 +1,26 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 cd "$(dirname "$0")"
 
 echo "Building Tachi..."
-swift build -c release 2>&1
+BUILD_ARGS=(-c release)
+TACHI_BUILD_TRIPLE="${TACHI_BUILD_TRIPLE:-}"
+if [ -n "$TACHI_BUILD_TRIPLE" ]; then
+    BUILD_ARGS+=(--triple "$TACHI_BUILD_TRIPLE")
+fi
+swift build "${BUILD_ARGS[@]}" 2>&1
 
-EXEC=".build/release/Tachi"
+BIN_DIR="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)"
+EXEC="$BIN_DIR/Tachi"
 APP_BUNDLE="Tachi.app"
 APP_DIR="$APP_BUNDLE/Contents/MacOS"
 APP_RESOURCES="$APP_BUNDLE/Contents/Resources"
 INSTALL_APP="/Applications/$APP_BUNDLE"
 LEGACY_APP_BUNDLES=("Monolith.app")
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+TACHI_INSTALL_APP="${TACHI_INSTALL_APP:-1}"
+
+test -x "$EXEC"
 
 rm -rf "$APP_BUNDLE"
 for legacy_bundle in "${LEGACY_APP_BUNDLES[@]}"; do
@@ -26,17 +36,27 @@ if [ -d Resources/Fonts ]; then
     cp -X Resources/Fonts/* "$APP_RESOURCES/Fonts/"
 fi
 
-# Re-sign so Info.plist is bound to the bundle identity
-codesign --force --sign - --deep "$APP_BUNDLE"
+# Bind Info.plist and resources to the bundle signature. Release builds pass a
+# Developer ID Application identity; local builds remain ad-hoc signed.
+if [ "$SIGN_IDENTITY" = "-" ]; then
+    codesign --force --sign - "$APP_BUNDLE"
+else
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+fi
+codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
-echo "Installing to $INSTALL_APP..."
-rm -rf "$INSTALL_APP"
-for legacy_bundle in "${LEGACY_APP_BUNDLES[@]}"; do
-    rm -rf "/Applications/$legacy_bundle"
-done
-ditto --noextattr --noqtn "$APP_BUNDLE" "$INSTALL_APP"
+if [ "$TACHI_INSTALL_APP" = "1" ]; then
+    echo "Installing to $INSTALL_APP..."
+    rm -rf "$INSTALL_APP"
+    for legacy_bundle in "${LEGACY_APP_BUNDLES[@]}"; do
+        rm -rf "/Applications/$legacy_bundle"
+    done
+    ditto --noextattr --noqtn "$APP_BUNDLE" "$INSTALL_APP"
+fi
 
 echo ""
 echo "Build complete: $APP_BUNDLE"
-echo "Installed to: $INSTALL_APP"
-echo "Run with: open \"$INSTALL_APP\""
+if [ "$TACHI_INSTALL_APP" = "1" ]; then
+    echo "Installed to: $INSTALL_APP"
+    echo "Run with: open \"$INSTALL_APP\""
+fi

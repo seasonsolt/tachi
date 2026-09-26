@@ -188,6 +188,7 @@ final class ViewModel {
     var items: [AccountWithUsage] = []
     var sessions: [CodingSession] = []
     var codexRateLimits: CodexRateLimitSnapshot?
+    var codexUsage: CodexUsageSnapshot?
     var claudeUsage: ClaudeUsageSnapshot?
     var claudeStats: ClaudeStats?
     var isLoading = true
@@ -219,6 +220,11 @@ final class ViewModel {
                 let recipes = RecipeStore.loadAll()
                 let name = recipes.first(where: { $0.id == id })?.name ?? id
                 self.upsertSource(id: id, name: name, data: data)
+            }
+        }
+        recipeRuntime?.addCodexUsageUpdateHandler { [weak self] snapshot in
+            DispatchQueue.main.async {
+                self?.codexUsage = snapshot
             }
         }
     }

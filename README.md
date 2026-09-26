@@ -9,18 +9,26 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/seasonsolt/e-acc/releases/latest">Download</a>
+  <a href="https://github.com/seasonsolt/tachi/releases/latest">Download</a>
   ·
   <a href="#what-you-see">Features</a>
   ·
   <a href="#private-by-design">Privacy</a>
   ·
   <a href="#install">Install</a>
+  ·
+  <a href="https://github.com/seasonsolt/tachi/issues">Feedback</a>
+</p>
+
+<p align="center">
+  <strong>macOS 14 Sonoma or later · Apple Silicon (M1 or newer)</strong>
 </p>
 
 Tachi is a small macOS menu bar app that shows your live AI-coding sessions and token spend — Claude Code, Codex, OpenCode, and more. It reads the local files those tools already write, so there is no account to create, no API key to paste, and nothing leaves your Mac.
 
 It is for people who live inside coding agents and want a quick pulse on what is running, without opening yet another dashboard.
+
+**[▶ Watch the 15-second product demo](docs/assets/tachi-demo.mp4)**
 
 <p align="center">
   <img src="docs/assets/tachi-panel.png" width="360" alt="Tachi menu bar panel with a live Claude Code usage card and a Codex quota card">
@@ -60,13 +68,16 @@ Tachi is local-first, on purpose:
 - It reads only the standard session files the tools already keep on disk. Nothing is uploaded, and there is no telemetry.
 - No account and no API key are needed for session tracking or usage — it is all derived from local data.
 - The local link the app uses is bound to loopback, so it is not reachable from your network.
-- Open source, free, and a native Swift app. Requires macOS 14 (Sonoma) or later.
+- Open source under the [MIT License](LICENSE), free, and a native Swift app.
+- Requires macOS 14 (Sonoma) or later on an Apple Silicon Mac (M1 or newer). Intel Macs are not supported by the current release.
 
 ## Install
 
 Grab the latest DMG:
 
-**[⬇ Download the latest release](https://github.com/seasonsolt/e-acc/releases/latest)**
+**[⬇ Download the latest release](https://github.com/seasonsolt/tachi/releases/latest)**
+
+The current release supports **Apple Silicon Macs only** (M1 or newer) and requires macOS 14 Sonoma or later.
 
 1. Open `Tachi-<version>.dmg` and drag **Tachi.app** onto **Applications**.
 2. Clear the download quarantine once (below), then launch Tachi — it lives in the menu bar.
@@ -81,12 +92,16 @@ xattr -dr com.apple.quarantine /Applications/Tachi.app
 
 Then double-click Tachi — it opens normally from then on. (Or: try to open it once, then **System Settings → Privacy & Security → Open Anyway**.)
 
-This is expected for any unsigned app. A fully frictionless install needs Developer ID signing and notarization, which is on the roadmap.
+This is expected for the current unsigned build. The repository now includes a Developer ID signing and notarization release workflow; the quarantine step will be removed as soon as the required Apple signing credentials are configured and a notarized DMG is published.
 
 ## Status
 
-Early release, in active use. Session tracking and the Claude/Codex usage cards work today; the current build is unsigned. Next up is a signed, notarized release for a one-click install.
+Available as a final v1.3.0 release and in active use. Session tracking and the Claude/Codex usage cards work today. The current DMG is ad-hoc signed and not notarized; a Developer ID signed, notarized release is the remaining requirement for a one-click install.
 
 ## For Builders
 
 This is a monorepo. The macOS app is in [`eacc-panel`](eacc-panel) (Swift); a companion web screen and CLI live in [`eacc-screen`](eacc-screen). Start with `eacc-panel` to understand the product; see the in-repo docs for implementation details.
+
+The repository includes macOS build/test CI and a notarized DMG workflow for release tags, documented in [Releasing Tachi](docs/RELEASING.md).
+
+Found a bug or have an idea? [Open an issue](https://github.com/seasonsolt/tachi/issues/new/choose).

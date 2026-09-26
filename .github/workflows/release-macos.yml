@@ -1,0 +1,140 @@
+name: Release notarized macOS app
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing v-prefixed tag to release
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Sign, notarize, and publish DMG
+    runs-on: macos-14
+    timeout-minutes: 40
+    env:
+      TAG_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      SIGN_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG_NAME }}
+
+      - name: Validate version
+        working-directory: eacc-panel
+        run: |
+          app_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
+          test "$TAG_NAME" = "v$app_version"
+          test -n "$SIGN_IDENTITY"
+
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          certificate_path="$RUNNER_TEMP/tachi-certificate.p12"
+          keychain_path="$RUNNER_TEMP/tachi-signing.keychain-db"
+          printf '%s' "$CERTIFICATE_P12" | base64 --decode > "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security list-keychain -d user -s "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security find-identity -p codesigning -v "$keychain_path"
+
+      - name: Build and sign app
+        working-directory: eacc-panel
+        env:
+          TACHI_INSTALL_APP: '0'
+          TACHI_BUILD_TRIPLE: arm64-apple-macosx14.0
+        run: ./build.sh
+
+      - name: Verify Apple Silicon artifact
+        working-directory: eacc-panel
+        run: |
+          file Tachi.app/Contents/MacOS/Tachi
+          lipo Tachi.app/Contents/MacOS/Tachi -verify_arch arm64
+
+      - name: Notarize app
+        working-directory: eacc-panel
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          api_key_path="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
+          printf '%s' "$APPLE_API_PRIVATE_KEY" > "$api_key_path"
+          ditto -c -k --keepParent Tachi.app "$RUNNER_TEMP/Tachi.app.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/Tachi.app.zip" \
+            --key "$api_key_path" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --wait
+          xcrun stapler staple Tachi.app
+          xcrun stapler validate Tachi.app
+          spctl --assess --type execute -vv Tachi.app
+
+      - name: Create and sign DMG
+        working-directory: eacc-panel
+        run: |
+          version="${TAG_NAME#v}"
+          dmg="Tachi-$version.dmg"
+          staging="$RUNNER_TEMP/tachi-dmg"
+          mkdir -p "$staging"
+          ditto Tachi.app "$staging/Tachi.app"
+          ln -s /Applications "$staging/Applications"
+          hdiutil create -volname Tachi -srcfolder "$staging" -ov -format UDZO "$dmg"
+          codesign --force --timestamp --sign "$SIGN_IDENTITY" "$dmg"
+
+      - name: Notarize DMG
+        working-directory: eacc-panel
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          version="${TAG_NAME#v}"
+          dmg="Tachi-$version.dmg"
+          api_key_path="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
+          xcrun notarytool submit "$dmg" \
+            --key "$api_key_path" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$dmg"
+          xcrun stapler validate "$dmg"
+          spctl --assess --type open --context context:primary-signature -vv "$dmg"
+          shasum -a 256 "$dmg" > "$dmg.sha256"
+
+      - name: Publish final release
+        working-directory: eacc-panel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${TAG_NAME#v}"
+          dmg="Tachi-$version.dmg"
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" "$dmg" "$dmg.sha256" --clobber
+            gh release edit "$TAG_NAME" --draft=false --prerelease=false --latest
+          else
+            gh release create "$TAG_NAME" "$dmg" "$dmg.sha256" \
+              --verify-tag \
+              --generate-notes \
+              --title "Tachi $version" \
+              --latest
+          fi
+
+      - name: Remove temporary signing material
+        if: ${{ always() }}
+        run: |
+          security delete-keychain "$RUNNER_TEMP/tachi-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/tachi-certificate.p12" "$RUNNER_TEMP"/AuthKey_*.p8

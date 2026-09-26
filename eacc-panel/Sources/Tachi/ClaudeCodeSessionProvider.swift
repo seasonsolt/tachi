@@ -127,6 +127,10 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
                 let cwd = lastEntry?["cwd"] as? String ?? decodeDirName(dir)
                 let slug = lastEntry?["slug"] as? String ?? ""
                 let projectName = sanitizeTaskText((cwd as NSString).lastPathComponent)
+                let taskTitle = claudeTaskTitle(
+                    recentEntries: recentEntries,
+                    fallback: sanitizeTaskText(slug) ?? projectName
+                )
                 let trace = claudeTrace(recentEntries: recentEntries, fallbackDate: modified, now: now)
                 let processAlive = registry.aliveIds.contains(sessionId)
 
@@ -152,10 +156,10 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
                         tool: tool,
                         projectPath: cwd,
                         slug: slug,
-                        taskTitle: sanitizeTaskText(slug) ?? projectName,
+                        taskTitle: taskTitle,
                         taskSummary: claudeTaskSummary(
                             recentEntries: recentEntries,
-                            fallback: sanitizeTaskText(slug) ?? projectName
+                            fallback: taskTitle
                         ),
                         status: status,
                         lastActivity: trace.lastActivity,
@@ -167,17 +171,20 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
             }
         }
 
-        var best: [String: CodingSession] = [:]
-        for session in sessions {
-            if let existing = best[session.projectPath] {
+        let liveProjectPaths = Set(sessions.filter(\.processAlive).map(\.projectPath))
+        var selected = sessions.filter(\.processAlive)
+        var newestClosed: [String: CodingSession] = [:]
+        for session in sessions where !session.processAlive && !liveProjectPaths.contains(session.projectPath) {
+            if let existing = newestClosed[session.projectPath] {
                 if session.lastActivity > existing.lastActivity {
-                    best[session.projectPath] = session
+                    newestClosed[session.projectPath] = session
                 }
             } else {
-                best[session.projectPath] = session
+                newestClosed[session.projectPath] = session
             }
         }
-        return SessionProviderResult(sessions: Array(best.values))
+        selected.append(contentsOf: newestClosed.values)
+        return SessionProviderResult(sessions: selected)
     }
 
     private struct SessionRegistry {
@@ -233,6 +240,16 @@ private final class ClaudeProjectSessionProvider: CodingSessionProvider {
             }
         }
         return trace(for: .quiet, timestamp: fallbackDate, now: now)
+    }
+
+    private func claudeTaskTitle(recentEntries: [[String: Any]], fallback: String?) -> String? {
+        for key in ["customTitle", "aiTitle"] {
+            for entry in recentEntries {
+                guard let title = sanitizeTaskText(entry[key] as? String) else { continue }
+                return title
+            }
+        }
+        return sanitizeTaskText(fallback)
     }
 
     private func claudeTaskSummary(recentEntries: [[String: Any]], fallback: String?) -> String? {

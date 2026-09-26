@@ -583,8 +583,8 @@ struct ContentView: View {
                    usage.month.costUSD > 0 || !usage.month.models.isEmpty {
                     claudeUsageCard(usage)
                 }
-                if let snapshot = vm.codexRateLimits {
-                    codexUsageSection(snapshot)
+                if vm.codexRateLimits != nil || vm.codexUsage != nil {
+                    codexUsageSection(snapshot: vm.codexRateLimits, usage: vm.codexUsage)
                 }
             }
             .padding(.horizontal, 16)
@@ -723,8 +723,11 @@ struct ContentView: View {
 
     // MARK: - Codex Usage
 
-    private func codexUsageSection(_ snapshot: CodexRateLimitSnapshot) -> some View {
-        CodexQuotaCard(snapshot: snapshot, themeColors: panelColors)
+    private func codexUsageSection(
+        snapshot: CodexRateLimitSnapshot?,
+        usage: CodexUsageSnapshot?
+    ) -> some View {
+        CodexQuotaCard(snapshot: snapshot, usage: usage, themeColors: panelColors)
     }
 
     private var providersSection: some View {
@@ -1912,7 +1915,8 @@ struct UtilBar: View {
 // MARK: - Codex Quota Card
 
 struct CodexQuotaCard: View {
-    let snapshot: CodexRateLimitSnapshot
+    let snapshot: CodexRateLimitSnapshot?
+    let usage: CodexUsageSnapshot?
     let themeColors: EACCThemeColors
 
     private var skin: EACCThemeColors { themeColors }
@@ -1928,7 +1932,7 @@ struct CodexQuotaCard: View {
                     .tracking(1.5)
                     .foregroundStyle(themeColors.textSecondary)
                 Spacer()
-                Text("OFFICIAL")
+                Text(usage == nil ? "OFFICIAL" : "LOCAL EST.")
                     .font(skin.mono(9, weight: .bold))
                     .tracking(1.0)
                     .padding(.horizontal, 7)
@@ -1962,7 +1966,9 @@ struct CodexQuotaCard: View {
                     Text("Codex account")
                         .font(skin.display(14, weight: .semibold))
                         .foregroundStyle(themeColors.textPrimary)
-                    Text(snapshot.limitName ?? snapshot.limitId ?? "codex")
+                    Text(usage == nil
+                        ? (snapshot?.limitName ?? snapshot?.limitId ?? "codex")
+                        : (snapshot == nil ? "Estimated from local sessions" : "Official quota · local estimate"))
                         .font(skin.mono(10, weight: .medium))
                         .foregroundStyle(skin.textMuted)
                         .lineLimit(1)
@@ -1970,41 +1976,124 @@ struct CodexQuotaCard: View {
 
                 Spacer()
 
-                if let count = snapshot.resetCreditCount {
+                if let count = snapshot?.resetCreditCount {
                     Text("\(count) resets")
                         .font(skin.mono(12, weight: .bold).monospacedDigit())
                         .foregroundStyle(themeColors.accent)
                 }
             }
 
-            VStack(spacing: 12) {
-                ForEach(snapshot.windows, id: \.kind.rawValue) { window in
-                    quotaWindowRow(window)
-                }
+            if let usage {
+                codexCostSummary(usage)
             }
 
-            if !snapshot.availableResetCredits.isEmpty {
-                VStack(spacing: 7) {
+            if let snapshot {
+                if usage != nil && (!snapshot.windows.isEmpty || !snapshot.availableResetCredits.isEmpty) {
                     AuroraDashedDivider()
-                    ForEach(Array(snapshot.availableResetCredits.prefix(4).enumerated()), id: \.offset) { index, credit in
-                        resetCreditRow(index: index, credit: credit)
-                    }
-                    if snapshot.availableResetCredits.count > 4 {
-                        Text("+\(snapshot.availableResetCredits.count - 4) more reset date ▾")
-                            .font(skin.mono(10, weight: .medium))
-                            .foregroundStyle(skin.textMuted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                VStack(spacing: 12) {
+                    ForEach(snapshot.windows, id: \.kind.rawValue) { window in
+                        quotaWindowRow(window)
                     }
                 }
-                .padding(.top, snapshot.windows.isEmpty ? 0 : 2)
-            } else if (snapshot.resetCreditCount ?? 0) > 0 {
-                Text("Reset valid dates unavailable")
-                    .font(skin.mono(10, weight: .medium))
-                    .foregroundStyle(skin.textMuted)
+
+                if !snapshot.availableResetCredits.isEmpty {
+                    VStack(spacing: 7) {
+                        AuroraDashedDivider()
+                        ForEach(Array(snapshot.availableResetCredits.prefix(4).enumerated()), id: \.offset) { index, credit in
+                            resetCreditRow(index: index, credit: credit)
+                        }
+                        if snapshot.availableResetCredits.count > 4 {
+                            Text("+\(snapshot.availableResetCredits.count - 4) more reset date ▾")
+                                .font(skin.mono(10, weight: .medium))
+                                .foregroundStyle(skin.textMuted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .padding(.top, snapshot.windows.isEmpty ? 0 : 2)
+                } else if (snapshot.resetCreditCount ?? 0) > 0 {
+                    Text("Reset valid dates unavailable")
+                        .font(skin.mono(10, weight: .medium))
+                        .foregroundStyle(skin.textMuted)
+                }
             }
         }
         .padding(16)
         .ritualDataCard(themeColors: themeColors, emphasis: themeColors.accent, radius: 18)
+    }
+
+    private func codexCostSummary(_ usage: CodexUsageSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("TODAY")
+                    .font(skin.mono(9, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundStyle(themeColors.accent.opacity(0.7))
+                Spacer()
+                Text(formatCost(usage.today.costUSD))
+                    .font(skin.mono(20, weight: .bold).monospacedDigit())
+                    .foregroundStyle(themeColors.accent)
+                Text("/ \(formatCount(usage.today.totalTokens))")
+                    .font(skin.mono(11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(themeColors.textSecondary)
+            }
+
+            HStack(spacing: 0) {
+                codexUsagePeriod("MONTH", window: usage.month)
+                Spacer()
+                codexUsagePeriod("RECENT", window: usage.recent)
+            }
+
+            if !usage.month.models.isEmpty {
+                VStack(spacing: 7) {
+                    AuroraDashedDivider()
+                    ForEach(usage.month.models) { model in
+                        codexUsageModelRow(model)
+                    }
+                }
+            }
+
+            if usage.isTruncated {
+                Text("Bounded scan · long sessions use approximate model attribution")
+                    .font(skin.mono(9, weight: .medium))
+                    .foregroundStyle(skin.textMuted)
+            }
+        }
+    }
+
+    private func codexUsagePeriod(_ label: String, window: CodexUsageWindow) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(skin.mono(9, weight: .medium))
+                .tracking(1.0)
+                .foregroundStyle(skin.textMuted)
+            HStack(spacing: 4) {
+                Text(formatCost(window.costUSD))
+                    .font(skin.mono(12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(themeColors.textSecondary)
+                Text(formatCount(window.totalTokens))
+                    .font(skin.mono(9, weight: .medium).monospacedDigit())
+                    .foregroundStyle(skin.textMuted)
+            }
+        }
+    }
+
+    private func codexUsageModelRow(_ model: CodexModelUsage) -> some View {
+        HStack(spacing: 8) {
+            Text(model.model)
+                .font(skin.mono(10, weight: .medium))
+                .foregroundStyle(themeColors.textSecondary)
+                .lineLimit(1)
+            Spacer()
+            Text(formatCost(model.costUSD))
+                .font(skin.mono(10, weight: .semibold).monospacedDigit())
+                .foregroundStyle(themeColors.accent)
+            Text(formatCount(model.totalTokens))
+                .font(skin.mono(9, weight: .medium).monospacedDigit())
+                .foregroundStyle(skin.textMuted)
+                .frame(width: 48, alignment: .trailing)
+        }
     }
 
     private func quotaWindowRow(_ window: CodexRateLimitWindow) -> some View {

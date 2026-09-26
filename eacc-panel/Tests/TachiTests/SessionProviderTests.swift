@@ -413,7 +413,44 @@ final class SessionProviderTests: XCTestCase {
         XCTAssertEqual(session.pulse, .warm)
     }
 
-    func testClaudeCodeProviderKeepsNewestSessionPerProject() throws {
+    func testClaudeCodeProviderKeepsLiveSessionsInSameProjectAndUsesClaudeTitles() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let projectDir = tempDir.appendingPathComponent("-tmp-aiworkspace", isDirectory: true)
+        let sessionsDir = tempDir.appendingPathComponent("sessions", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        try """
+        {"timestamp":"1970-01-01T00:03:00Z","type":"user","entrypoint":"claude-desktop","cwd":"/tmp/aiworkspace","slug":"gentle-munching-sunset","message":"Validate lead rules"}
+        {"type":"custom-title","customTitle":"TAPD 1065390 线索规则验证"}
+        {"type":"ai-title","aiTitle":"验证线索规则页签与待分配功能"}
+        """.write(to: projectDir.appendingPathComponent("rules.jsonl"), atomically: true, encoding: .utf8)
+        try """
+        {"timestamp":"1970-01-01T00:03:20Z","type":"user","entrypoint":"claude-desktop","cwd":"/tmp/aiworkspace","message":"Review Operations UI"}
+        {"type":"custom-title","customTitle":"Operations 前端功能和 UI 审查"}
+        {"type":"ai-title","aiTitle":"检查线索生成规则页面功能和UI风格"}
+        """.write(to: projectDir.appendingPathComponent("operations.jsonl"), atomically: true, encoding: .utf8)
+
+        let livePid = ProcessInfo.processInfo.processIdentifier
+        try """
+        {"pid":\(livePid),"sessionId":"rules","cwd":"/tmp/aiworkspace","startedAt":1}
+        """.write(to: sessionsDir.appendingPathComponent("rules.json"), atomically: true, encoding: .utf8)
+        try """
+        {"pid":\(livePid),"sessionId":"operations","cwd":"/tmp/aiworkspace","startedAt":1}
+        """.write(to: sessionsDir.appendingPathComponent("operations.json"), atomically: true, encoding: .utf8)
+
+        let provider = ClaudeCodeSessionProvider(projectsPath: tempDir.path, sessionsPath: sessionsDir.path)
+        let result = provider.scanSessions(now: Date(timeIntervalSince1970: 220))
+
+        let titlesById = Dictionary(uniqueKeysWithValues: result.sessions.map { ($0.id, $0.taskTitle) })
+        XCTAssertEqual(titlesById.count, 2)
+        XCTAssertEqual(titlesById["rules"], "TAPD 1065390 线索规则验证")
+        XCTAssertEqual(titlesById["operations"], "Operations 前端功能和 UI 审查")
+    }
+
+    func testClaudeCodeProviderKeepsNewestClosedSessionPerProject() throws {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let projectDir = tempDir.appendingPathComponent("-tmp-tachi", isDirectory: true)

@@ -40,6 +40,8 @@ interface ClaudeProjectEntry {
   type?: unknown;
   cwd?: unknown;
   slug?: unknown;
+  customTitle?: unknown;
+  aiTitle?: unknown;
   entrypoint?: unknown;
   message?: unknown;
   content?: unknown;
@@ -190,6 +192,10 @@ export function readClaudeProjectSessions(
         const isDesign = isDesktop && !registeredSessionIds.has(sessionId);
         const tool: SessionTool = isDesign ? 'claude_design' : 'claude_code';
         const projectName = sanitizeTaskText(cwd.split('/').filter(Boolean).at(-1));
+        const taskTitle = claudeProjectTaskTitle(
+          recentEntries,
+          sanitizeTaskText(slug) ?? projectName,
+        );
         const processAlive = aliveSessionIds.has(sessionId);
         let signal = claudeSessionSignal(recentEntries, startedAt, nowMs);
         let status = sessionStatusForSignal(signal, startedAt, nowMs);
@@ -216,8 +222,8 @@ export function readClaudeProjectSessions(
           status,
           signal,
           lastActivityAt: startedAt,
-          taskTitle: sanitizeTaskText(slug) ?? projectName,
-          taskSummary: claudeProjectTaskSummary(recentEntries, sanitizeTaskText(slug) ?? projectName),
+          taskTitle,
+          taskSummary: claudeProjectTaskSummary(recentEntries, taskTitle),
         });
       }
     }
@@ -225,9 +231,20 @@ export function readClaudeProjectSessions(
     return [];
   }
 
+  const liveProjectPaths = new Set(
+    sessions
+      .filter((session) => session.tool === 'claude_code' && aliveSessionIds.has(session.sessionId))
+      .map((session) => session.cwd),
+  );
   const best = new Map<string, SessionInfo>();
   for (const session of sessions) {
-    const key = `${session.tool ?? 'session'}:${session.cwd}`;
+    const isLiveClaudeCode = session.tool === 'claude_code' && aliveSessionIds.has(session.sessionId);
+    if (!isLiveClaudeCode && session.tool === 'claude_code' && liveProjectPaths.has(session.cwd)) {
+      continue;
+    }
+    const key = isLiveClaudeCode
+      ? `claude_code:${session.sessionId}`
+      : `${session.tool ?? 'session'}:${session.cwd}`;
     const existing = best.get(key);
     if (!existing || session.startedAt > existing.startedAt) {
       best.set(key, session);
@@ -392,6 +409,20 @@ function parseTimestampMs(raw: unknown): number | undefined {
   if (typeof raw !== 'string') return undefined;
   const parsed = Date.parse(raw);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function claudeProjectTaskTitle(
+  recentEntries: ClaudeProjectEntry[],
+  fallback?: string,
+): string | undefined {
+  for (const key of ['customTitle', 'aiTitle'] as const) {
+    for (const entry of recentEntries) {
+      const rawTitle = entry[key];
+      const title = sanitizeTaskText(typeof rawTitle === 'string' ? rawTitle : undefined);
+      if (title) return title;
+    }
+  }
+  return sanitizeTaskText(fallback);
 }
 
 function claudeProjectTaskSummary(
