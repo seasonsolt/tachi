@@ -19,6 +19,10 @@ struct Account: Identifiable, Sendable {
     let name: String
     let platform: String
     let type: String
+    let status: String
+    let errorMessage: String
+    let rateLimitedAt: String?
+    let rateLimitResetAt: String?
 
     var icon: String {
         switch platform {
@@ -34,6 +38,18 @@ struct Account: Identifiable, Sendable {
         case "antigravity": return "antigravity"
         default: return "gray"
         }
+    }
+
+    var rateLimitRemainingSeconds: Int? {
+        guard let rateLimitResetAt,
+              let resetDate = parseISODate(rateLimitResetAt)
+        else { return nil }
+        return max(0, Int(resetDate.timeIntervalSinceNow))
+    }
+
+    var isRateLimited: Bool {
+        guard let remaining = rateLimitRemainingSeconds else { return false }
+        return remaining > 0
     }
 }
 
@@ -213,7 +229,12 @@ final class APIClient: NSObject, URLSessionDelegate, @unchecked Sendable {
             return Account(
                 id: id, name: name,
                 platform: platform,
-                type: item["type"] as? String ?? "")
+                type: item["type"] as? String ?? "",
+                status: item["status"] as? String ?? "",
+                errorMessage: item["error_message"] as? String ?? "",
+                rateLimitedAt: item["rate_limited_at"] as? String,
+                rateLimitResetAt: item["rate_limit_reset_at"] as? String
+            )
         }
     }
 
@@ -417,6 +438,13 @@ func formatRemaining(_ seconds: Int) -> String {
 
 func formatResetTime(_ iso: String) -> String {
     guard !iso.isEmpty else { return "" }
+    guard let d = parseISODate(iso) else { return "" }
+    let delta = Int(d.timeIntervalSinceNow)
+    if delta <= 0 { return "resetting..." }
+    return formatRemaining(delta)
+}
+
+func parseISODate(_ iso: String) -> Date? {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     var date = formatter.date(from: iso)
@@ -429,10 +457,7 @@ func formatResetTime(_ iso: String) -> String {
         df.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
         date = df.date(from: iso)
     }
-    guard let d = date else { return "" }
-    let delta = Int(d.timeIntervalSinceNow)
-    if delta <= 0 { return "resetting..." }
-    return formatRemaining(delta)
+    return date
 }
 
 func formatTokens(_ n: Int) -> String {

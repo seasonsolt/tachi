@@ -1497,6 +1497,26 @@ struct ProviderCard: View {
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .foregroundStyle(themeColors.textMuted)
                 }
+                if cap.account.isRateLimited, let remaining = cap.account.rateLimitRemainingSeconds {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.orange)
+                        Text("RATE LIMITED")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.orange)
+                        Text("resumes in \(formatRemaining(remaining))")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(themeColors.textSecondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 7)
+                    .background(
+                        Capsule()
+                            .fill(Color.orange.opacity(0.10))
+                    )
+                }
                 capacityContent(usage)
             }
         } else {
