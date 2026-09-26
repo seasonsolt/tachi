@@ -256,31 +256,130 @@ struct DesktopPetView: View {
         return 64 + (CGFloat(taskCount) * itemHeight) + itemSpacing + footerHeight
     }
 
+    private struct TaskBubblePalette {
+        let accent: Color
+        let accentAlt: Color
+        let shellTop: Color
+        let shellBottom: Color
+        let cardTop: Color
+        let cardBottom: Color
+        let textPrimary: Color
+        let textSecondary: Color
+        let textMuted: Color
+        let glow: Color
+    }
+
+    private func toolBrandColor(for tool: CodingTool) -> Color {
+        switch tool {
+        case .claudeCode: return Color(red: 0.91, green: 0.35, blue: 0.14)
+        case .codex: return Color(red: 0.29, green: 0.73, blue: 0.47)
+        case .openCode: return Color(red: 0.38, green: 0.56, blue: 0.89)
+        }
+    }
+
+    private var taskBubblePalette: TaskBubblePalette {
+        switch vm.companionPersona {
+        case .laughingMan:
+            return TaskBubblePalette(
+                accent: Color(red: 0.06, green: 0.83, blue: 0.98),
+                accentAlt: Color(red: 0.34, green: 0.62, blue: 1.0),
+                shellTop: Color(red: 0.12, green: 0.17, blue: 0.23).opacity(0.90),
+                shellBottom: Color(red: 0.05, green: 0.09, blue: 0.15).opacity(0.84),
+                cardTop: Color(red: 0.20, green: 0.28, blue: 0.36).opacity(0.62),
+                cardBottom: Color(red: 0.10, green: 0.16, blue: 0.24).opacity(0.58),
+                textPrimary: Color.white.opacity(0.94),
+                textSecondary: Color(red: 0.67, green: 0.86, blue: 0.95),
+                textMuted: Color(red: 0.52, green: 0.71, blue: 0.82),
+                glow: Color(red: 0.05, green: 0.72, blue: 0.92).opacity(0.28)
+            )
+        case .matrixAgent:
+            return TaskBubblePalette(
+                accent: Color(red: 0.09, green: 0.98, blue: 0.40),
+                accentAlt: Color(red: 0.32, green: 1.0, blue: 0.62),
+                shellTop: Color(red: 0.03, green: 0.10, blue: 0.06).opacity(0.90),
+                shellBottom: Color(red: 0.01, green: 0.05, blue: 0.03).opacity(0.88),
+                cardTop: Color(red: 0.08, green: 0.18, blue: 0.10).opacity(0.62),
+                cardBottom: Color(red: 0.03, green: 0.12, blue: 0.06).opacity(0.58),
+                textPrimary: Color(red: 0.90, green: 1.0, blue: 0.92),
+                textSecondary: Color(red: 0.66, green: 0.96, blue: 0.72),
+                textMuted: Color(red: 0.42, green: 0.76, blue: 0.52),
+                glow: Color(red: 0.08, green: 0.76, blue: 0.28).opacity(0.26)
+            )
+        case .amberEye:
+            return TaskBubblePalette(
+                accent: Color(red: 0.95, green: 0.63, blue: 0.26),
+                accentAlt: Color(red: 0.88, green: 0.34, blue: 0.24),
+                shellTop: Color(red: 0.22, green: 0.16, blue: 0.11).opacity(0.90),
+                shellBottom: Color(red: 0.14, green: 0.09, blue: 0.06).opacity(0.86),
+                cardTop: Color(red: 0.30, green: 0.20, blue: 0.14).opacity(0.62),
+                cardBottom: Color(red: 0.20, green: 0.13, blue: 0.09).opacity(0.58),
+                textPrimary: Color(red: 0.98, green: 0.93, blue: 0.86),
+                textSecondary: Color(red: 0.90, green: 0.78, blue: 0.64),
+                textMuted: Color(red: 0.76, green: 0.61, blue: 0.48),
+                glow: Color(red: 0.87, green: 0.48, blue: 0.18).opacity(0.24)
+            )
+        case .voidMonolith:
+            return TaskBubblePalette(
+                accent: Color.white.opacity(0.92),
+                accentAlt: Color(red: 0.58, green: 0.71, blue: 0.86),
+                shellTop: Color(red: 0.12, green: 0.12, blue: 0.14).opacity(0.90),
+                shellBottom: Color(red: 0.05, green: 0.06, blue: 0.08).opacity(0.88),
+                cardTop: Color(red: 0.22, green: 0.24, blue: 0.27).opacity(0.56),
+                cardBottom: Color(red: 0.11, green: 0.13, blue: 0.17).opacity(0.52),
+                textPrimary: Color.white.opacity(0.94),
+                textSecondary: Color(red: 0.80, green: 0.84, blue: 0.90),
+                textMuted: Color(red: 0.62, green: 0.68, blue: 0.76),
+                glow: Color(red: 0.48, green: 0.58, blue: 0.74).opacity(0.20)
+            )
+        case .defaultOrb:
+            let panel = vm.panelThemeColors
+            return TaskBubblePalette(
+                accent: panel.accent,
+                accentAlt: panel.accentEdge,
+                shellTop: panel.cardBg.opacity(0.90),
+                shellBottom: panel.bg.opacity(0.84),
+                cardTop: panel.cardBg.opacity(0.56),
+                cardBottom: panel.bg.opacity(0.52),
+                textPrimary: panel.textPrimary,
+                textSecondary: panel.textSecondary,
+                textMuted: panel.textMuted,
+                glow: panel.accent.opacity(0.22)
+            )
+        }
+    }
+
     private var taskBubble: some View {
-        let panelColors = vm.panelThemeColors
+        let palette = taskBubblePalette
         let fillTint = LinearGradient(
             colors: [
-                panelColors.accent.opacity(0.20),
-                panelColors.accentEdge.opacity(0.14),
-                panelColors.bg.opacity(0.28)
+                palette.shellTop,
+                palette.shellBottom
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
         let sheen = LinearGradient(
             colors: [
-                Color.white.opacity(0.28),
-                Color.white.opacity(0.06),
+                Color.white.opacity(0.18),
+                palette.accentAlt.opacity(0.12),
                 Color.clear
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        let cardGradient = LinearGradient(
+            colors: [
+                palette.cardTop,
+                palette.cardBottom
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
         let strokeGradient = LinearGradient(
             colors: [
-                Color.white.opacity(0.38),
-                panelColors.accent.opacity(0.48),
-                panelColors.accentEdge.opacity(0.32)
+                Color.white.opacity(0.24),
+                palette.accent.opacity(0.58),
+                palette.accentAlt.opacity(0.44)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -289,15 +388,21 @@ struct DesktopPetView: View {
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
                 Circle()
-                    .fill(panelColors.accent)
+                    .fill(
+                        LinearGradient(
+                            colors: [palette.accent, palette.accentAlt],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: 10, height: 10)
                 Text(vm.companionTaskHeader)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(panelColors.textPrimary)
+                    .foregroundStyle(palette.textPrimary)
                 Spacer()
                 CompanionPersonaMenu(
                     vm: vm,
-                    accent: panelColors.accent
+                    accent: palette.accent
                 )
             }
 
@@ -314,27 +419,47 @@ struct DesktopPetView: View {
                                     .padding(.vertical, 3)
                                     .background(
                                         Capsule()
-                                            .fill(panelColors.accent.opacity(0.12))
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [
+                                                        palette.accent.opacity(0.18),
+                                                        palette.accentAlt.opacity(0.10)
+                                                    ],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
                                     )
-                                    .foregroundStyle(panelColors.accent)
+                                    .foregroundStyle(palette.accent)
                             }
 
-                            Text(vm.companionTaskLine(for: session))
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundStyle(panelColors.textPrimary)
-                                .lineLimit(2)
+                            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                                Image(systemName: session.tool.icon)
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(toolBrandColor(for: session.tool))
+                                Text(vm.companionTaskLine(for: session))
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(palette.textPrimary)
+                                    .lineLimit(2)
+                            }
 
                             HStack(spacing: 6) {
                                 Text(vm.companionTaskMeta(for: session))
                                     .font(.system(size: 9, weight: .medium, design: .rounded))
-                                    .foregroundStyle(panelColors.textSecondary)
+                                    .foregroundStyle(palette.textSecondary)
                                     .lineLimit(1)
 
                                 Spacer(minLength: 0)
 
                                 Image(systemName: "arrow.up.forward")
                                     .font(.system(size: 9, weight: .semibold))
-                                    .foregroundStyle(panelColors.accent.opacity(0.9))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [palette.accent, palette.accentAlt],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -345,10 +470,10 @@ struct DesktopPetView: View {
                     .padding(.vertical, 7)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.ultraThinMaterial)
+                            .fill(cardGradient)
                             .overlay {
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(fillTint.opacity(0.42))
+                                    .fill(sheen.opacity(0.35))
                             }
                             .overlay {
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -362,7 +487,7 @@ struct DesktopPetView: View {
             if let footer = vm.companionTaskFooter {
                 Text(footer)
                     .font(.system(size: 9, weight: .medium, design: .rounded))
-                    .foregroundStyle(panelColors.textMuted)
+                    .foregroundStyle(palette.textMuted)
                     .lineLimit(1)
             }
         }
@@ -373,27 +498,51 @@ struct DesktopPetView: View {
         .background(
             ZStack(alignment: .bottomLeading) {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(fillTint)
-                    }
+                    .fill(fillTint)
                     .overlay {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .fill(sheen)
                     }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        palette.accent.opacity(0.18),
+                                        .clear
+                                    ],
+                                    center: .topLeading,
+                                    startRadius: 18,
+                                    endRadius: 220
+                                )
+                            )
+                    }
                     .padding(.bottom, 14)
 
                 BubbleTail()
-                    .fill(.ultraThinMaterial)
+                    .fill(fillTint)
                     .overlay {
                         BubbleTail()
-                            .fill(fillTint)
+                            .fill(sheen)
                     }
                     .frame(width: 20, height: 18)
                     .offset(x: 40, y: 2)
             }
         )
+        .overlay(alignment: .topLeading) {
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [palette.accent.opacity(0.85), palette.accentAlt.opacity(0.35)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: 132, height: 2)
+                .padding(.top, 10)
+                .padding(.leading, 16)
+                .blendMode(.screen)
+        }
         .overlay(
             ZStack(alignment: .bottomLeading) {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -406,7 +555,7 @@ struct DesktopPetView: View {
                     .offset(x: 40, y: 2)
             }
         )
-        .shadow(color: panelColors.accent.opacity(0.14), radius: 24, y: 10)
+        .shadow(color: palette.glow, radius: 24, y: 10)
         .shadow(color: .black.opacity(0.10), radius: 12, y: 6)
         .fixedSize(horizontal: false, vertical: true)
     }
